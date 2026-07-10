@@ -807,21 +807,14 @@ Helper:
 function recalc(row, activeTttKeys=[]) {
   const isFlat     = row.kelompok === 'flat';
   const isMd       = row.tipe_project === 'md';
-  const hKerja     = parseInt(row.h_kerja) || 0; 
   const gajiPokok  = parseFloat(row.gaji_pokok)    || 0;
   const tunjTetap  = parseFloat(row.tunj_tetap)    || 0;
   const tunjJabatan = parseFloat(row.tunj_jabatan) || 0;
   const upahPenuh  = gajiPokok + tunjTetap + tunjJabatan;
   const kompPwt = Math.round(upahPenuh / 12);
-  const comDay    = isMd ? (parseFloat(row.com_day)        || 0) * hKerja : (parseFloat(row.com_day)    || 0);
-  const tunjMakan = isMd ? (parseFloat(row.tunj_makan)     || 0) * hKerja : (parseFloat(row.tunj_makan) || 0);
-  const tunjKehadiran = isMd ? (parseFloat(row.tunj_kehadiran) || 0) * hKerja : (parseFloat(row.tunj_kehadiran) || 0);
-  const tttPerHari = parseFloat(row.ttt_perhari) || 0;
   const insentif          = parseFloat(row.insentif)           || 0;
-  const tunjProd          = parseFloat(row.tunj_produksi)      || 0;
   const tunjLap           = parseFloat(row.tunj_lapangan)      || 0;
   const tunjPulsa         = parseFloat(row.tunj_pulsa)         || 0;
-  const kompensasiKontrak = parseFloat(row.kompensasi_kontrak) || 0;
   const uangHadir         = parseFloat(row.uang_hadir)         || 0;
   const lSabtu      = parseInt(row.l_sabtu)      || 0;
   const lLibur      = parseInt(row.l_libur)      || 0;
@@ -845,10 +838,7 @@ function recalc(row, activeTttKeys=[]) {
     : isFlat
       ? (isKhawistaFlat && isPiling ? upahLemburPilingFlat : totalFlat)
       : Math.round(nilaiPerJam * jmlJamLembur);
-  const customSum = Object.entries(row)
-  .filter(([k]) => k.startsWith('custom_'))
-  .reduce((s, [, v]) => s + (parseFloat(v) || 0), 0);
-  const DEFAULT_TTT_KEYS = ['com_day','insentif','tunj_makan','tunj_produksi','tunj_lapangan','tunj_kehadiran','tunj_pulsa','kompensasi_kontrak'];
+  const DEFAULT_TTT_KEYS =['com_day','insentif','tunj_makan','tunj_produksi','tunj_lapangan','tunj_kehadiran','tunj_pulsa','kompensasi_kontrak'];
   const activeTttSum = DEFAULT_TTT_KEYS
     .filter(k => activeTttKeys.includes(k))
     .reduce((s, k) => s + (parseFloat(row[k]) || 0), 0);

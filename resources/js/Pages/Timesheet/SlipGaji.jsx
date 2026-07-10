@@ -84,7 +84,6 @@ function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
   const gajiPokok  = num(slip.gaji_pokok);
   const tunjTetap  = num(slip.tunj_tetap);
   const kompPwt    = num(slip.kompensasi_pwt);
-  const upahPenuh  = gajiPokok + tunjTetap;
   const upahLembur = num(slip.upah_lembur);
   const gajiKotor  = num(slip.gaji_kotor);
   const pctJht     = slip.pct_jht     ?? 2;

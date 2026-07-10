@@ -474,7 +474,6 @@ export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters
   const activeCols    = view === 'operator' ? activeOpCols : activeVehicleCols;
   const applyColsFn   = view === 'operator' ? applyOpCols  : applyVehicleCols;
   const colDefs       = view === 'operator' ? OPERATOR_COLS : VEHICLE_COLS;
-  const defaultCols   = view === 'operator' ? DEFAULT_OPERATOR_COLS : DEFAULT_VEHICLE_COLS;
 
   // ── DUAL SCROLLBAR REFS ──
   const topScrollRef  = useRef(null);
@@ -499,8 +498,8 @@ export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters
   // lebar konten tabel sesuai tab aktif
   const tableWidth = view === 'operator' ? 2840 : 4100;
 
-    function doFilter(s, t, st, v) {
-        router.get('/equipment', {search:s,type:t,status:st,view:v||view}, {preserveState:true,replace:true});
+    function doFilter(searchVal, typeVal, statusVal, viewVal) {
+        router.get('/equipment', {search:searchVal,type:typeVal,status:statusVal,view:viewVal||view}, {preserveState:true,replace:true});
     }
 
   function handleSaveEquipment(form) {
@@ -521,7 +520,7 @@ export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters
 
   const data     = equipment.data      || [];
   const total    = equipment.total     || 0;
-  const s        = equipment.stats     || {};
+  const stats    = equipment.stats     || {};
   const typeList = equipment.type_list || [];
   const prevUrl  = equipment.prev_page_url;
   const nextUrl  = equipment.next_page_url;
@@ -675,12 +674,12 @@ return (
       {/* ── STATS ── */}
       <div className="stat-grid-6" style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:12, marginBottom:20 }}>
         {[
-          {l:'Total Unit',       v:s.total||0,                c:'var(--blue)',   href:'/equipment'},
-          {l:'Aktif',            v:s.aktif||0,                c:'var(--green)',  href:'/equipment?status=AKTIF'},
-          {l:'No Comply',        v:s.no_comply||0,            c:'var(--red)',    href:'/equipment?status=NO COMPLY'},
-          {l:'STNK Expired',     v:s.stnk_expired||0,         c:'var(--red)',    href:'/equipment'},
-          {l:'KIR Expired',      v:s.kir_expired||0,          c:'var(--accent)', href:'/equipment'},
-          {l:'Vehicle Pass Exp', v:s.vehicle_pass_expired||0, c:'var(--accent)', href:'/equipment'},
+          {l:'Total Unit',       v:stats.total||0,                c:'var(--blue)',   href:'/equipment'},
+          {l:'Aktif',            v:stats.aktif||0,                c:'var(--green)',  href:'/equipment?status=AKTIF'},
+          {l:'No Comply',        v:stats.no_comply||0,            c:'var(--red)',    href:'/equipment?status=NO COMPLY'},
+          {l:'STNK Expired',     v:stats.stnk_expired||0,         c:'var(--red)',    href:'/equipment'},
+          {l:'KIR Expired',      v:stats.kir_expired||0,          c:'var(--accent)', href:'/equipment'},
+          {l:'Vehicle Pass Exp', v:stats.vehicle_pass_expired||0, c:'var(--accent)', href:'/equipment'},
         ].map((st,i)=>(
           <div key={i} className="stat" onClick={()=>router.visit(st.href)}
             style={{cursor:'pointer',textAlign:'center',padding:'14px 10px'}}>

@@ -45,9 +45,9 @@ const DEFAULT_COLS = ['sim','sio_k3','mcu','kp','badge'];
 
 // ── COLUMN PICKER MODAL ──
 function ColPickerModal({ selected, onClose, onApply }) {
-  const [sel, setSel] = useState([...selected]);
+  const [selectedCols, setSelectedCols] = useState([...selected]);
   function toggle(key) {
-    setSel(prev => prev.includes(key) ? prev.filter(k=>k!==key) : [...prev, key]);
+    setSelectedCols(prev => prev.includes(key) ? prev.filter(k=>k!==key) : [...prev, key]);
   }
   return (
     <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
@@ -66,10 +66,10 @@ function ColPickerModal({ selected, onClose, onApply }) {
             {OPTIONAL_COLS.filter(c=>!c.key.startsWith('doc_')&&!['tgl_masuk','agama','alamat'].includes(c.key)).map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
                 style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',
-                  background:sel.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
-                  color:sel.includes(col.key)?'var(--accent)':'var(--muted2)',
-                  border:`1px solid ${sel.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
-                {sel.includes(col.key)?'✓ ':''}{col.label}
+                  background:selectedCols.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
+                  color:selectedCols.includes(col.key)?'var(--accent)':'var(--muted2)',
+                  border:`1px solid ${selectedCols.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
+                {selectedCols.includes(col.key)?'✓ ':''}{col.label}
               </div>
             ))}
           </div>
@@ -78,10 +78,10 @@ function ColPickerModal({ selected, onClose, onApply }) {
             {OPTIONAL_COLS.filter(c=>['tgl_masuk','agama','alamat'].includes(c.key)).map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
                 style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',
-                  background:sel.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
-                  color:sel.includes(col.key)?'var(--accent)':'var(--muted2)',
-                  border:`1px solid ${sel.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
-                {sel.includes(col.key)?'✓ ':''}{col.label}
+                  background:selectedCols.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
+                  color:selectedCols.includes(col.key)?'var(--accent)':'var(--muted2)',
+                  border:`1px solid ${selectedCols.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
+                {selectedCols.includes(col.key)?'✓ ':''}{col.label}
               </div>
             ))}
           </div>
@@ -91,16 +91,16 @@ function ColPickerModal({ selected, onClose, onApply }) {
             {DOC_TIPES.map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
                 style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',
-                  background:sel.includes(col.key)?'rgba(34,201,122,.12)':'var(--bg3)',
-                  color:sel.includes(col.key)?'#22C97A':'var(--muted2)',
-                  border:`1px solid ${sel.includes(col.key)?'#22C97A':'var(--border)'}`}}>
-                {sel.includes(col.key)?'✓ ':''}{col.label}
+                  background:selectedCols.includes(col.key)?'rgba(34,201,122,.12)':'var(--bg3)',
+                  color:selectedCols.includes(col.key)?'#22C97A':'var(--muted2)',
+                  border:`1px solid ${selectedCols.includes(col.key)?'#22C97A':'var(--border)'}`}}>
+                {selectedCols.includes(col.key)?'✓ ':''}{col.label}
               </div>
             ))}
           </div>
         </div>
         <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)',position:'sticky',bottom:0,background:'var(--bg2)'}}>
-          <button type="button" onClick={()=>setSel(DEFAULT_COLS)}
+          <button type="button" onClick={()=>setSelectedCols(DEFAULT_COLS)}
             style={{padding:'8px 16px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
             Reset Default
           </button>
@@ -108,7 +108,7 @@ function ColPickerModal({ selected, onClose, onApply }) {
             style={{padding:'8px 16px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
             Batal
           </button>
-          <button type="button" onClick={()=>{ onApply(sel); onClose(); }}
+          <button type="button" onClick={()=>{ onApply(selectedCols); onClose(); }}
             style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
             ✓ Terapkan
           </button>

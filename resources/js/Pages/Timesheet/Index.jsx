@@ -301,7 +301,7 @@ function EditableCell({ employeeId, tahun, bulan, hari, value, isSunday, isHolid
         }
     }
 
-    const cs = getCellStyle(val, isSunday, isHoliday, holidayTipe, isDark);
+    const cellStyle = getCellStyle(val, isSunday, isHoliday, holidayTipe, isDark);
     const borderColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.1)';
 
     return (
@@ -311,7 +311,7 @@ function EditableCell({ employeeId, tahun, bulan, hari, value, isSunday, isHolid
             cursor: isViewer ? 'default' : 'pointer',
             borderRight: `1px solid ${borderColor}`,
             borderBottom: `1px solid ${borderColor}`,
-            ...cs,
+            ...cellStyle,
         }}>
             {editing ? (
                 <input ref={inputRef} defaultValue={val}
@@ -684,7 +684,6 @@ function EditAnggotaModal({ member, onClose, projectKode }) {
     );
 }
 
-// ── TAB KELOLA ANGGOTA ────────────────────────────────────────
 // ── TAB KELOLA ANGGOTA (dengan drag-drop + grouping per jam/flat) ─
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -1137,8 +1136,8 @@ export default function TimesheetPage({
         setLocalDays(prev => ({...prev, [empId]: {...prev[empId], [hari]: nilai}}));
     }
 
-    function navigate(t, b, s) {
-        router.get('/timesheet', {tahun:t, bulan:b, search:s}, {preserveState:true, replace:true});
+    function navigate(newTahun, newBulan, newSearch) {
+        router.get('/timesheet', {tahun:newTahun, bulan:newBulan, search:newSearch}, {preserveState:true, replace:true});
     }
 
     const tahunList = [];

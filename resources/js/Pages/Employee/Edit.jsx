@@ -339,7 +339,7 @@ function HistoryKeluarSection({ employeeId }) {
 
 // ── MAIN COMPONENT ──
 export default function EmployeeEdit({ employee, positions = [] }) {
-  const { data, setData, put, processing, errors, isDirty } = useForm({
+  const { data, setData, put, processing, isDirty } = useForm({
     id_badge:             employee.id_badge             || '',
     nama_lengkap:         employee.nama_lengkap         || '',
     nama_ibu:             employee.nama_ibu             || '',
