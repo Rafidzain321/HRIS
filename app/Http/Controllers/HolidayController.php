@@ -3,16 +3,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Holiday;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class HolidayController extends Controller
 {
-    public function index()
-    {
-        // Pengaturan sekarang hanya placeholder — hari libur dikelola dari tab di Timesheet
-        return Inertia::render('Pengaturan/Index');
-    }
-
     public function store(Request $request)
     {
         $data = $request->validate([

@@ -120,7 +120,6 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/employees/sp/{sp}', [EmployeeSpController::class, 'destroySp']);
     Route::get('/employees/{id}/history', [EmployeeSpController::class, 'getHistory']);
 
-    Route::get('/pengaturan', [HolidayController::class, 'index'])->name('pengaturan');
     Route::post('/pengaturan/holidays', [HolidayController::class, 'store'])->name('holidays.store');
     Route::delete('/pengaturan/holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
 
@@ -129,6 +128,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pengaturan/users', [UserManagementController::class, 'store']);
     Route::put('/pengaturan/users/{user}', [UserManagementController::class, 'update']);
     Route::post('/pengaturan/users/{user}/toggle', [UserManagementController::class, 'toggleActive']);
+    Route::post('/pengaturan/users/{user}/reset-password', [UserManagementController::class, 'resetPassword']);
+    Route::post('/pengaturan/change-password', [UserManagementController::class, 'changePassword']);
     Route::post('/logout', [UserManagementController::class, 'logout'])->name('logout');
 
     Route::get('/employees/{employee}/documents', [EmployeeDocumentController::class, 'index']);

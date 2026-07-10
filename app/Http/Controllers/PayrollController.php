@@ -637,6 +637,11 @@ class PayrollController extends Controller
         $emp   = Employee::with(['position', 'project'])->findOrFail($employeeId);
         $isMd  = $emp->project?->tipe_gaji === 'md';
 
+        $payroll = EmployeePayroll::firstOrNew([
+            'employee_id' => $employeeId,
+            'tahun'       => $tahun,
+            'bulan'       => $bulan,
+        ]);
 
         if ($isMd) {
             $tsData = $this->getTimesheetData($emp->id, $tahun, $bulan);
@@ -751,12 +756,6 @@ class PayrollController extends Controller
                 'tunj_pulsa'            => $data['tunj_pulsa']     ?? 0,
             ]);
         }
-
-        $payroll = EmployeePayroll::firstOrNew([
-            'employee_id' => $employeeId,
-            'tahun'       => $tahun,
-            'bulan'       => $bulan,
-        ]);
 
         $updateData = array_merge($slip, [
             'tunj_kehadiran' => $data['tunj_kehadiran'] ?? 0,
