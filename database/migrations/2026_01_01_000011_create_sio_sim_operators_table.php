@@ -1,0 +1,20 @@
+w<?php
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('sio_sim_operators', function (Blueprint $table) {
+            $table->id();
+            $table->integer('no')->nullable();
+            $table->string('nama', 200);
+            $table->date('license_expired')->nullable();
+            $table->date('kp_expired')->nullable();
+            $table->date('sio_expired')->nullable();
+            $table->string('keterangan', 255)->nullable();
+            $table->timestamps();
+        });
+    }
+    public function down(): void { Schema::dropIfExists('sio_sim_operators'); }
+};

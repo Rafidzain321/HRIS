@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(php artisan tinker --execute=\"App\\\\Models\\\\Project::all\\(['id','kode','nama','warna']\\)->each\\(function\\(\\\\$p\\){ echo \\\\$p->id.' | '.\\\\$p->kode.' | '.\\\\$p->nama.' | '.\\\\$p->warna.PHP_EOL; }\\);\")"
+    ]
+  }
+}
