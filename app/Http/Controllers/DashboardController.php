@@ -2,12 +2,9 @@
 namespace App\Http\Controllers;
 
 // DashboardController.php
-use App\Models\Payroll;
-use App\Models\Project;
 use App\Models\Employee;
 use Carbon\Carbon;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -30,7 +27,6 @@ class DashboardController extends Controller
             }
             $activeProjectId = session('active_project_kode');
         } else {
-            $user = auth()->user();
             if ($request->has('project')) {
                 $kode = $request->get('project');
                 $proj = \App\Models\Project::where('kode', $kode)->first();

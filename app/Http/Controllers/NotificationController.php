@@ -2,9 +2,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
-use App\Models\Equipment;
-use App\Models\EquipmentOperator;
-use App\Models\SioSimOperator;
 use Carbon\Carbon;
 use Inertia\Inertia;
 

@@ -12,6 +12,9 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 
 class PayrollExportController extends Controller
@@ -27,7 +30,6 @@ class PayrollExportController extends Controller
     const C_BPJS       = 'FFFFFF';
     const C_ALPA       = 'FFFFFF';
     const C_BERSIH     = 'FFFFFF';
-    const C_ABSEN      = 'FFFFFF';
     const C_HDR_TXT    = '000000';
     const C_TS_SUN     = 'FEE2E2';
     const C_TS_SAT     = 'EEF2FF';
@@ -113,7 +115,6 @@ class PayrollExportController extends Controller
 
         $hasSubGroup     = $rows && collect($rows)->pluck('sub_group')->filter()->isNotEmpty();
         $hasPotOksigen   = collect($rows)->sum('pot_tabung_oksigen') > 0;
-        $hasKeteranganMd = $isMd;
 
         // ── Susun kolom (urutan persis seperti contoh Excel) ──
         // Format kolom: [label, width, warna, grup, sub-grup]
@@ -179,9 +180,8 @@ class PayrollExportController extends Controller
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('DATA GAJI');
 
-        $colKeys  = array_keys($cols);
-        $totalCol = count($colKeys);
-        $lastColLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($totalCol);
+        $totalCol = count($cols);
+        $lastColLetter = Coordinate::stringFromColumnIndex($totalCol);
 
         // Judul
         $sheet->mergeCells("A1:{$lastColLetter}1");
@@ -213,30 +213,29 @@ class PayrollExportController extends Controller
         // ── Header 3 tingkat (baris 5 = grup, 6 = sub-grup, 7 = detail) ──
         $rGroup = 5; $rSub = 6; $rDetail = 7;
         $colList = array_values($cols);
-        $keyList = array_keys($cols);
         $n = count($colList);
 
         // set lebar kolom + isi baris detail (tingkat-3)
         for ($i = 0; $i < $n; $i++) {
-            [$label, $width, $bg, $group, $sub] = $colList[$i];
-            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i + 1);
-            $sheet->getColumnDimension($colLetter)->setWidth($width);
-            $this->hdr($sheet, $colLetter . $rDetail, $label, $bg);
+            [$label, $width, $bg] = $colList[$i];
+            $colL = Coordinate::stringFromColumnIndex($i + 1);
+            $sheet->getColumnDimension($colL)->setWidth($width);
+            $this->hdr($sheet, $colL . $rDetail, $label, $bg);
         }
 
         // Merge & isi grup (tingkat-1) dan sub-grup (tingkat-2)
         $i = 0;
         while ($i < $n) {
-            [$label, $width, $bg, $group, $sub] = $colList[$i];
-            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i + 1);
+            [$label, $width, $bg, $group] = $colList[$i];
+            $colL = Coordinate::stringFromColumnIndex($i + 1);
 
             if ($group === null) {
                 // Kolom identitas → merge vertikal penuh (baris 5-7)
-                $sheet->mergeCells("{$colLetter}{$rGroup}:{$colLetter}{$rDetail}");
+                $sheet->mergeCells("{$colL}{$rGroup}:{$colL}{$rDetail}");
                 // pindahkan label detail ke sel merge teratas
-                $sheet->setCellValue("{$colLetter}{$rGroup}", $label);
-                $sheet->setCellValue("{$colLetter}{$rDetail}", null);
-                $this->hdr($sheet, "{$colLetter}{$rGroup}", $label, $bg);
+                $sheet->setCellValue("{$colL}{$rGroup}", $label);
+                $sheet->setCellValue("{$colL}{$rDetail}", null);
+                $this->hdr($sheet, "{$colL}{$rGroup}", $label, $bg);
                 $i++;
                 continue;
             }
@@ -244,8 +243,8 @@ class PayrollExportController extends Controller
             // Cari rentang kolom yang punya grup sama (berturut-turut)
             $j = $i;
             while ($j < $n && $colList[$j][3] === $group) $j++;
-            $startL = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i + 1);
-            $endL   = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($j);
+            $startL = Coordinate::stringFromColumnIndex($i + 1);
+            $endL   = Coordinate::stringFromColumnIndex($j);
             // merge baris grup (tingkat-1) sepanjang rentang
             if ($startL === $endL) $sheet->mergeCells("{$startL}{$rGroup}:{$startL}{$rGroup}");
             else $sheet->mergeCells("{$startL}{$rGroup}:{$endL}{$rGroup}");
@@ -258,12 +257,12 @@ class PayrollExportController extends Controller
                 $subColor = $colList[$k][2];
                 $m = $k;
                 while ($m < $j && $colList[$m][4] === $subName) $m++;
-                $sL = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($k + 1);
-                $eL = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($m);
+                $sL = Coordinate::stringFromColumnIndex($k + 1);
+                $eL = Coordinate::stringFromColumnIndex($m);
                 if ($subName === null) {
                     // tidak ada sub-grup → merge vertikal baris 6-7 (sub + detail)
                     for ($x = $k; $x < $m; $x++) {
-                        $xL = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($x + 1);
+                        $xL = Coordinate::stringFromColumnIndex($x + 1);
                         $sheet->mergeCells("{$xL}{$rSub}:{$xL}{$rDetail}");
                         // label detail sudah diisi, pindahkan ke sel merge
                         $lbl = $colList[$x][0];
@@ -309,7 +308,7 @@ class PayrollExportController extends Controller
         $colLetter = [];
         $ci = 1;
         foreach ($cols as $key => $meta) {
-            $colLetter[$key] = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($ci);
+            $colLetter[$key] = Coordinate::stringFromColumnIndex($ci);
             $ci++;
         }
 
@@ -347,10 +346,7 @@ class PayrollExportController extends Controller
             $refGajiK = $L('gaji_kotor', $r);
             $refInsen = $L('insentif', $r);
             $refTLap  = $L('tunj_lapangan', $r);
-            $refTMkn  = $L('tunj_makan', $r);
-            $refTKhd  = $L('tunj_kehadiran', $r);
             $refTPls  = $L('tunj_pulsa', $r);
-            $refCDay  = $L('com_day', $r);
             $refStb   = $L('stb', $r);
 
             // Range TTT untuk SUM (dari kolom pertama TTT sampai kolom terakhir TTT)
@@ -406,8 +402,8 @@ class PayrollExportController extends Controller
 
             // ── Isi setiap sel ──
             $c = 1;
-            foreach ($cols as $key => [$label, $width, $bg]) {
-                $colL   = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
+            foreach ($cols as $key => [, , $bg]) {
+                $colL   = Coordinate::stringFromColumnIndex($c);
                 $cellRef = $colL . $r;
                 $isMoney = in_array($key, $moneyCols, true);
                 $align   = $key === 'no' ? Alignment::HORIZONTAL_CENTER
@@ -463,7 +459,7 @@ class PayrollExportController extends Controller
         $totalRow = $lastRow + 1;
         if (count($rows) > 0) {
             $gajiPokokIdx = array_search('gaji_pokok', array_keys($cols), true);
-            $mergeEndCol  = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $gajiPokokIdx));
+            $mergeEndCol  = Coordinate::stringFromColumnIndex(max(1, $gajiPokokIdx));
             $sheet->mergeCells("A{$totalRow}:{$mergeEndCol}{$totalRow}");
             $sheet->setCellValue("A{$totalRow}", 'TOTAL');
             $sheet->getStyle("A{$totalRow}")->applyFromArray([
@@ -473,8 +469,8 @@ class PayrollExportController extends Controller
             ]);
 
             $c = 1;
-            foreach ($cols as $key => [$label, $width, $bg]) {
-                $colL    = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
+            foreach (array_keys($cols) as $key) {
+                $colL    = Coordinate::stringFromColumnIndex($c);
                 $cellRef = $colL . $r;
                 if (in_array($key, $moneyCols, true)) {
                     $cellRef = $colL . $totalRow;
@@ -529,7 +525,7 @@ class PayrollExportController extends Controller
 
         // Auto-fit lebar kolom berdasarkan konten
         for ($i = 1; $i <= $n; $i++) {
-            $colL = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i);
+            $colL = Coordinate::stringFromColumnIndex($i);
             $sheet->getColumnDimension($colL)->setAutoSize(true);
         }
 
@@ -589,7 +585,7 @@ class PayrollExportController extends Controller
         $holidays    = Holiday::inMonth($tahun, $bulan)->get()->keyBy(fn($h) => (int) $h->tanggal->format('j'));
 
         // ── Judul ──
-        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(4 + $daysInMonth + 5);
+        $lastCol = Coordinate::stringFromColumnIndex(4 + $daysInMonth + 5);
         $sheet->mergeCells("A1:{$lastCol}1");
         $sheet->setCellValue('A1', 'TIMESHEET ' . strtoupper($namaBulan) . " {$tahun} — PROJECT " . strtoupper($namaProj));
         $sheet->getStyle('A1')->applyFromArray([
@@ -627,7 +623,7 @@ class PayrollExportController extends Controller
         $hariNama = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
         for ($d = 1; $d <= $daysInMonth; $d++) {
             $colIdx = 4 + $d; // E = 5
-            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx);
+            $col = Coordinate::stringFromColumnIndex($colIdx);
             $date = Carbon::create($tahun, $bulan, $d);
             $isSun = $date->isSunday();
             $isSat = $date->isSaturday();
@@ -655,7 +651,7 @@ class PayrollExportController extends Controller
         $summaryLabels = ['Total Jam', 'Izin', 'Sakit', 'Alpa', 'Cuti'];
         $sumStartIdx   = 4 + $daysInMonth + 1;
         foreach ($summaryLabels as $i => $label) {
-            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($sumStartIdx + $i);
+            $col = Coordinate::stringFromColumnIndex($sumStartIdx + $i);
             $sheet->setCellValue("{$col}{$rHari}", $label);
             $sheet->mergeCells("{$col}{$rHari}:{$col}{$rTgl}");
             $sheet->getStyle("{$col}{$rHari}")->applyFromArray([
@@ -673,6 +669,14 @@ class PayrollExportController extends Controller
         // ── Data rows ──
         $tsMap = []; // ['badge' => ['range' => 'E5:AI5', 'total_jam' => 'AJ5', 'izin' => 'AK5', ...]]
         $startDataRow = $rTgl + 1;
+
+        // Ambil semua data timesheet bulan ini sekaligus (hindari query per-baris di dalam loop)
+        $employeeIds = collect($rows)->pluck('employee_id')->filter()->unique()->values()->all();
+        $timesheetsByEmployee = empty($employeeIds) ? collect() : Timesheet::whereIn('employee_id', $employeeIds)
+            ->where('tahun', $tahun)
+            ->where('bulan', $bulan)
+            ->get()
+            ->groupBy('employee_id');
 
         foreach ($rows as $idx => $row) {
             $r = $startDataRow + $idx;
@@ -692,17 +696,15 @@ class PayrollExportController extends Controller
                 ]);
             }
 
-            // Ambil data timesheet dari DB
-            $tsData = $empId ? Timesheet::where([
-                'employee_id' => $empId,
-                'tahun'       => $tahun,
-                'bulan'       => $bulan,
-            ])->pluck('nilai', 'hari')->toArray() : [];
+            // Ambil data timesheet dari peta yang sudah di-load di awal (bukan query per-baris)
+            $tsData = $empId && isset($timesheetsByEmployee[$empId])
+                ? $timesheetsByEmployee[$empId]->pluck('nilai', 'hari')->toArray()
+                : [];
 
             // Isi sel per hari
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $colIdx = 4 + $d;
-                $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx);
+                $col = Coordinate::stringFromColumnIndex($colIdx);
                 $val = $tsData[$d] ?? null;
                 $date = Carbon::create($tahun, $bulan, $d);
                 $isSun = $date->isSunday();
@@ -744,13 +746,13 @@ class PayrollExportController extends Controller
             }
 
             // Kolom summary — pakai formula
-            $firstDayCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(5);
-            $lastDayCol  = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(4 + $daysInMonth);
+            $firstDayCol = Coordinate::stringFromColumnIndex(5);
+            $lastDayCol  = Coordinate::stringFromColumnIndex(4 + $daysInMonth);
             $range = "{$firstDayCol}{$r}:{$lastDayCol}{$r}";
 
             $summaryCols = [];
             foreach ($summaryLabels as $i => $label) {
-                $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($sumStartIdx + $i);
+                $col = Coordinate::stringFromColumnIndex($sumStartIdx + $i);
                 $summaryCols[$label] = "{$col}{$r}";
                 if ($label === 'Total Jam') {
                     $sheet->setCellValue("{$col}{$r}", "=SUM({$range})");
@@ -818,7 +820,7 @@ class PayrollExportController extends Controller
         // Helper: buat formula INDEX — pakai referensi ke sel spinner
         $idx = function (string $key) use ($colLetter, $dgRange, &$spinnerRow) {
             if (!isset($colLetter[$key])) return '""';
-            $targetColIdx = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($colLetter[$key]);
+            $targetColIdx = Coordinate::columnIndexFromString($colLetter[$key]);
             return "=IFERROR(INDEX({$dgRange},\$B\${$spinnerRow},{$targetColIdx}),\"\")";
         };
 
@@ -844,7 +846,7 @@ class PayrollExportController extends Controller
         $sheet->mergeCells("A{$rLogo}:A" . ($rLogo + 2));
         $logoPath = public_path('logo-akm.png');
         if (file_exists($logoPath)) {
-            $drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
+            $drawing = new Drawing();
             $drawing->setName('Logo AKM');
             $drawing->setPath($logoPath);
             $drawing->setHeight(70);
@@ -924,8 +926,8 @@ class PayrollExportController extends Controller
 
         // Data Validation type WHOLE — Excel akan tampilkan panah scroll otomatis
         $validation = $sheet->getCell("B{$r}")->getDataValidation();
-        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_WHOLE);
-        $validation->setOperator(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::OPERATOR_BETWEEN);
+        $validation->setType(DataValidation::TYPE_WHOLE);
+        $validation->setOperator(DataValidation::OPERATOR_BETWEEN);
         $validation->setFormula1('1');
         $validation->setFormula2((string) $jumlahKaryawan);
         $validation->setAllowBlank(false);

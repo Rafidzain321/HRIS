@@ -3,7 +3,6 @@ namespace App\Http\Controllers;
 
 use App\Models\EmployeeSp;
 use App\Models\EmployeeTerminationLog;
-use App\Models\Employee;
 use Illuminate\Http\Request;
 
 class EmployeeSpController extends Controller
@@ -36,28 +35,6 @@ class EmployeeSpController extends Controller
     {
         $sp->delete();
         return back()->with('success', 'Catatan SP dihapus.');
-    }
-
-    // ── Termination Log ──
-
-    public function storeTermLog(Request $request)
-    {
-        $request->validate([
-            'employee_id'    => 'required|exists:employees,id',
-            'tanggal_keluar' => 'required|date',
-            'alasan_keluar'  => 'required|string',
-            'catatan_keluar' => 'nullable|string',
-        ]);
-
-        EmployeeTerminationLog::create([
-            'employee_id'    => $request->employee_id,
-            'tanggal_keluar' => $request->tanggal_keluar,
-            'alasan_keluar'  => $request->alasan_keluar,
-            'catatan_keluar' => $request->catatan_keluar,
-            'dicatat_oleh'   => auth()->user()->name ?? 'System',
-        ]);
-
-        return back()->with('success', 'History keluar dicatat.');
     }
 
     // Ambil SP + log untuk 1 employee (dipakai di Edit page)

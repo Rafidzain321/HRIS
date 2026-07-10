@@ -1,8 +1,11 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\Holiday;
 use App\Models\OvertimeCustom;
+use App\Models\Timesheet;
 use App\Models\TimesheetMember;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class OvertimeCustomController extends Controller
@@ -27,12 +30,12 @@ class OvertimeCustomController extends Controller
             ->groupBy('employee_id');
 
         // Hitung hari Sabtu & Minggu/libur dari timesheet
-        $daysInMonth = \Carbon\Carbon::create($tahun, $bulan)->daysInMonth;
-        $holidays = \App\Models\Holiday::inMonth($tahun, $bulan)
+        $daysInMonth = Carbon::create($tahun, $bulan)->daysInMonth;
+        $holidays = Holiday::inMonth($tahun, $bulan)
             ->get()->keyBy(fn($h) => (int) $h->tanggal->format('j'));
 
         $employeeIds = $members->pluck('employee.id')->filter()->toArray();
-        $timesheets = \App\Models\Timesheet::where('tahun', $tahun)
+        $timesheets = Timesheet::where('tahun', $tahun)
             ->where('bulan', $bulan)
             ->whereIn('employee_id', $employeeIds)
             ->get()
@@ -52,7 +55,7 @@ class OvertimeCustomController extends Controller
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $val = $empTs->get($d)?->nilai;
                 if ($val === null || $val === '' || !is_numeric($val)) continue;
-                $date   = \Carbon\Carbon::create($tahun, $bulan, $d);
+                $date   = Carbon::create($tahun, $bulan, $d);
                 $isSun  = $date->isSunday();
                 $isHol  = $holidays->has($d) && !$isSun;
                 $isSat  = $date->isSaturday();

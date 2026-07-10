@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\EmployeePayroll;
 use App\Models\Holiday;
@@ -12,6 +13,13 @@ use App\Models\ProjectTttItem;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Color;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class PayrollController extends Controller
 {
@@ -231,6 +239,20 @@ class PayrollController extends Controller
             ->orderBy('urutan')->orderBy('id_badge')
             ->get();
 
+        // Ambil semua EmployeePayroll tersimpan untuk periode ini dalam 1 query
+        // (dipakai di loop utama & loop custom TTT di bawah — sebelumnya query per-karyawan berulang).
+        $employeeIds = [];
+        foreach ($members as $m) {
+            if ($m->employee) {
+                $employeeIds[] = $m->employee->id;
+            }
+        }
+        $savedPayrolls = EmployeePayroll::where('tahun', $tahun)
+            ->where('bulan', $bulan)
+            ->whereIn('employee_id', $employeeIds)
+            ->get()
+            ->keyBy('employee_id');
+
         $rows            = [];
         $totalGajiKotor  = 0;
         $totalGajiBersih = 0;
@@ -242,11 +264,7 @@ class PayrollController extends Controller
             $isMd   = $emp->project?->tipe_gaji === 'md';
             $isFlat = $m->kelompok === 'flat';
 
-            $saved = EmployeePayroll::where([
-                'employee_id' => $emp->id,
-                'tahun'       => $tahun,
-                'bulan'       => $bulan,
-            ])->first();
+            $saved = $savedPayrolls->get($emp->id);
 
             if ($isMd) {
                 $tsData = $this->getTimesheetData($emp->id, $tahun, $bulan);
@@ -347,11 +365,7 @@ class PayrollController extends Controller
         $customKeys = $tttItems->where('is_default', false)->pluck('key')->toArray();
 
         foreach ($rows as &$row) {
-            $saved = EmployeePayroll::where([
-                'employee_id' => $row['employee_id'],
-                'tahun'       => $tahun,
-                'bulan'       => $bulan,
-            ])->first();
+            $saved = $savedPayrolls->get($row['employee_id']);
 
             foreach ($customKeys as $key) {
                 $row[$key] = $saved?->ttt_custom[$key] ?? 0;
@@ -441,8 +455,9 @@ class PayrollController extends Controller
                     $upahPenuh     = $gajiPokok + $tunjTetap;
                     $nilaiPerJam   = $upahPenuh / 173;
 
+                    $projectKode = strtolower($emp->project?->kode ?? '');
                     $isKhawistaPilingFlat = $isFlat
-                        && in_array($projectKodeCheck = strtolower($emp->project?->kode ?? ''), ['khawista', 'nk'])
+                        && in_array($projectKode, ['khawista', 'nk'])
                         && strtolower($m->sub_group ?? '') === 'piling';
 
                     if ($isKhawistaPilingFlat) {
@@ -471,7 +486,6 @@ class PayrollController extends Controller
                     $potonganPensiun = round($upahPenuh * 0.01);
                     $potonganKes     = round($upahPenuh * 0.01);
 
-                    $projectKode  = strtolower($emp->project?->kode ?? '');
                     $izinDipotong = !in_array($projectKode, ['khawista', 'purnama']);
                     $potonganAlpa = round($upahPenuh / 25 * ($slip['alpa'] + ($izinDipotong ? $slip['izin'] : 0)), 2);
 
@@ -568,7 +582,7 @@ class PayrollController extends Controller
             );
         }
 
-        \App\Models\ActivityLog::record(
+        ActivityLog::record(
             'update',
             'Data Gaji',
             null,
@@ -783,7 +797,7 @@ class PayrollController extends Controller
         $payroll->save();
 
         $empLog = Employee::find($employeeId);
-        \App\Models\ActivityLog::record(
+        ActivityLog::record(
             'update',
             'Data Gaji',
             $empLog?->nama_lengkap ?? "ID:{$employeeId}",
@@ -915,13 +929,13 @@ class PayrollController extends Controller
         $gajiKotor  = $slip['gaji_kotor'];
         $gajiBersih = $gajiKotor - $totalPot + ($slip['kekurangan_bulan_lalu'] ?? 0);
 
-        $ss = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $ss = new Spreadsheet();
         $ws = $ss->getActiveSheet();
         $ws->setTitle('Slip Gaji');
 
         $ws->getPageSetup()
-            ->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A5)
-            ->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_PORTRAIT)
+            ->setPaperSize(PageSetup::PAPERSIZE_A5)
+            ->setOrientation(PageSetup::ORIENTATION_PORTRAIT)
             ->setFitToPage(true)->setFitToWidth(1)->setFitToHeight(0);
         $ws->getPageMargins()->setTop(0.5)->setRight(0.4)->setBottom(0.5)->setLeft(0.4);
         $ws->getColumnDimension('A')->setWidth(14.4);
@@ -933,12 +947,12 @@ class PayrollController extends Controller
         $ws->getColumnDimension('G')->setWidth(14);
 
         $fmtRp              = fn($n) => $n !== null ? number_format((float) $n, 0, ',', '.') : '-';
-        $borderThin         = ['borders' => ['outline' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]]];
-        $borderBottom       = ['borders' => ['bottom'  => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]]];
-        $borderTopMed       = ['borders' => ['top'     => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM]]];
+        $borderThin         = ['borders' => ['outline' => ['borderStyle' => Border::BORDER_THIN]]];
+        $borderBottom       = ['borders' => ['bottom'  => ['borderStyle' => Border::BORDER_THIN]]];
+        $borderTopMed       = ['borders' => ['top'     => ['borderStyle' => Border::BORDER_MEDIUM]]];
         $borderTopBottomMed = ['borders' => [
-            'top'    => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM],
-            'bottom' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM],
+            'top'    => ['borderStyle' => Border::BORDER_MEDIUM],
+            'bottom' => ['borderStyle' => Border::BORDER_MEDIUM],
         ]];
 
         $r = 1;
@@ -946,22 +960,22 @@ class PayrollController extends Controller
         // Header
         $ws->mergeCells("A{$r}:G{$r}");
         $ws->setCellValue("A{$r}", 'PT. ANDALAS KARYA MULIA');
-        $ws->getStyle("A{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 12, 'name' => 'Arial'], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]]);
+        $ws->getStyle("A{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 12, 'name' => 'Arial'], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]]);
         $ws->getRowDimension($r)->setRowHeight(16);
         $r++;
 
         $ws->mergeCells("A{$r}:G{$r}");
         $ws->setCellValue("A{$r}", 'Jl. Wonosari, Komplek Wonosari Regency Blok B No.1, Tangkerang Selatan, Pekanbaru - Riau');
-        $ws->getStyle("A{$r}")->applyFromArray(['font' => ['size' => 8, 'name' => 'Arial'], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]]);
+        $ws->getStyle("A{$r}")->applyFromArray(['font' => ['size' => 8, 'name' => 'Arial'], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]]);
         $r++;
 
         $ws->getStyle("A{$r}:G{$r}")->applyFromArray($borderTopMed);
         $ws->mergeCells("A{$r}:D{$r}");
         $ws->setCellValue("A{$r}", 'SLIP GAJI KARYAWAN');
-        $ws->getStyle("A{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 11, 'name' => 'Arial'], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT]]);
+        $ws->getStyle("A{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 11, 'name' => 'Arial'], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT]]);
         $ws->mergeCells("E{$r}:G{$r}");
         $ws->setCellValue("E{$r}", 'Periode : ' . $periodeStr);
-        $ws->getStyle("E{$r}")->applyFromArray(['font' => ['size' => 9, 'name' => 'Arial'], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT]]);
+        $ws->getStyle("E{$r}")->applyFromArray(['font' => ['size' => 9, 'name' => 'Arial'], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT]]);
         $ws->getStyle("A{$r}:G{$r}")->applyFromArray($borderBottom);
         $r++;
         $r++;
@@ -996,14 +1010,14 @@ class PayrollController extends Controller
         $ws->setCellValue("E{$rowNama}", 'GAJI BERSIH (NETTO)');
         $ws->getStyle("E{$rowNama}")->applyFromArray([
             'font'      => ['bold' => true, 'size' => 8, 'name' => 'Arial'],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
 
         $ws->mergeCells("E{$rowJabatan}:G{$rowJabatan}");
         $ws->setCellValue("E{$rowJabatan}", 'Rp ' . $fmtRp($gajiBersih));
         $ws->getStyle("E{$rowJabatan}")->applyFromArray([
             'font'      => ['bold' => true, 'size' => 14, 'name' => 'Arial'],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
         $ws->getStyle("E{$rowJabatan}:G{$rowJabatan}")->applyFromArray($borderThin);
 
@@ -1015,7 +1029,7 @@ class PayrollController extends Controller
         $addSectionHeader = function (string $letter, string $title) use ($ws, &$r) {
             $ws->mergeCells("A{$r}:G{$r}");
             $ws->setCellValue("A{$r}", ($letter ? $letter . '.   ' : '') . $title);
-            $ws->getStyle("A{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 9, 'name' => 'Arial'], 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFE8E8E8']]]);
+            $ws->getStyle("A{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 9, 'name' => 'Arial'], 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFE8E8E8']]]);
             $ws->getRowDimension($r)->setRowHeight(13);
             $r++;
         };
@@ -1026,12 +1040,12 @@ class PayrollController extends Controller
             $ws->setCellValue("C{$r}", $nama);
             if ($sub) {
                 $ws->setCellValue("E{$r}", $sub);
-                $ws->getStyle("E{$r}")->getFont()->setSize(7)->setName('Arial')->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FF888888'));
+                $ws->getStyle("E{$r}")->getFont()->setSize(7)->setName('Arial')->setColor(new Color('FF888888'));
             }
             $ws->setCellValue("F{$r}", '=');
             $ws->setCellValue("G{$r}", $nilai !== null ? 'Rp ' . $fmtRp($nilai) : '-');
             $ws->getStyle("A{$r}:G{$r}")->getFont()->setSize(9)->setName('Arial');
-            $ws->getStyle("G{$r}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+            $ws->getStyle("G{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             $ws->getRowDimension($r)->setRowHeight(13);
             $r++;
         };
@@ -1041,7 +1055,7 @@ class PayrollController extends Controller
             $ws->setCellValue("A{$r}", $label);
             $ws->setCellValue("G{$r}", 'Rp ' . $fmtRp($nilai));
             $ws->getStyle("A{$r}:G{$r}")->applyFromArray(['font' => ['bold' => $bold, 'size' => 9, 'name' => 'Arial']]);
-            $ws->getStyle("G{$r}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+            $ws->getStyle("G{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             $ws->getStyle("A{$r}:G{$r}")->applyFromArray($bold ? $borderTopBottomMed : $borderTopMed);
             $ws->getRowDimension($r)->setRowHeight(14);
             $r++;
@@ -1098,8 +1112,8 @@ class PayrollController extends Controller
         $ws->mergeCells("A{$r}:F{$r}");
         $ws->setCellValue("A{$r}", 'PENGHASILAN BERSIH (NETTO)');
         $ws->setCellValue("G{$r}", 'Rp ' . $fmtRp($gajiBersih));
-        $ws->getStyle("A{$r}:G{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 11, 'name' => 'Arial'], 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFF0F0F0']], 'borders' => ['top' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM], 'bottom' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM]]]);
-        $ws->getStyle("G{$r}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+        $ws->getStyle("A{$r}:G{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 11, 'name' => 'Arial'], 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFF0F0F0']], 'borders' => ['top' => ['borderStyle' => Border::BORDER_MEDIUM], 'bottom' => ['borderStyle' => Border::BORDER_MEDIUM]]]);
+        $ws->getStyle("G{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $ws->getRowDimension($r)->setRowHeight(18);
         $r++;
         $r++;
@@ -1108,7 +1122,7 @@ class PayrollController extends Controller
         $ws->mergeCells("A{$r}:G{$r}");
         $ws->setCellValue("A{$r}", 'Pekanbaru, ' . now()->isoFormat('D MMMM Y'));
         $ws->getStyle("A{$r}")->getFont()->setSize(8)->setName('Arial');
-        $ws->getStyle("A{$r}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+        $ws->getStyle("A{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $r++;
         $r++;
 
@@ -1136,21 +1150,21 @@ class PayrollController extends Controller
 
         foreach ($colsToUse as $i => $col) {
             $ws->setCellValue("{$col}{$r}", $ttdMerged[$i]['label']);
-            $ws->getStyle("{$col}{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 8, 'name' => 'Arial'], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]]);
+            $ws->getStyle("{$col}{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 8, 'name' => 'Arial'], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]]);
         }
         $r += 4;
         foreach ($colsToUse as $i => $col) {
             $ws->setCellValue("{$col}{$r}", $ttdMerged[$i]['name']);
-            $ws->getStyle("{$col}{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 8, 'name' => 'Arial'], 'borders' => ['top' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]]);
+            $ws->getStyle("{$col}{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 8, 'name' => 'Arial'], 'borders' => ['top' => ['borderStyle' => Border::BORDER_THIN]], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]]);
         }
         $r++;
         foreach ($colsToUse as $i => $col) {
             $ws->setCellValue("{$col}{$r}", $ttdMerged[$i]['jabatan']);
-            $ws->getStyle("{$col}{$r}")->applyFromArray(['font' => ['italic' => true, 'size' => 8, 'name' => 'Arial'], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]]);
+            $ws->getStyle("{$col}{$r}")->applyFromArray(['font' => ['italic' => true, 'size' => 8, 'name' => 'Arial'], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]]);
         }
 
         $namaFile = 'SlipGaji_' . $employee->id_badge . '_' . str_replace(' ', '_', $periodeStr) . '.xlsx';
-        $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss);
+        $writer   = new Xlsx($ss);
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . $namaFile . '"');
         header('Cache-Control: max-age=0');

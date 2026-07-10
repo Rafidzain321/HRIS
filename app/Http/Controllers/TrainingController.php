@@ -36,8 +36,6 @@ class TrainingController extends Controller
                 'masa_berlaku_tahun' => $t->masa_berlaku_tahun,
             ]);
 
-        $pid = $this->activeProjectId();
-
         $query = EmployeeTraining::with(['employee.position', 'trainingType'])
             ->when($pid, fn($q) => $q->whereHas('employee', fn($eq) => $eq->where('project_id', $pid)))
             ->when($search, fn($q) => $q->whereHas(

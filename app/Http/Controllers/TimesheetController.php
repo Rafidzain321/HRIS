@@ -13,69 +13,46 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Color;
 
 class TimesheetController extends Controller
 {
-    // ── 55 badge karyawan Construction Central WUR Giam ──
-    private function centralBadges(): array
+    /**
+     * Nama bulan (1-12) dalam Bahasa Indonesia — dipakai di index() dan export().
+     */
+    private function namaBulanList(): array
     {
         return [
-            'AKM-EW-0096',
-            'AKM-EW-0065',
-            'AKM-EW-0099',
-            'AKM-EW-0097',
-            'AKM-EW-0066',
-            'AKM-EW-0072',
-            'AKM-EW-0067',
-            'AKM-EW-0069',
-            'AKM-EW-0074',
-            'AKM-EW-0100',
-            'AKM-EW-0101',
-            'AKM-EW-0064',
-            'AKM-EW-0190',
-            'AKM-EW-0174',
-            'AKM-EW-0061',
-            'AKM-EW-0059',
-            'AKM-EW-0057',
-            'AKM-EW-0110',
-            'AKM-EW-0119',
-            'AKM-EW-0051',
-            'AKM-EW-0052',
-            'AKM-EW-0111',
-            'AKM-EW-0053',
-            'AKM-EW-0054',
-            'AKM-EW-0258',
-            'AKM-EW-0060',
-            'AKM-EW-0129',
-            'AKM-EW-0194',
-            'AKM-EW-0112',
-            'AKM-EW-0114',
-            'AKM-EW-0198',
-            'AKM-EW-0200',
-            'AKM-EW-0169',
-            'AKM-EW-0109',
-            'AKM-EW-0170',
-            'AKM-EW-0232',
-            'AKM-EW-0266',
-            'AKM-EW-0126',
-            'AKM-EW-0712',
-            'AKM-EW-0203',
-            'AKM-EW-0202',
-            'AKM-EW-0657',
-            'AKM-EW-0713',
-            'AKM-EW-0197',
-            'AKM-EW-0073',
-            'AKM-EW-0013',
-            'AKM-EW-0103',
-            'AKM-EW-0068',
-            'AKM-EW-0102',
-            'AKM-EW-0117',
-            'AKM-EW-0062',
-            'AKM-EW-0113',
-            'AKM-EW-0236',
-            'AKM-EW-0127',
-            'AKM-EW-0167',
+            1 => 'Januari',
+            2 => 'Februari',
+            3 => 'Maret',
+            4 => 'April',
+            5 => 'Mei',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'Agustus',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember',
+        ];
+    }
+
+    /**
+     * Nama override hardcode per badge (khusus Giam, bisa dipindah ke DB nanti).
+     * Dipakai di index() dan export(), digabung dengan override dari DB (nama_override member).
+     */
+    private function namaOverrideHardcode(): array
+    {
+        return [
+            'AKM-EW-0236' => 'SASTRO',
+            'AKM-EW-0197' => 'M YASIR SIREGAR',
+            'AKM-EW-0073' => 'EVANDRI WANDA',
+            'AKM-EW-0013' => 'M RAPIQI',
+            'AKM-EW-0068' => 'YUDHA PRATAMA',
+            'AKM-EW-0102' => 'JAMI MARUZUKI',
+            'AKM-EW-0117' => 'M REVAL AL AKHYAR',
+            'AKM-EW-0127' => 'MUHAMMAD RENO',
+            'AKM-EW-0167' => 'M HUSNI IQBAL',
         ];
     }
 
@@ -91,21 +68,7 @@ class TimesheetController extends Controller
         $holidays = \App\Models\Holiday::inMonth($tahun, $bulan)
             ->get()->keyBy(fn($h) => (int) $h->tanggal->format('j'));
 
-        $days = [];
-        for ($d = 1; $d <= $daysInMonth; $d++) {
-            $date = Carbon::create($tahun, $bulan, $d);
-            $holiday = $holidays->get($d);
-            $days[] = [
-                'day' => $d,
-                'date' => $date->format('Y-m-d'),
-                'day_name' => $dayNamesID[$date->dayOfWeek],
-                'is_sunday' => $date->isSunday(),
-                'is_saturday' => $date->isSaturday(),
-                'is_holiday' => $holiday !== null,
-                'holiday_label' => $holiday?->keterangan,
-                'holiday_tipe' => $holiday?->tipe,
-            ];
-        }
+        $days = $this->buildDaysArray($tahun, $bulan, $daysInMonth, $dayNamesID, $holidays);
 
         // Ambil project aktif user yang login
         $projectId = $this->activeProjectId();
@@ -133,18 +96,7 @@ class TimesheetController extends Controller
         $tipePerBadge = $members->pluck('tipe', 'id_badge')->toArray();
 
         // Nama override hardcode (khusus Giam, bisa dipindah ke DB nanti)
-        $namaOverrideHard = [
-            'AKM-EW-0236' => 'SASTRO',
-            'AKM-EW-0197' => 'M YASIR SIREGAR',
-            'AKM-EW-0073' => 'EVANDRI WANDA',
-            'AKM-EW-0013' => 'M RAPIQI',
-            'AKM-EW-0068' => 'YUDHA PRATAMA',
-            'AKM-EW-0102' => 'JAMI MARUZUKI',
-            'AKM-EW-0117' => 'M REVAL AL AKHYAR',
-            'AKM-EW-0127' => 'MUHAMMAD RENO',
-            'AKM-EW-0167' => 'M HUSNI IQBAL',
-        ];
-        $namaOverride = array_merge($namaOverrideHard, $namaOverrideDb);
+        $namaOverride = array_merge($this->namaOverrideHardcode(), $namaOverrideDb);
 
         // Query karyawan aktif dari member list
         $employees = Employee::whereIn('id_badge', $badgeList)
@@ -182,97 +134,22 @@ class TimesheetController extends Controller
             ->whereIn('employee_id', $employees->pluck('id'))
             ->get()->groupBy('employee_id');
 
-        $grid = $employees->map(function ($emp) use ($timesheets, $daysInMonth, $namaOverride, $tipePerBadge, $tahun, $bulan, $members) {
-            $empTs = $timesheets->get($emp->id, collect());
-            $tsMap = $empTs->keyBy('hari');
-            $tipe = $tipePerBadge[$emp->id_badge] ?? '7jam';
-            $regJam = $tipe === '8jam' ? 8 : 7; // jam reguler per hari
+        // Peta id_badge => member (first occurrence, sama seperti firstWhere) supaya
+        // lookup sub_group per baris di bawah tidak perlu scan ulang $members tiap kali.
+        $membersByBadge = $members->unique('id_badge')->keyBy('id_badge');
 
-            $rows = [];
-            $totalHadir = 0;
-            $totalIzin = 0;
-            $totalSakit = 0;
-            $totalAlpa = 0;
-            $totalCuti = 0;
-            $totalOtJam = 0; // total jam lembur (khusus 8jam)
+        $grid = $employees->map(fn($emp) => $this->buildEmployeeGridRow(
+            $emp,
+            $timesheets,
+            $daysInMonth,
+            $namaOverride,
+            $tipePerBadge,
+            $tahun,
+            $bulan,
+            $membersByBadge
+        ));
 
-            for ($d = 1; $d <= $daysInMonth; $d++) {
-                $val = $tsMap->get($d)?->nilai;
-                $rows[$d] = $val;
-                if (!$val)
-                    continue;
-                $up = strtoupper($val);
-
-                if ($up === 'I')
-                    $totalIzin++;
-                elseif ($up === 'S')
-                    $totalSakit++;
-                elseif ($up === 'A')
-                    $totalAlpa++;
-                elseif ($up === 'C')
-                    $totalCuti++;
-                elseif (is_numeric($val)) {
-                    $jam = (float) $val;
-                    $totalHadir++;
-
-                    // Hitung OT untuk MD (8jam)
-                    if ($tipe === '8jam') {
-                        $date = Carbon::create($tahun, $bulan, $d);
-                        $isSat = $date->isSaturday();
-                        $isSun = $date->isSunday();
-
-                        if ($isSun) {
-                            // Minggu: semua jam = OT 2x
-                            $totalOtJam += $jam;
-                        } elseif ($isSat) {
-                            // Sabtu: semua jam = OT 1.5x dari jam pertama
-                            $totalOtJam += $jam;
-                        } else {
-                            // Hari biasa: lebih dari 8 jam = OT
-                            if ($jam > $regJam) {
-                                $totalOtJam += ($jam - $regJam);
-                            }
-                        }
-                    }
-                }
-            }
-
-            $result = [
-                'id' => $emp->id,
-                'id_badge' => $emp->id_badge,
-                'nama_lengkap' => $namaOverride[$emp->id_badge] ?? $emp->nama_lengkap,
-                'jabatan' => $emp->position?->nama_jabatan ?? '-',
-                'tipe' => $tipe,
-                'sub_group' => $members->firstWhere('id_badge', $emp->id_badge)?->sub_group,
-                'days' => $rows,
-                'total_hadir' => $totalHadir,
-                'total_izin' => $totalIzin,
-                'total_sakit' => $totalSakit,
-                'total_alpa' => $totalAlpa,
-                'total_cuti' => $totalCuti,
-            ];
-
-            if ($tipe === '8jam') {
-                $result['total_ot_jam'] = round($totalOtJam, 2);
-            }
-
-            return $result;
-        });
-
-        $bulanList = [
-            1 => 'Januari',
-            2 => 'Februari',
-            3 => 'Maret',
-            4 => 'April',
-            5 => 'Mei',
-            6 => 'Juni',
-            7 => 'Juli',
-            8 => 'Agustus',
-            9 => 'September',
-            10 => 'Oktober',
-            11 => 'November',
-            12 => 'Desember',
-        ];
+        $bulanList = $this->namaBulanList();
 
         // Ambil project info untuk frontend
         $projectInfo = null;
@@ -324,69 +201,183 @@ class TimesheetController extends Controller
         ]);
     }
 
-    public function update(Request $request)
-        {
-            $request->validate([
-                'employee_id' => 'required|exists:employees,id',
-                'tahun' => 'required|integer',
-                'bulan' => 'required|integer|between:1,12',
-                'hari' => 'required|integer|between:1,31',
-                'nilai' => 'nullable|string|max:10',
-            ]);
-    
-            $nilai = $request->nilai;
-            if ($nilai !== null && $nilai !== '') {
-                if (is_numeric($nilai)) {
-                    $nilai = (string) $nilai;
-                } else {
-                    $nilai = strtoupper(trim($nilai));
-                    if (!in_array($nilai, ['I', 'S', 'A', 'C', 'STB']))
-                        $nilai = null;
+    /**
+     * Bangun array info tiap hari dalam sebulan (dipakai untuk header kalender di frontend).
+     * Ekstraksi murni dari index() — tidak mengubah urutan/hasil, hanya isolasi.
+     */
+    private function buildDaysArray(int $tahun, int $bulan, int $daysInMonth, array $dayNamesID, $holidays): array
+    {
+        $days = [];
+        for ($d = 1; $d <= $daysInMonth; $d++) {
+            $date = Carbon::create($tahun, $bulan, $d);
+            $holiday = $holidays->get($d);
+            $days[] = [
+                'day' => $d,
+                'date' => $date->format('Y-m-d'),
+                'day_name' => $dayNamesID[$date->dayOfWeek],
+                'is_sunday' => $date->isSunday(),
+                'is_saturday' => $date->isSaturday(),
+                'is_holiday' => $holiday !== null,
+                'holiday_label' => $holiday?->keterangan,
+                'holiday_tipe' => $holiday?->tipe,
+            ];
+        }
+        return $days;
+    }
+
+    /**
+     * Hitung satu baris grid timesheet untuk seorang karyawan (rekap hadir/izin/sakit/alpa/cuti
+     * + OT jam untuk tipe 8jam). Ekstraksi murni dari closure ->map() di index() — logika dan
+     * urutan perhitungan tidak diubah sama sekali.
+     */
+    private function buildEmployeeGridRow(
+        $emp,
+        $timesheets,
+        int $daysInMonth,
+        array $namaOverride,
+        array $tipePerBadge,
+        int $tahun,
+        int $bulan,
+        $membersByBadge
+    ): array {
+        $empTs = $timesheets->get($emp->id, collect());
+        $tsMap = $empTs->keyBy('hari');
+        $tipe = $tipePerBadge[$emp->id_badge] ?? '7jam';
+        $regJam = $tipe === '8jam' ? 8 : 7; // jam reguler per hari
+
+        $rows = [];
+        $totalHadir = 0;
+        $totalIzin = 0;
+        $totalSakit = 0;
+        $totalAlpa = 0;
+        $totalCuti = 0;
+        $totalOtJam = 0; // total jam lembur (khusus 8jam)
+
+        for ($d = 1; $d <= $daysInMonth; $d++) {
+            $val = $tsMap->get($d)?->nilai;
+            $rows[$d] = $val;
+            if (!$val)
+                continue;
+            $up = strtoupper($val);
+
+            if ($up === 'I')
+                $totalIzin++;
+            elseif ($up === 'S')
+                $totalSakit++;
+            elseif ($up === 'A')
+                $totalAlpa++;
+            elseif ($up === 'C')
+                $totalCuti++;
+            elseif (is_numeric($val)) {
+                $jam = (float) $val;
+                $totalHadir++;
+
+                // Hitung OT untuk MD (8jam)
+                if ($tipe === '8jam') {
+                    $date = Carbon::create($tahun, $bulan, $d);
+                    $isSat = $date->isSaturday();
+                    $isSun = $date->isSunday();
+
+                    if ($isSun) {
+                        // Minggu: semua jam = OT 2x
+                        $totalOtJam += $jam;
+                    } elseif ($isSat) {
+                        // Sabtu: semua jam = OT 1.5x dari jam pertama
+                        $totalOtJam += $jam;
+                    } else {
+                        // Hari biasa: lebih dari 8 jam = OT
+                        if ($jam > $regJam) {
+                            $totalOtJam += ($jam - $regJam);
+                        }
+                    }
                 }
-            } else {
-                $nilai = null;
             }
-    
-            if ($nilai === null) {
-                Timesheet::where([
+        }
+
+        $result = [
+            'id' => $emp->id,
+            'id_badge' => $emp->id_badge,
+            'nama_lengkap' => $namaOverride[$emp->id_badge] ?? $emp->nama_lengkap,
+            'jabatan' => $emp->position?->nama_jabatan ?? '-',
+            'tipe' => $tipe,
+            'sub_group' => $membersByBadge->get($emp->id_badge)?->sub_group,
+            'days' => $rows,
+            'total_hadir' => $totalHadir,
+            'total_izin' => $totalIzin,
+            'total_sakit' => $totalSakit,
+            'total_alpa' => $totalAlpa,
+            'total_cuti' => $totalCuti,
+        ];
+
+        if ($tipe === '8jam') {
+            $result['total_ot_jam'] = round($totalOtJam, 2);
+        }
+
+        return $result;
+    }
+
+    public function update(Request $request)
+    {
+        $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'tahun' => 'required|integer',
+            'bulan' => 'required|integer|between:1,12',
+            'hari' => 'required|integer|between:1,31',
+            'nilai' => 'nullable|string|max:10',
+        ]);
+
+        $nilai = $request->nilai;
+        if ($nilai !== null && $nilai !== '') {
+            if (is_numeric($nilai)) {
+                $nilai = (string) $nilai;
+            } else {
+                $nilai = strtoupper(trim($nilai));
+                if (!in_array($nilai, ['I', 'S', 'A', 'C', 'STB']))
+                    $nilai = null;
+            }
+        } else {
+            $nilai = null;
+        }
+
+        if ($nilai === null) {
+            Timesheet::where([
+                'employee_id' => $request->employee_id,
+                'tahun' => $request->tahun,
+                'bulan' => $request->bulan,
+                'hari' => $request->hari,
+            ])->delete();
+        } else {
+            Timesheet::updateOrCreate(
+                [
                     'employee_id' => $request->employee_id,
                     'tahun' => $request->tahun,
                     'bulan' => $request->bulan,
-                    'hari' => $request->hari,
-                ])->delete();
-            } else {
-                Timesheet::updateOrCreate(
-                    [
-                        'employee_id' => $request->employee_id,
-                        'tahun' => $request->tahun,
-                        'bulan' => $request->bulan,
-                        'hari' => $request->hari
-                    ],
-                    ['nilai' => $nilai]
-                );
-            }
-    
-            // Log hanya untuk nilai non-numerik (I/S/A/C) supaya tidak spam
-            // Input jam kerja (angka) dicatat sekali per hari saja
-            if ($nilai !== null) {
-                $emp = Employee::find($request->employee_id);
-                $tipe = in_array(strtoupper($nilai), ['I','S','A','C']) ? 'status' : 'jam';
-                \App\Models\ActivityLog::record(
-                    'update',
-                    'Timesheet',
-                    $emp?->nama_lengkap ?? "ID:{$request->employee_id}",
-                    "Input timesheet {$request->tahun}/{$request->bulan} hari {$request->hari}: {$nilai}"
-                );
-            }
-
-            $this->recalcPayroll(
-                $request->employee_id,
-                $request->tahun,
-                $request->bulan
+                    'hari' => $request->hari
+                ],
+                ['nilai' => $nilai]
             );
-
-            return response()->json(['ok' => true, 'nilai' => $nilai]);
         }
+
+        // Log hanya untuk nilai non-numerik (I/S/A/C) supaya tidak spam
+        // Input jam kerja (angka) dicatat sekali per hari saja
+        if ($nilai !== null) {
+            $emp = Employee::find($request->employee_id);
+            \App\Models\ActivityLog::record(
+                'update',
+                'Timesheet',
+                $emp?->nama_lengkap ?? "ID:{$request->employee_id}",
+                "Input timesheet {$request->tahun}/{$request->bulan} hari {$request->hari}: {$nilai}"
+            );
+        }
+
+        $this->recalcPayroll(
+            $request->employee_id,
+            $request->tahun,
+            $request->bulan
+        );
+
+        return response()->json(['ok' => true, 'nilai' => $nilai]);
+    }
 
     private function recalcPayroll(int $employeeId, int $tahun, int $bulan): void
     {
@@ -560,37 +551,14 @@ class TimesheetController extends Controller
             }
         }
 
-        $bulanNama = [
-            1 => 'Januari',
-            2 => 'Februari',
-            3 => 'Maret',
-            4 => 'April',
-            5 => 'Mei',
-            6 => 'Juni',
-            7 => 'Juli',
-            8 => 'Agustus',
-            9 => 'September',
-            10 => 'Oktober',
-            11 => 'November',
-            12 => 'Desember'
-        ];
+        $bulanNama = $this->namaBulanList();
         $dayNames = ['Mgg', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
         $daysInMonth = Carbon::create($tahun, $bulan)->daysInMonth;
         $bulanStr = $bulanNama[$bulan];
 
         // Nama override
-        $namaOverride = [
-            'AKM-EW-0236' => 'SASTRO',
-            'AKM-EW-0197' => 'M YASIR SIREGAR',
-            'AKM-EW-0073' => 'EVANDRI WANDA',
-            'AKM-EW-0013' => 'M RAPIQI',
-            'AKM-EW-0068' => 'YUDHA PRATAMA',
-            'AKM-EW-0102' => 'JAMI MARUZUKI',
-            'AKM-EW-0117' => 'M REVAL AL AKHYAR',
-            'AKM-EW-0127' => 'MUHAMMAD RENO',
-            'AKM-EW-0167' => 'M HUSNI IQBAL',
-        ];
+        $namaOverride = $this->namaOverrideHardcode();
 
         $members = TimesheetMember::where('aktif', true)
             ->when($projectId, fn($q, $pid) => $q->where('project_id', $pid))
@@ -684,19 +652,7 @@ class TimesheetController extends Controller
                 . sprintf('%02d', $bulan) . '-' . substr($tahun, 2);
 
             // Warna header: Minggu=merah, Sabtu=hijau, Libur=oranye, Normal=putih
-            if ($isSun) {
-                $bgColor = 'FF0000';
-                $txtColor = 'FFFFFF';
-            } elseif ($isHoliday) {
-                $bgColor = 'F4A010';
-                $txtColor = '3D1F00';  // oranye
-            } elseif ($isSat) {
-                $bgColor = '92D050';
-                $txtColor = '276221';
-            } else {
-                $bgColor = 'FFFFFF';
-                $txtColor = '000000';  // putih normal
-            }
+            [$bgColor, $txtColor] = $this->dayHeaderColors($isSun, $isHoliday, $isSat);
 
             $sheet->setCellValue($col . '6', $dayLabel);
             $sheet->getStyle($col . '6')->applyFromArray([
@@ -785,46 +741,7 @@ class TimesheetController extends Controller
                 }
 
                 // Tentukan warna latar berdasarkan nilai atau kondisi hari
-                if ($isSun) {
-                    $cellBg = 'AA0000';
-                    $txtClr = 'FFFFFF';
-                } elseif ($isHoliday && ($val === null || $val === '')) {
-                    $cellBg = 'F4A010';
-                    $txtClr = '3D1F00';
-                } elseif ($val !== null && $val !== '') {
-                    $up = strtoupper((string) $val);
-                    if ($up === 'I') {
-                        $cellBg = 'BDD7EE';
-                        $txtClr = '1F497D';
-                    } elseif ($up === 'S') {
-                        $cellBg = 'FFD966';
-                        $txtClr = '7F6000';
-                    } elseif ($up === 'A') {
-                        $cellBg = 'FF7C80';
-                        $txtClr = '9C0006';
-                    } elseif ($up === 'C') {
-                        $cellBg = 'C6EFCE';
-                        $txtClr = '276221';
-                    } elseif (is_numeric($val)) {
-                        $n = (float) $val;
-                        if ($n >= 10) {
-                            $cellBg = 'CCFFCC';
-                            $txtClr = '276221';
-                        } elseif ($n >= 8) {
-                            $cellBg = 'FFCCCC';
-                            $txtClr = '9C0006';
-                        } else {
-                            $cellBg = 'FF6666';
-                            $txtClr = 'FFFFFF';
-                        }
-                    } else {
-                        $cellBg = $rowBg;
-                        $txtClr = '000000';
-                    }
-                } else {
-                    $cellBg = $rowBg;
-                    $txtClr = '000000';
-                }
+                [$cellBg, $txtClr] = $this->dayCellColors($val, $isSun, $isHoliday, $rowBg);
 
                 $sheet->getStyle($cellRef)->applyFromArray([
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $cellBg]],
@@ -898,78 +815,7 @@ class TimesheetController extends Controller
                 $col = $this->colLetter($dayStartCol + $d - 1);
                 $cellRef = $col . $dataRow;
 
-                $styles = [];
-
-                // I = Izin — biru muda
-                $cfI = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
-                $cfI->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
-                $cfI->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_EQUAL);
-                $cfI->addCondition('"I"');
-                $cfI->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('BDD7EE');
-                $cfI->getStyle()->getFont()->getColor()->setRGB('1F497D');
-                $cfI->getStyle()->getFont()->setBold(true);
-                $styles[] = $cfI;
-
-                // S = Sakit — kuning
-                $cfS = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
-                $cfS->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
-                $cfS->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_EQUAL);
-                $cfS->addCondition('"S"');
-                $cfS->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFD966');
-                $cfS->getStyle()->getFont()->getColor()->setRGB('7F6000');
-                $cfS->getStyle()->getFont()->setBold(true);
-                $styles[] = $cfS;
-
-                // A = Alpha — merah
-                $cfA = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
-                $cfA->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
-                $cfA->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_EQUAL);
-                $cfA->addCondition('"A"');
-                $cfA->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FF7C80');
-                $cfA->getStyle()->getFont()->getColor()->setRGB('9C0006');
-                $cfA->getStyle()->getFont()->setBold(true);
-                $styles[] = $cfA;
-
-                // C = Cuti — hijau muda
-                $cfC = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
-                $cfC->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
-                $cfC->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_EQUAL);
-                $cfC->addCondition('"C"');
-                $cfC->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6EFCE');
-                $cfC->getStyle()->getFont()->getColor()->setRGB('276221');
-                $cfC->getStyle()->getFont()->setBold(true);
-                $styles[] = $cfC;
-
-                // Angka >= 10 — hijau
-                $cf10 = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
-                $cf10->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
-                $cf10->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_GREATERTHANOREQUAL);
-                $cf10->addCondition('10');
-                $cf10->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('CCFFCC');
-                $cf10->getStyle()->getFont()->getColor()->setRGB('276221');
-                $styles[] = $cf10;
-
-                // Angka >= 8 dan < 10 — merah muda
-                $cf8 = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
-                $cf8->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
-                $cf8->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_BETWEEN);
-                $cf8->addCondition('8');
-                $cf8->addCondition('9.99');
-                $cf8->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFCCCC');
-                $cf8->getStyle()->getFont()->getColor()->setRGB('9C0006');
-                $styles[] = $cf8;
-
-                // Angka > 0 dan < 8 — merah tua
-                $cfLow = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
-                $cfLow->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
-                $cfLow->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_BETWEEN);
-                $cfLow->addCondition('0.01');
-                $cfLow->addCondition('7.99');
-                $cfLow->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FF6666');
-                $cfLow->getStyle()->getFont()->getColor()->setRGB('FFFFFF');
-                $styles[] = $cfLow;
-
-                $sheet->getStyle($cellRef)->setConditionalStyles($styles);
+                $this->applyDayConditionalFormatting($sheet, $cellRef);
             }
 
             $sheet->getRowDimension($dataRow)->setRowHeight(14);
@@ -1054,5 +900,143 @@ class TimesheetController extends Controller
             $n = intdiv($n, 26);
         }
         return $letter;
+    }
+
+    /**
+     * Warna latar/teks untuk sel header hari (row 6) di export Excel.
+     * Minggu=merah, Libur=oranye, Sabtu=hijau, Normal=putih.
+     * Ekstraksi murni dari export() — nilai warna & urutan prioritas kondisi tidak diubah.
+     *
+     * @return array{0: string, 1: string} [bgColor, txtColor]
+     */
+    private function dayHeaderColors(bool $isSun, bool $isHoliday, bool $isSat): array
+    {
+        if ($isSun) {
+            return ['FF0000', 'FFFFFF'];
+        } elseif ($isHoliday) {
+            return ['F4A010', '3D1F00']; // oranye
+        } elseif ($isSat) {
+            return ['92D050', '276221'];
+        }
+        return ['FFFFFF', '000000']; // putih normal
+    }
+
+    /**
+     * Warna latar/teks untuk sel data hari (I/S/A/C/angka jam) di export Excel.
+     * Ekstraksi murni dari export() — nilai warna & urutan prioritas kondisi tidak diubah.
+     *
+     * @return array{0: string, 1: string} [cellBg, txtClr]
+     */
+    private function dayCellColors($val, bool $isSun, bool $isHoliday, string $rowBg): array
+    {
+        if ($isSun) {
+            return ['AA0000', 'FFFFFF'];
+        }
+        if ($isHoliday && ($val === null || $val === '')) {
+            return ['F4A010', '3D1F00'];
+        }
+        if ($val !== null && $val !== '') {
+            $up = strtoupper((string) $val);
+            if ($up === 'I') {
+                return ['BDD7EE', '1F497D'];
+            } elseif ($up === 'S') {
+                return ['FFD966', '7F6000'];
+            } elseif ($up === 'A') {
+                return ['FF7C80', '9C0006'];
+            } elseif ($up === 'C') {
+                return ['C6EFCE', '276221'];
+            } elseif (is_numeric($val)) {
+                $n = (float) $val;
+                if ($n >= 10) {
+                    return ['CCFFCC', '276221'];
+                } elseif ($n >= 8) {
+                    return ['FFCCCC', '9C0006'];
+                }
+                return ['FF6666', 'FFFFFF'];
+            }
+            return [$rowBg, '000000'];
+        }
+        return [$rowBg, '000000'];
+    }
+
+    /**
+     * Pasang conditional formatting Excel (I/S/A/C + rentang angka jam) pada satu sel hari,
+     * supaya kalau user edit langsung di Excel warnanya otomatis mengikuti. Ekstraksi murni
+     * dari export() — kondisi, warna, dan urutan style tidak diubah.
+     */
+    private function applyDayConditionalFormatting($sheet, string $cellRef): void
+    {
+        $styles = [];
+
+        // I = Izin — biru muda
+        $cfI = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
+        $cfI->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
+        $cfI->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_EQUAL);
+        $cfI->addCondition('"I"');
+        $cfI->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('BDD7EE');
+        $cfI->getStyle()->getFont()->getColor()->setRGB('1F497D');
+        $cfI->getStyle()->getFont()->setBold(true);
+        $styles[] = $cfI;
+
+        // S = Sakit — kuning
+        $cfS = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
+        $cfS->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
+        $cfS->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_EQUAL);
+        $cfS->addCondition('"S"');
+        $cfS->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFD966');
+        $cfS->getStyle()->getFont()->getColor()->setRGB('7F6000');
+        $cfS->getStyle()->getFont()->setBold(true);
+        $styles[] = $cfS;
+
+        // A = Alpha — merah
+        $cfA = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
+        $cfA->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
+        $cfA->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_EQUAL);
+        $cfA->addCondition('"A"');
+        $cfA->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FF7C80');
+        $cfA->getStyle()->getFont()->getColor()->setRGB('9C0006');
+        $cfA->getStyle()->getFont()->setBold(true);
+        $styles[] = $cfA;
+
+        // C = Cuti — hijau muda
+        $cfC = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
+        $cfC->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
+        $cfC->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_EQUAL);
+        $cfC->addCondition('"C"');
+        $cfC->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6EFCE');
+        $cfC->getStyle()->getFont()->getColor()->setRGB('276221');
+        $cfC->getStyle()->getFont()->setBold(true);
+        $styles[] = $cfC;
+
+        // Angka >= 10 — hijau
+        $cf10 = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
+        $cf10->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
+        $cf10->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_GREATERTHANOREQUAL);
+        $cf10->addCondition('10');
+        $cf10->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('CCFFCC');
+        $cf10->getStyle()->getFont()->getColor()->setRGB('276221');
+        $styles[] = $cf10;
+
+        // Angka >= 8 dan < 10 — merah muda
+        $cf8 = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
+        $cf8->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
+        $cf8->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_BETWEEN);
+        $cf8->addCondition('8');
+        $cf8->addCondition('9.99');
+        $cf8->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFCCCC');
+        $cf8->getStyle()->getFont()->getColor()->setRGB('9C0006');
+        $styles[] = $cf8;
+
+        // Angka > 0 dan < 8 — merah tua
+        $cfLow = new \PhpOffice\PhpSpreadsheet\Style\Conditional();
+        $cfLow->setConditionType(\PhpOffice\PhpSpreadsheet\Style\Conditional::CONDITION_CELLIS);
+        $cfLow->setOperatorType(\PhpOffice\PhpSpreadsheet\Style\Conditional::OPERATOR_BETWEEN);
+        $cfLow->addCondition('0.01');
+        $cfLow->addCondition('7.99');
+        $cfLow->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FF6666');
+        $cfLow->getStyle()->getFont()->getColor()->setRGB('FFFFFF');
+        $styles[] = $cfLow;
+
+        $sheet->getStyle($cellRef)->setConditionalStyles($styles);
     }
 }

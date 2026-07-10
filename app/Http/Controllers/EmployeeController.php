@@ -173,7 +173,7 @@ class EmployeeController extends Controller
         }
 
         $umur = $employee->tanggal_lahir
-            ? \Carbon\Carbon::parse($employee->tanggal_lahir)->age
+            ? Carbon::parse($employee->tanggal_lahir)->age
             : null;
 
         return Inertia::render('Employee/Edit', [
@@ -326,8 +326,8 @@ class EmployeeController extends Controller
             "Terminate {$employee->nama_lengkap} ({$employee->id_badge}): {$data['alasan_keluar']} tgl {$data['tanggal_keluar']}"
         );
 
-        $tglKeluar = \Carbon\Carbon::parse($data['tanggal_keluar']);
-        $bulanSekarang = \Carbon\Carbon::today()->format('Y-m');
+        $tglKeluar = Carbon::parse($data['tanggal_keluar']);
+        $bulanSekarang = Carbon::today()->format('Y-m');
         $bulanKeluar = $tglKeluar->format('Y-m');
 
         if ($bulanKeluar < $bulanSekarang) {

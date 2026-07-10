@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\Project;
 use App\Models\SioSimOperator;
 use App\Models\DriverDetail;
 use App\Models\Equipment;
@@ -37,6 +38,16 @@ class ExportController extends Controller
             'alignment' => ['horizontal'=>Alignment::HORIZONTAL_CENTER,'vertical'=>Alignment::VERTICAL_CENTER,'wrapText'=>true],
             'borders'   => ['allBorders'=>['borderStyle'=>Border::BORDER_THIN,'color'=>['rgb'=>'AAAAAA']]],
         ]);
+    }
+
+    // ── Helper: render baris header tabel (label + lebar kolom) ──
+    private function renderHeaderRow($sheet, array $headers, int $hRow, int $rowHeight = 32): void
+    {
+        foreach ($headers as $col => [$label, $width]) {
+            $this->headerStyle($sheet, $col.$hRow, $label);
+            $sheet->getColumnDimension($col)->setWidth($width);
+        }
+        $sheet->getRowDimension($hRow)->setRowHeight($rowHeight);
     }
 
     // ── Helper: style cell biasa ──
@@ -90,7 +101,7 @@ class ExportController extends Controller
         $sheet->mergeCells("A1:{$lastCol}1");
         $projectId = session('active_project_kode');
         $projectLabel = $projectId
-            ? strtoupper(\App\Models\Project::find($projectId)?->kode ?? 'UNKNOWN')
+            ? strtoupper(Project::find($projectId)?->kode ?? 'UNKNOWN')
             : 'SEMUA PROJECT';
         $sheet->setCellValue('A1', strtoupper($title) . ' — PT. ANDALAS KARYA MULIA (' . $projectLabel . ')');
         $sheet->getStyle('A1')->applyFromArray([
@@ -192,12 +203,11 @@ class ExportController extends Controller
     public function karyawan(Request $request)
     {
         $pid = $this->getProjectId();
-        $employees = Employee::aktif()->with(['position','ppe','documents'])
+        $employees = Employee::aktif()->with(['position','ppe'])
             ->when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('nama_lengkap')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('Data Karyawan');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet, 'Data Karyawan Aktif', 'AH', $employees->count());
 
@@ -215,11 +225,7 @@ class ExportController extends Controller
         ];
 
         $hRow = 4;
-        foreach ($headers as $col => [$label, $width]) {
-            $this->headerStyle($sheet, $col.$hRow, $label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $dateCols = ['P','S','T','U','Y','AA','AE','AF'];
         $startRow = 5;
@@ -292,13 +298,12 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function mcu()
     {
-       $pid = $this->getProjectId();
+        $pid = $this->getProjectId();
         $employees = Employee::aktif()->with('position')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('exp_mcu')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('MCU');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet, 'Data MCU Karyawan', 'I', $employees->count());
 
@@ -308,11 +313,7 @@ class ExportController extends Controller
             'G'=>['Status MCU',12],'H'=>['Derajat Kesehatan',14],'I'=>['Lokasi MCU',18],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label, $width]) {
-            $this->headerStyle($sheet, $col.$hRow, $label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($employees as $idx => $emp) {
@@ -352,7 +353,6 @@ class ExportController extends Controller
             ->orderBy('expire_badge')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('Badge & KP');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet, 'Data Badge & KP Karyawan', 'I', $employees->count());
 
@@ -362,11 +362,7 @@ class ExportController extends Controller
             'G'=>['Status KP',18],'H'=>['Exp KP',14],'I'=>['KP Ready',18],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label, $width]) {
-            $this->headerStyle($sheet, $col.$hRow, $label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($employees as $idx => $emp) {
@@ -405,7 +401,6 @@ class ExportController extends Controller
             ->whereNotNull('type_sim')->orderBy('expired_sim')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('SIM Karyawan');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet,'Data SIM Karyawan','H',$employees->count());
 
@@ -415,11 +410,7 @@ class ExportController extends Controller
             'G'=>['Kota Dikeluarkan',18],'H'=>['Expired SIM',14],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label, $width]) {
-            $this->headerStyle($sheet,$col.$hRow,$label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($employees as $idx => $emp) {
@@ -454,7 +445,6 @@ class ExportController extends Controller
         $operators = SioSimOperator::orderBy('nama')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('GOI Operator');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet,'Data GOI Operator (SIO/SIM)','G',$operators->count());
 
@@ -464,11 +454,7 @@ class ExportController extends Controller
             'F'=>['SIO Expired',14],'G'=>['Keterangan',24],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label,$width]) {
-            $this->headerStyle($sheet,$col.$hRow,$label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($operators as $idx => $op) {
@@ -504,7 +490,6 @@ class ExportController extends Controller
             ->orderBy('name')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('Driver');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet,'Data Driver','M',$drivers->count());
 
@@ -516,11 +501,7 @@ class ExportController extends Controller
             'L'=>['Tgl Approve',14],'M'=>['DVP Status',24],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label,$width]) {
-            $this->headerStyle($sheet,$col.$hRow,$label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($drivers as $idx => $d) {
@@ -562,7 +543,6 @@ class ExportController extends Controller
             ->orderBy('no_unit')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('Equipment Unit');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet,'Data Equipment & Vehicle','AC',$equipments->count());
 
@@ -579,11 +559,7 @@ class ExportController extends Controller
             'AC'=>['Keterangan',24],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label,$width]) {
-            $this->headerStyle($sheet,$col.$hRow,$label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($equipments as $idx => $eq) {
@@ -644,7 +620,6 @@ class ExportController extends Controller
             ->where('is_active',true)->orderBy('operator_name')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('Equipment Operator');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet,'Data Equipment Operator','R',$operators->count());
 
@@ -659,11 +634,7 @@ class ExportController extends Controller
             'Q'=>['K3 P3A2 No.',22],'R'=>['K3 P3A2 Exp',14],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label,$width]) {
-            $this->headerStyle($sheet,$col.$hRow,$label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($operators as $idx => $op) {
@@ -712,7 +683,6 @@ class ExportController extends Controller
             ->orderBy('name')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('CCPM Manpower');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet,'Data Manpower CCPM Facility Engineering','L',$manpower->count());
 
@@ -724,11 +694,7 @@ class ExportController extends Controller
             'L'=>['Status',22],'M'=>['Status Medical',22],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label,$width]) {
-            $this->headerStyle($sheet,$col.$hRow,$label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($manpower as $idx => $m) {
@@ -771,7 +737,6 @@ class ExportController extends Controller
             ->orderBy('employee_id')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('Training');
-        $sheet = $wb->getActiveSheet();
 
         $this->makeTitle($sheet,'Data Training Karyawan','K',$trainings->count());
 
@@ -783,11 +748,7 @@ class ExportController extends Controller
             'J'=>['Expired',14],'K'=>['Ket.',20],
         ];
         $hRow = 4;
-        foreach ($headers as $col => [$label,$width]) {
-            $this->headerStyle($sheet,$col.$hRow,$label);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(32);
+        $this->renderHeaderRow($sheet, $headers, $hRow);
 
         $startRow = 5;
         foreach ($trainings as $idx => $t) {
@@ -832,7 +793,6 @@ class ExportController extends Controller
 
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('PPE '.now()->year);
-        $sheet = $wb->getActiveSheet();
         $sheet->setShowGridlines(false);
 
         // ── HEADER PERUSAHAAN (baris 1-6) ──
@@ -1011,27 +971,7 @@ class ExportController extends Controller
         $sheet->getPageSetup()->setFitToHeight(0);
         $sheet->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.4)->setRight(0.4);
 
-        $filename = 'PPE_'.now()->format('Ymd_His').'.xlsx';
-        $writer   = new Xlsx($wb);
-        return response()->stream(function() use ($writer) {
-            $writer->save('php://output');
-        }, 200, [
-            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-            'Cache-Control'       => 'max-age=0',
-        ]);
-    }
-
-    private function ppeHdr($sheet, string $cell, string $label, string $bg, bool $mergeDown=false, int $rowSpan=1): void
-    {
-        $sheet->setCellValue($cell, $label);
-        $this->applyPpeHdrStyle($sheet, $cell, $bg);
-        if ($mergeDown && $rowSpan > 1) {
-            preg_match('/([A-Z]+)(\d+)/', $cell, $m);
-            $endRow = (int)$m[2] + $rowSpan - 1;
-            $mergeRange = $m[1].$m[2].':'.$m[1].$endRow;
-            try { $sheet->mergeCells($mergeRange); } catch (\Exception $e) {}
-        }
+        return $this->streamExcel($wb, 'PPE_'.now()->format('Ymd_His').'.xlsx');
     }
 
     private function applyPpeHdrStyle($sheet, string $cell, string $bg): void
@@ -1047,8 +987,8 @@ class ExportController extends Controller
     private function ppeDateCell($sheet, string $col, int $row, $date, string $bg): void
     {
         if ($date) {
-            $d = $date instanceof \Carbon\Carbon ? $date : \Carbon\Carbon::parse($date);
-            $sheet->setCellValue($col.$row, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($d->timestamp));
+            $d = $date instanceof Carbon ? $date : Carbon::parse($date);
+            $sheet->setCellValue($col.$row, ExcelDate::PHPToExcel($d->timestamp));
             $sheet->getStyle($col.$row)->getNumberFormat()->setFormatCode('DD/MM/YYYY');
         } else {
             $sheet->setCellValue($col.$row, '');

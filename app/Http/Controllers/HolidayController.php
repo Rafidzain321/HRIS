@@ -29,23 +29,4 @@ class HolidayController extends Controller
         $holiday->delete();
         return back()->with('success', 'Hari libur berhasil dihapus.');
     }
-
-    // JSON endpoint untuk Timesheet (opsional)
-    public function byMonth(Request $request)
-    {
-        $tahun = $request->get('tahun', now()->year);
-        $bulan = $request->get('bulan', now()->month);
-
-        $holidays = Holiday::inMonth($tahun, $bulan)
-            ->get()
-            ->map(fn($h) => [
-                'tanggal'    => $h->tanggal->format('Y-m-d'),
-                'day'        => (int) $h->tanggal->format('j'),
-                'keterangan' => $h->keterangan,
-                'tipe'       => $h->tipe,
-            ])
-            ->keyBy('day');
-
-        return response()->json($holidays);
-    }
 }

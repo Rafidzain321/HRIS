@@ -7,7 +7,6 @@ use App\Models\Employee;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class EquipmentController extends Controller
 {

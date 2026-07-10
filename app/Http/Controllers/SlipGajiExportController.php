@@ -2,7 +2,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmployeePayroll;
-use App\Models\Employee;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
