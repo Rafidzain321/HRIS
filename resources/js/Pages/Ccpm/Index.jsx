@@ -1,8 +1,8 @@
 // resources>js>Pages>Ccpm>Index.jsx
 import { ConfirmModal } from '@/Layouts/AppLayout';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
-import { router, Link, usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import ImportModal from '@/Components/ImportModal';
 
 const CCPM_COLS = [

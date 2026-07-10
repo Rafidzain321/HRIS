@@ -178,16 +178,16 @@ export default function Dashboard({
                       <td style={{padding:'10px 8px'}}>
                         <div style={{display:'flex',gap:5}}>
                           {(()=>{
-                            const s = sisaUrgent;
-                            if (s === (e.sisa_sim??9999)   && (e.sisa_sim??9999)   >= -90)
+                            const sUrgent = sisaUrgent;
+                            if (sUrgent === (e.sisa_sim??9999)   && (e.sisa_sim??9999)   >= -90)
                               return e.sim_status==='expired'
                                 ? <span className="pill pill-red">SIM</span>
                                 : <span className="pill pill-warn">SIM</span>;
-                            if (s === (e.sisa_mcu??9999)   && (e.sisa_mcu??9999)   >= -90)
+                            if (sUrgent === (e.sisa_mcu??9999)   && (e.sisa_mcu??9999)   >= -90)
                               return e.mcu_status==='expired'
                                 ? <span className="pill pill-red">MCU</span>
                                 : <span className="pill pill-warn">MCU</span>;
-                            if (s === (e.sisa_badge??9999) && (e.sisa_badge??9999) >= -90)
+                            if (sUrgent === (e.sisa_badge??9999) && (e.sisa_badge??9999) >= -90)
                               return e.badge_status==='expired'
                                 ? <span className="pill pill-red">Badge</span>
                                 : <span className="pill pill-warn">Badge</span>;

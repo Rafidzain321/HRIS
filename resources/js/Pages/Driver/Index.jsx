@@ -194,8 +194,8 @@ export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filt
   const [modal, setModal]     = useState(null);
   const [confirmHapus, setConfirmHapus] = useState(null);
 
-  function doFilter(s, st, li, pe) {
-    router.get('/driver', {search:s,status:st,license:li,permit:pe}, {preserveState:true,replace:true});
+  function doFilter(searchVal, statusVal, licenseVal, permitVal) {
+    router.get('/driver', {search:searchVal,status:statusVal,license:licenseVal,permit:permitVal}, {preserveState:true,replace:true});
   }
 
   function handleSave(form) {
@@ -230,12 +230,12 @@ export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filt
         onCancel={()=>setConfirmHapus(null)}
         onConfirm={()=>{
           const id = confirmHapus.id;
-          const s = search, st = status, li = license, pe = permit;
+          const searchVal = search, statusVal = status, licenseVal = license, permitVal = permit;
           setConfirmHapus(null);
           router.delete(`/driver/${id}`, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => doFilter(s, st, li, pe),
+            onSuccess: () => doFilter(searchVal, statusVal, licenseVal, permitVal),
           });
         }}
         title="Hapus Data Driver"

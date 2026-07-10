@@ -54,12 +54,6 @@ function EditPpeModal({ employee, onClose }) {
     });
   }
 
-  const Row = ({ label, children }) => (
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 14px',marginBottom:8}}>
-      {children}
-    </div>
-  );
-
   const F = ({ label, k, type='text', opts }) => (
     <div>
       <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>{label}</label>
@@ -223,12 +217,6 @@ export default function PpePage({ employees={data:[],total:0,links:[],current_pa
     {k:'frc_XXL', label:'FRC (XXL)'},
     {k:'frc_XXXL',label:'FRC (XXXL)'},
     {k:'has_frc', label:'FRC (Total)'},
-  ];
-
-  const filterTabs = [
-    {key:'all',    label:'Semua',      val:stats.total},
-    {key:'has_frc',label:'Punya FRC',  val:stats.has_frc},
-    {key:'no_frc', label:'Belum FRC',  val:stats.no_frc},
   ];
 
   return (

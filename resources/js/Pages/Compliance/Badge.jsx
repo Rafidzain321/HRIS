@@ -3,8 +3,6 @@ import React, { useState, useEffect } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 
-function fmtDate(d){ if(!d) return '—'; try{ const dt=new Date(d); const m=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']; return `${String(dt.getDate()).padStart(2,'0')} ${m[dt.getMonth()]} ${dt.getFullYear()}`; }catch{ return '—'; } }
-
 function StatusPill({ status }){
   if(status==='expired') return <span className="pill pill-red">Expired</span>;
   if(status==='warning') return <span className="pill pill-warn">&lt;30hr</span>;
