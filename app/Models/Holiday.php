@@ -13,14 +13,4 @@ class Holiday extends Model
     {
         return $query->whereYear('tanggal', $tahun)->whereMonth('tanggal', $bulan);
     }
-
-    // Tipe labels
-    public static function tipeOptions(): array
-    {
-        return [
-            'libur_nasional' => 'Libur Nasional',
-            'cuti_bersama'   => 'Cuti Bersama',
-            'libur_khusus'   => 'Libur Khusus',
-        ];
-    }
 }

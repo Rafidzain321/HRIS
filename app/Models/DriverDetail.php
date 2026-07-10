@@ -37,8 +37,4 @@ class DriverDetail extends Model
             return 'warning';
         return 'valid';
     }
-    public function project()
-    {
-        return $this->belongsTo(\App\Models\Project::class);
-    }
 }

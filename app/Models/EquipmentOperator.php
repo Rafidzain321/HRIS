@@ -3,12 +3,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\Carbon;
 
 class EquipmentOperator extends Model
 {
     protected $fillable = [
-        'project_id',  // ← tambah
+        'project_id',
         'equipment_id',
         'employee_id',
         'operator_name',

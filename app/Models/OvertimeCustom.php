@@ -21,9 +21,4 @@ class OvertimeCustom extends Model
     {
         return $this->belongsTo(Employee::class);
     }
-
-    public function getTotalAttribute(): int
-    {
-        return $this->tarif_per_hari * $this->jumlah_hari;
-    }
 }

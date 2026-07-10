@@ -1,6 +1,5 @@
 <?php
 namespace App\Models;
-// ActivityLog.php
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

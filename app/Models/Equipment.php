@@ -5,13 +5,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\Carbon;
 
 class Equipment extends Model
 {
     protected $table = 'equipments';
     protected $fillable = [
-        'project_id',  // ← tambah
+        'project_id',
         'no_unit','plat_nomor','type_unit','model','manufacture','serial_no',
         'tahun','gps_unit_id','kategori','kapasitas',
         'stnk_expired','tax_expired','kir_expired','izin_non_bm_expired',

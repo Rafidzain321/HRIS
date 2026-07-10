@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Carbon\Carbon;
 
 class Employee extends Model
 {
@@ -50,12 +49,10 @@ class Employee extends Model
     // ── RELASI ──
     public function position(): BelongsTo    { return $this->belongsTo(Position::class); }
     public function department(): BelongsTo  { return $this->belongsTo(Department::class); }
-    public function driver(): HasOne         { return $this->hasOne(Driver::class); }
     public function ppe(): HasOne            { return $this->hasOne(Ppe::class); }
     public function trainings(): HasMany     { return $this->hasMany(Training::class); }
-    public function complianceLogs(): HasMany{ return $this->hasMany(ComplianceLog::class); }
-    public function documents(): HasMany     { return $this->hasMany(\App\Models\EmployeeDocument::class); }
-    public function timesheets(): HasMany    { return $this->hasMany(\App\Models\Timesheet::class); }
+    public function documents(): HasMany     { return $this->hasMany(EmployeeDocument::class); }
+    public function timesheets(): HasMany    { return $this->hasMany(Timesheet::class); }
     public function project() { return $this->belongsTo(Project::class); }
     // ── COMPUTED ATTRIBUTES ──
     public function getUmurAttribute(): ?int

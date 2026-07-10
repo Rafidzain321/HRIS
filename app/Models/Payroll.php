@@ -14,12 +14,4 @@ class Payroll extends Model
     protected $casts = ['tanggal_bayar' => 'date'];
 
     public function employee(): BelongsTo { return $this->belongsTo(Employee::class); }
-
-    public function getTotalPendapatanAttribute(): float
-    {
-        return $this->gapok + $this->t_jabatan + $this->incentive
-             + $this->uang_makan + $this->produksi + $this->lapangan
-             + $this->lembur_sabtu + $this->lembur_minggu
-             + $this->uang_transport + $this->kompensasi;
-    }
 }
