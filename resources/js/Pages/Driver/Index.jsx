@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import ImportModal from '@/Components/ImportModal';
+import { Plus, Pencil, X, Save, Truck, Upload, Download, Search, Check, Trash2 } from 'lucide-react';
 
 // ── Helper: strip trailing .0 dari angka yang disimpan sebagai float ──
 function stripDotZero(val) {
@@ -82,9 +83,9 @@ function DriverModal({ mode, data, onClose, onSave }) {
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:16, width:'min(660px, calc(100vw - 24px))', maxHeight:'90vh', overflow:'auto', boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)' }}>
           <div style={{ fontFamily:'Syne,sans-serif', fontSize:15, fontWeight:700, color:'var(--text)' }}>
-            {mode==='add' ? '➕ Tambah Driver' : '✏️ Edit Driver'}
+            {mode==='add' ? <span style={{display:'inline-flex',alignItems:'center',gap:8}}><Plus size={15}/>Tambah Driver</span> : <span style={{display:'inline-flex',alignItems:'center',gap:8}}><Pencil size={15}/>Edit Driver</span>}
           </div>
-          <div onClick={onClose} style={{ cursor:'pointer', fontSize:18, color:'var(--muted)' }}>✕</div>
+          <div onClick={onClose} style={{ cursor:'pointer', color:'var(--muted)', display:'flex' }}><X size={18}/></div>
         </div>
 
         <div style={{ padding:'18px 20px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px 16px' }}>
@@ -175,7 +176,7 @@ function DriverModal({ mode, data, onClose, onSave }) {
           </button>
           <button onClick={() => { if(!form.name.trim()){alert('Nama wajib diisi!');return;} onSave(form); }}
             style={{ padding:'9px 22px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#E8A020,#A06010)', color:'#0C0F14', fontSize:12.5, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
-            {mode==='add' ? '➕ Tambah' : '💾 Simpan'}
+            {mode==='add' ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Tambah</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan</span>}
           </button>
         </div>
       </div>
@@ -185,7 +186,7 @@ function DriverModal({ mode, data, onClose, onSave }) {
 
 export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filters = {} }) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [search, setSearch]   = useState(filters.search  || '');
   const [status, setStatus]   = useState(filters.status  || '');
   const [license, setLicense] = useState(filters.license || '');
@@ -286,7 +287,7 @@ export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filt
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">🚛 Data Driver — PT. Andalas Karya Mulia</div>
+          <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><Truck size={14}/> Data Driver — PT. Andalas Karya Mulia</div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <select value={status} onChange={e=>{setStatus(e.target.value);doFilter(search,e.target.value,license,permit);}}>
               <option value="">Semua Status</option>
@@ -307,23 +308,23 @@ export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filt
             {!isViewer && (
               <button onClick={()=>setModal({mode:'add'})}
                 style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                ➕ Tambah
+                <Plus size={13} style={{verticalAlign:-2}}/> Tambah
               </button>
             )}
 
             {!isViewer && (
               <button onClick={()=>setShowImport(true)}
                 style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                📥 Import
+                <Upload size={13} style={{verticalAlign:-2}}/> Import
               </button>
             )}
-            <a href="/export/driver" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif"}}>📤 Export</a>
+            <a href="/export/driver" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Download size={13}/> Export</a>
           </div>
         </div>
 
         <div style={{padding:'14px 16px'}}>
           <div style={{position:'relative',marginBottom:14}}>
-            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',fontSize:15,color:'var(--muted)'}}>🔍</span>
+            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={15}/></span>
             <input className="search-input" type="text" value={search}
               placeholder="Cari nama, NIK, no. SIM..."
               onChange={e=>{setSearch(e.target.value);doFilter(e.target.value,status,license,permit);}}
@@ -381,7 +382,7 @@ export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filt
                     <td><PosttestPill status={d.posttest_status} /></td>
                     <td>
                       <span style={{fontSize:10.5,color:d.dvp_status==='KP has been exist'?'var(--green)':'var(--muted2)'}}>
-                        {d.dvp_status==='KP has been exist'?'✅ Ada':d.dvp_status||'—'}
+                        {d.dvp_status==='KP has been exist'?<span style={{display:'inline-flex',alignItems:'center',gap:4}}><Check size={11}/>Ada</span>:d.dvp_status||'—'}
                       </span>
                     </td>
                     {!isViewer && (
@@ -389,11 +390,11 @@ export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filt
                         <div style={{display:'flex',gap:5,justifyContent:'center'}}>
                           <button onClick={()=>setModal({mode:'edit',data:{...d}})}
                             style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                            ✏️ Edit
+                            <Pencil size={11} style={{verticalAlign:-2}}/> Edit
                           </button>
                           <button onClick={()=>setConfirmHapus(d)}
                             style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                            🗑️ Hapus
+                            <Trash2 size={11} style={{verticalAlign:-2}}/> Hapus
                           </button>
                         </div>
                       </td>

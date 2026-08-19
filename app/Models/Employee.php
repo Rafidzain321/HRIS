@@ -54,6 +54,8 @@ class Employee extends Model
     public function documents(): HasMany     { return $this->hasMany(EmployeeDocument::class); }
     public function timesheets(): HasMany    { return $this->hasMany(Timesheet::class); }
     public function project() { return $this->belongsTo(Project::class); }
+    public function hoDetail(): HasOne       { return $this->hasOne(EmployeeHoDetail::class); }
+    public function kpiIndicators(): HasMany { return $this->hasMany(EmployeeKpiIndicator::class); }
     // ── COMPUTED ATTRIBUTES ──
     public function getUmurAttribute(): ?int
     {

@@ -36,6 +36,23 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $permissions = $user
+            ? ($user->hasRole('super-admin')
+                ? \Spatie\Permission\Models\Permission::pluck('name')
+                : $user->getAllPermissions()->pluck('name'))
+            : collect();
+
+        // Sama persis dengan logika di CheckMenuPermission middleware — dipakai frontend
+        // supaya tombol Tambah/Edit/Hapus otomatis disembunyikan (bukan cuma gagal 403)
+        // saat user multi-project sedang melihat project selain project asalnya.
+        $isProjectReadonly = false;
+        if ($user && !$user->hasRole('super-admin') && !$user->hasRole('viewer')) {
+            $projectIds = $user->project_ids ? json_decode($user->project_ids, true) : null;
+            if (is_array($projectIds) && count($projectIds) > 1) {
+                $activeProjectId = session('active_project_kode') ?: ($projectIds[0] ?? null);
+                $isProjectReadonly = (int) $activeProjectId !== (int) $user->project_id;
+            }
+        }
 
         return array_merge(parent::share($request), [
             'auth' => [
@@ -56,7 +73,10 @@ class HandleInertiaRequests extends Middleware
                         'is_super_admin' => $user->hasRole('super-admin'),
                         'is_viewer' => $user->hasRole('viewer'),
                         'is_project_user' => $user->hasRole('project-user'),
+                        'is_project_readonly' => $isProjectReadonly,
+                        'restrict_payroll' => (bool) $user->restrict_payroll,
                     ],
+                    'permissions' => $permissions,
                 ] : null,
             ],
             'flash' => [
@@ -67,7 +87,7 @@ class HandleInertiaRequests extends Middleware
             'active_project_id' => session('active_project_kode'),
             'projects' => \App\Models\Project::where('is_active', true)
                 ->orderBy('nama')
-                ->get(['id', 'kode', 'nama', 'warna'])
+                ->get(['id', 'kode', 'nama', 'warna', 'tipe_gaji'])
                 ->toArray(),
         ]);
     }

@@ -54,16 +54,16 @@ export function KaryawanPerProjectChart({ data = [] }) {
     return (
         <ResponsiveContainer width="100%" height={280}>
             <BarChart data={data} margin={{ top: 10, right: 16, left: -12, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
                 <XAxis
                     dataKey="project"
                     tick={{ fontSize: 11, fill: '#8A90A8' }}
-                    axisLine={{ stroke: 'rgba(255,255,255,.1)' }}
+                    axisLine={{ stroke: 'var(--border2)' }}
                     tickLine={false}
                 />
                 <YAxis
                     tick={{ fontSize: 11, fill: '#8A90A8' }}
-                    axisLine={false}
+                    axisLine={{ stroke: 'var(--border2)' }}
                     tickLine={false}
                     allowDecimals={false}
                 />
@@ -95,17 +95,17 @@ export function PengeluaranGajiChart({ data = [], projectKeys = [], isMultiProje
     return (
         <ResponsiveContainer width="100%" height={stackMode ? 320 : 280}>
             <BarChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
                 <XAxis
                     dataKey="label"
                     tick={{ fontSize: 10, fill: '#8A90A8' }}
-                    axisLine={{ stroke: 'rgba(255,255,255,.1)' }}
+                    axisLine={{ stroke: 'var(--border2)' }}
                     tickLine={false}
                     interval="preserveStartEnd"
                 />
                 <YAxis
                     tick={{ fontSize: 10, fill: '#8A90A8' }}
-                    axisLine={false}
+                    axisLine={{ stroke: 'var(--border2)' }}
                     tickLine={false}
                     tickFormatter={formatRupiahShort}
                 />

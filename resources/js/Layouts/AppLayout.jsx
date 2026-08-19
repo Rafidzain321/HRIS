@@ -2,27 +2,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import { PROJECT_COLORS } from '@/Constants/projectColors';
+import {
+  LayoutDashboard, User, Shield, Stethoscope, CreditCard, HardHat,
+  ClipboardList, Car, Truck, Calendar, Receipt, Wallet, BookOpen, Bell,
+  Settings, Moon, Sun, X, Loader2, CheckCircle2, XCircle, TriangleAlert,
+  Trash2, LogOut, Menu, Eye, Building2, Check, Target,
+} from 'lucide-react';
 
 const NAV = [
   { section: 'Utama' },
-  { key: 'dashboard',  icon: '⊞', label: 'Dashboard',     href: '/' },
-  { key: 'karyawan',   icon: '👤', label: 'Data Karyawan', href: '/employees', badge: null },
+  { key: 'dashboard',  icon: LayoutDashboard, label: 'Dashboard',     href: '/' },
+  { key: 'karyawan',   icon: User, label: 'Data Karyawan', href: '/employees', badge: null },
   { section: 'Compliance' },
-  { key: 'sim',        icon: '🛡️', label: 'SIM Karyawan',  href: '/compliance/sim',     badge: null },
-  { key: 'mcu',        icon: '🏥', label: 'MCU',           href: '/compliance/mcu',     badge: null },
-  { key: 'badge',      icon: '💳', label: 'Badge / KP',    href: '/compliance/badge',   badge: null },
-  { key: 'ppe',        icon: '🦺', label: 'PPE & Atribut', href: '/compliance/ppe' },
+  { key: 'sim',        icon: Shield, label: 'SIM Karyawan',  href: '/compliance/sim',     badge: null },
+  { key: 'mcu',        icon: Stethoscope, label: 'MCU',           href: '/compliance/mcu',     badge: null },
+  { key: 'badge',      icon: CreditCard, label: 'Badge / KP',    href: '/compliance/badge',   badge: null },
+  { key: 'ppe',        icon: HardHat, label: 'PPE & Atribut', href: '/compliance/ppe' },
   { section: 'Operasional' },
-  { key: 'ccpm',       icon: '📋', label: 'Data CCPM',     href: '/ccpm',       badge: null },
-  { key: 'driver',     icon: '👷', label: 'Data Driver',   href: '/driver' },
-  { key: 'equipment', icon: '🚜', label: 'Equipment & Operator', href: '/equipment' },
-  { key: 'timesheet',  icon: '📅', label: 'Timesheet',     href: '/timesheet' },
-  { key: 'slip-gaji',  icon: '🧾', label: 'Slip Gaji',     href: '/timesheet/slip-gaji' },
-  { key: 'data-gaji',  icon: '💰', label: 'Data Gaji',     href: '/timesheet/data-gaji' },
-  { key: 'training',   icon: '📚', label: 'Training',      href: '/training' },
+  { key: 'ccpm',       icon: ClipboardList, label: 'Data CCPM',     href: '/ccpm',       badge: null },
+  { key: 'driver',     icon: Car, label: 'Data Driver',   href: '/driver' },
+  { key: 'equipment', icon: Truck, label: 'Equipment & Operator', href: '/equipment' },
+  { key: 'timesheet',  icon: Calendar, label: 'Timesheet',     href: '/timesheet' },
+  { key: 'slip-gaji',  icon: Receipt, label: 'Slip Gaji',     href: '/timesheet/slip-gaji' },
+  { key: 'data-gaji',  icon: Wallet, label: 'Data Gaji',     href: '/timesheet/data-gaji' },
+  { key: 'training',   icon: BookOpen, label: 'Training',      href: '/training' },
+  { key: 'kpi',        icon: Target, label: 'KPI',           href: '/kpi' },
   { section: 'Sistem' },
-  { key: 'notifications', icon: '🔔', label: 'Notifikasi', href: '/notifications' },
-  { key: 'pengaturan', icon: '⚙️', label: 'Pengaturan',   href: '/pengaturan' },
+  { key: 'notifications', icon: Bell, label: 'Notifikasi', href: '/notifications' },
+  { key: 'pengaturan', icon: Settings, label: 'Pengaturan',   href: '/pengaturan' },
 ];
 
 function SnowCanvas({ dark }) {
@@ -89,8 +96,8 @@ function RealtimeClock() {
   const mons = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   return (
     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-      <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:8, padding:'5px 10px', fontSize:11, color:'var(--muted2)' }} className="hide-mobile">
-        📅 <b style={{ color:'var(--accent2)' }}>{days[now.getDay()]}, {String(now.getDate()).padStart(2,'0')} {mons[now.getMonth()]} {now.getFullYear()}</b>
+      <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:8, padding:'5px 10px', fontSize:11, color:'var(--muted2)', display:'inline-flex', alignItems:'center', gap:5 }} className="hide-mobile">
+        <Calendar size={13}/> <b style={{ color:'var(--accent2)' }}>{days[now.getDay()]}, {String(now.getDate()).padStart(2,'0')} {mons[now.getMonth()]} {now.getFullYear()}</b>
       </div>
       <div className="hide-mobile" style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:8, padding:'5px 10px', fontSize:13, fontFamily:'monospace', fontWeight:700, color:'var(--accent)', minWidth:78, textAlign:'center' }}>
         {String(now.getHours()).padStart(2,'0')}:{String(now.getMinutes()).padStart(2,'0')}:{String(now.getSeconds()).padStart(2,'0')}
@@ -102,7 +109,7 @@ function RealtimeClock() {
 function ThemeToggle({ dark, onToggle }) {
   return (
     <div onClick={onToggle} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', userSelect:'none' }}>
-      <span style={{ fontSize:14 }}>{dark ? '🌙' : '☀️'}</span>
+      <span style={{ display:'inline-flex' }}>{dark ? <Moon size={14}/> : <Sun size={14}/>}</span>
       <div style={{ width:40, height:22, borderRadius:11, background: dark ? '#3A8FE0' : '#E8C030', position:'relative', transition:'background .3s', border:'1px solid rgba(255,255,255,.15)', flexShrink:0 }}>
         <div style={{ position:'absolute', top:2, left: dark ? 20 : 2, width:16, height:16, borderRadius:'50%', background:'#fff', boxShadow:'0 1px 4px rgba(0,0,0,.3)', transition:'left .25s cubic-bezier(.22,.9,.25,1)' }}/>
       </div>
@@ -123,7 +130,7 @@ function NotifPanel({ open, onClose }) {
     }, 60000);
     return () => clearInterval(interval);
   }, [open]);
-  const typeIcon  = { sim:'🚗', mcu:'🏥', badge:'💳', kp:'📋' };
+  const typeIcon  = { sim:Car, mcu:Stethoscope, badge:CreditCard, kp:ClipboardList };
   const typeColor = { sim:'#3A8FE0', mcu:'#E06A20', badge:'#E8A020', kp:'#22C97A' };
   if (!open) return null;
   return (
@@ -131,17 +138,17 @@ function NotifPanel({ open, onClose }) {
       <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:199 }} />
       <div style={{ position:'fixed', top:58, right:12, width:'min(380px, calc(100vw - 24px)', maxHeight:'70vh', zIndex:200, background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:14, boxShadow:'0 20px 60px rgba(0,0,0,.4)', display:'flex', flexDirection:'column', animation:'fadeUp .2s both' }}>
         <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-          <div style={{ fontWeight:600, fontSize:13 }}>
-            🔔 Notifikasi Compliance
+          <div style={{ fontWeight:600, fontSize:13, display:'flex', alignItems:'center', gap:6 }}>
+            <Bell size={14}/> Notifikasi Compliance
             {data?.summary?.total > 0 && <span style={{ marginLeft:6, background:'var(--red)', color:'#fff', fontSize:9.5, fontWeight:700, borderRadius:99, padding:'1px 6px' }}>{data.summary.total}</span>}
           </div>
-          <div onClick={onClose} style={{ cursor:'pointer', fontSize:16, color:'var(--muted)', padding:'2px 6px' }}>✕</div>
+          <div onClick={onClose} style={{ cursor:'pointer', color:'var(--muted)', padding:'2px 6px', display:'flex' }}><X size={16}/></div>
         </div>
         <div style={{ overflowY:'auto', flex:1 }}>
           {loading ? (
-            <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12 }}>⏳ Memuat...</div>
+            <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> Memuat...</div>
           ) : !data?.items?.length ? (
-            <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12 }}>✅ Tidak ada compliance alert</div>
+            <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><CheckCircle2 size={14} color="#22C97A"/> Tidak ada compliance alert</div>
           ) : data.items.map((item, i) => (
             <a key={i} href={item.href} onClick={e=>{
                 e.preventDefault();
@@ -152,7 +159,7 @@ function NotifPanel({ open, onClose }) {
               style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'11px 14px', borderBottom:'1px solid var(--border)', textDecoration:'none', transition:'background .12s', cursor:'pointer' }}
               onMouseEnter={e=>e.currentTarget.style.background='rgba(232,160,32,.05)'}
               onMouseLeave={e=>e.currentTarget.style.background=''}>
-              <span style={{ fontSize:18, flexShrink:0 }}>{typeIcon[item.type] || '⚠️'}</span>
+              <span style={{ flexShrink:0, display:'flex' }}>{(() => { const Ic = typeIcon[item.type] || TriangleAlert; return <Ic size={18} color={typeColor[item.type]||'var(--accent)'}/>; })()}</span>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.nama}</div>
                 <div style={{ fontSize:10.5, color:'var(--muted2)', marginTop:1 }}>{item.jabatan}</div>
@@ -169,7 +176,9 @@ function NotifPanel({ open, onClose }) {
         {data?.summary && (
           <div style={{ padding:'10px 14px', borderTop:'1px solid var(--border)', display:'flex', gap:10, flexShrink:0 }}>
             {Object.entries(data.summary.by_type||{}).map(([k,v])=> v>0 && (
-              <span key={k} style={{ fontSize:10.5, color: typeColor[k]||'var(--muted2)' }}>{typeIcon[k]} {v}</span>
+              <span key={k} style={{ fontSize:10.5, color: typeColor[k]||'var(--muted2)', display:'inline-flex', alignItems:'center', gap:3 }}>
+                {(() => { const Ic = typeIcon[k]; return Ic ? <Ic size={12}/> : null; })()} {v}
+              </span>
             ))}
           </div>
         )}
@@ -191,12 +200,12 @@ function FlashNotif() {
   const isSuccess = msg.type === 'success';
   return (
     <div style={{ position:'fixed', bottom:20, right:16, zIndex:9999, display:'flex', alignItems:'center', gap:10, background: isSuccess?'rgba(34,201,122,.15)':'rgba(224,69,69,.15)', border:`1px solid ${isSuccess?'rgba(34,201,122,.4)':'rgba(224,69,69,.4)'}`, borderRadius:12, padding:'12px 16px', boxShadow:'0 8px 32px rgba(0,0,0,.35)', backdropFilter:'blur(8px)', width:'min(360px, calc(100vw - 32px))', transition:'all .3s', opacity:visible?1:0, transform:visible?'translateY(0)':'translateY(16px)', pointerEvents:visible?'auto':'none' }}>
-      <span style={{ fontSize:18, flexShrink:0 }}>{isSuccess?'✅':'❌'}</span>
+      <span style={{ flexShrink:0, display:'flex' }}>{isSuccess ? <CheckCircle2 size={18} color="#22C97A"/> : <XCircle size={18} color="#E04545"/>}</span>
       <div style={{ flex:1 }}>
         <div style={{ fontSize:12, fontWeight:600, color:isSuccess?'#22C97A':'#E04545' }}>{isSuccess?'Berhasil!':'Gagal!'}</div>
         <div style={{ fontSize:11.5, color:'var(--muted2)', marginTop:2, lineHeight:1.4 }}>{msg.text}</div>
       </div>
-      <div onClick={()=>setVisible(false)} style={{ cursor:'pointer', fontSize:13, color:'var(--muted)', padding:'2px 5px', borderRadius:5, border:'1px solid rgba(255,255,255,.07)', flexShrink:0 }}>✕</div>
+      <div onClick={()=>setVisible(false)} style={{ cursor:'pointer', color:'var(--muted)', padding:'2px 5px', borderRadius:5, border:'1px solid rgba(255,255,255,.07)', flexShrink:0, display:'flex' }}><X size={13}/></div>
       <div style={{ position:'absolute', bottom:0, left:0, height:3, borderRadius:'0 0 12px 12px', background:isSuccess?'#22C97A':'#E04545', animation:visible?'shrink 5s linear forwards':'none', width:'100%' }}/>
     </div>
   );
@@ -206,8 +215,8 @@ export function ConfirmModal({ open, onConfirm, onCancel, title, message, confir
   if (!open) return null;
 
   const colors = {
-    danger:  { bg:'rgba(224,69,69,.1)',  border:'rgba(224,69,69,.3)',  btn:'linear-gradient(135deg,#E04545,#A03030)', icon:'🗑️', iconBg:'rgba(224,69,69,.15)' },
-    warning: { bg:'rgba(232,160,32,.1)', border:'rgba(232,160,32,.3)', btn:'linear-gradient(135deg,#E8A020,#A06010)', icon:'⚠️', iconBg:'rgba(232,160,32,.15)' },
+    danger:  { bg:'rgba(224,69,69,.1)',  border:'rgba(224,69,69,.3)',  btn:'linear-gradient(135deg,#E04545,#A03030)', icon:<Trash2 size={28} color="#E04545"/>, iconBg:'rgba(224,69,69,.15)' },
+    warning: { bg:'rgba(232,160,32,.1)', border:'rgba(232,160,32,.3)', btn:'linear-gradient(135deg,#E8A020,#A06010)', icon:<TriangleAlert size={28} color="#E8A020"/>, iconBg:'rgba(232,160,32,.15)' },
   };
   const c = colors[type] || colors.danger;
   const displayIcon = icon || c.icon;
@@ -220,7 +229,7 @@ export function ConfirmModal({ open, onConfirm, onCancel, title, message, confir
 
         <div style={{padding:'28px 28px 20px',textAlign:'center'}}>
           {/* Icon */}
-          <div style={{width:56,height:56,borderRadius:14,background:c.iconBg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,margin:'0 auto 16px'}}>
+          <div style={{width:56,height:56,borderRadius:14,background:c.iconBg,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}>
             {displayIcon}
           </div>
 
@@ -251,63 +260,31 @@ export function ConfirmModal({ open, onConfirm, onCancel, title, message, confir
   );
 }
 
-// ── Profile Dropdown ────────────────────────────────────────
+// ── Profile + Logout ────────────────────────────────────────
 function ProfileMenu({ authUser, onLogout }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function handler(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   return (
-    <div ref={ref} style={{ position:'relative', padding:'10px 8px', borderTop:'1px solid var(--border)' }}>
-      {open && (
-        <div style={{
-          position:'absolute', bottom:'calc(100% + 6px)', left:8, right:8,
-          background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:10,
-          boxShadow:'0 12px 32px rgba(0,0,0,.35)', overflow:'hidden', zIndex:60,
-          animation:'fadeUp .15s both',
-        }}>
-          <a href="/pengaturan" onClick={()=>setOpen(false)} style={{
-            display:'flex', alignItems:'center', gap:8, padding:'10px 14px',
-            fontSize:12.5, color:'var(--text)', textDecoration:'none',
-            borderBottom:'1px solid var(--border)', cursor:'pointer',
-          }}
-            onMouseEnter={e=>e.currentTarget.style.background='rgba(232,160,32,.06)'}
-            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-            ⚙️ Pengaturan
-          </a>
-          <div onClick={()=>{ setOpen(false); onLogout(); }} style={{
-            display:'flex', alignItems:'center', gap:8, padding:'10px 14px',
-            fontSize:12.5, color:'#E04545', cursor:'pointer',
-          }}
-            onMouseEnter={e=>e.currentTarget.style.background='rgba(224,69,69,.08)'}
-            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-            🚪 Logout
-          </div>
-        </div>
-      )}
-      <div onClick={()=>setOpen(o=>!o)}
-        style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'var(--bg3)', border:'1px solid var(--border)', cursor:'pointer', transition:'background .15s' }}
-        onMouseEnter={e=>e.currentTarget.style.background='var(--card)'}
-        onMouseLeave={e=>e.currentTarget.style.background='var(--bg3)'}>
+    <div style={{ padding:'10px 8px', borderTop:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:6 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'var(--bg3)', border:'1px solid var(--border)' }}>
         <div style={{ width:28, height:28, borderRadius:7, background:'linear-gradient(135deg,#3A8FE0,#22C97A)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
           {(authUser?.name || 'HR').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase()}
         </div>
         <div style={{ minWidth:0, flex:1 }}>
           <div style={{ fontSize:11, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{authUser?.name || 'Admin HR'}</div>
           <div style={{ fontSize:9.5, color:'var(--muted)' }}>
-            {authUser?.role || authUser?.can?.is_super_admin ? 'Super Admin' :
+            {authUser?.role === 'super-admin' || authUser?.can?.is_super_admin ? 'Super Admin' :
             authUser?.can?.is_viewer ? 'Viewer' :
             authUser?.project?.nama || 'Project User'}
           </div>
         </div>
-        <span style={{ fontSize:10, color:'var(--muted)', transform: open ? 'rotate(180deg)' : 'none', transition:'transform .15s' }}>▼</span>
+      </div>
+      <div onClick={onLogout} style={{
+        display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 10px', borderRadius:8,
+        fontSize:12, fontWeight:600, color:'#E04545', cursor:'pointer',
+        background:'rgba(224,69,69,.06)', border:'1px solid rgba(224,69,69,.18)', transition:'background .15s',
+      }}
+        onMouseEnter={e=>e.currentTarget.style.background='rgba(224,69,69,.12)'}
+        onMouseLeave={e=>e.currentTarget.style.background='rgba(224,69,69,.06)'}>
+        <LogOut size={14}/> Keluar
       </div>
     </div>
   );
@@ -333,11 +310,7 @@ function ProjectDropdown({ authUser }) {
 
   function selectProject(kode) {
     setOpen(false);
-    if (showMulti) {
-      router.post('/switch-project', { project: kode });
-    } else {
-      window.location.href = `/?project=${kode}`;
-    }
+    router.post('/switch-project', { project: kode });
   }
 
   return (
@@ -374,7 +347,7 @@ function ProjectDropdown({ authUser }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', padding: '0 10px', maxHeight: '50vh', overflowY: 'auto' }}>
               {!showMulti && (
-                <div onClick={() => { setOpen(false); window.location.href = '/?project=all'; }}
+                <div onClick={() => { setOpen(false); router.post('/switch-project', { project: 'all' }); }}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '12px 10px', borderRadius: 10,
@@ -384,27 +357,48 @@ function ProjectDropdown({ authUser }) {
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
                     <span style={{ fontSize: 14, fontWeight: !activeProjectId ? 700 : 400, color: !activeProjectId ? 'var(--accent)' : 'var(--text)' }}>Semua Project</span>
                   </div>
-                  {!activeProjectId && <span style={{ color: 'var(--accent)', fontSize: 16 }}>✓</span>}
+                  {!activeProjectId && <Check size={16} color="var(--accent)"/>}
                 </div>
               )}
-              {(showMulti ? multiProjects : projects).map(p => {
-                const isActive = activeProjectId === p.id;
-                const warna = PROJECT_COLORS[p.kode] || p.warna;
-                return (
-                  <div key={p.id} onClick={() => selectProject(p.kode)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '12px 10px', borderRadius: 10,
-                      background: isActive ? `${warna}18` : 'transparent',
-                    }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: warna }} />
-                      <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 400, color: isActive ? warna : 'var(--text)' }}>{p.nama}</span>
+              {(() => {
+                const list = showMulti ? multiProjects : projects;
+                const fieldList = list.filter(p => p.kode.toUpperCase() !== 'HO');
+                const hoItem = list.find(p => p.kode.toUpperCase() === 'HO');
+                const renderRow = p => {
+                  const isActive = activeProjectId === p.id;
+                  const warna = PROJECT_COLORS[p.kode] || p.warna;
+                  return (
+                    <div key={p.id} onClick={() => selectProject(p.kode)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '12px 10px', borderRadius: 10,
+                        background: isActive ? `${warna}18` : 'transparent',
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: warna }} />
+                        <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 400, color: isActive ? warna : 'var(--text)' }}>{p.nama}</span>
+                      </div>
+                      {isActive && <Check size={16} color={warna}/>}
                     </div>
-                    {isActive && <span style={{ color: warna, fontSize: 16 }}>✓</span>}
-                  </div>
+                  );
+                };
+                return (
+                  <>
+                    {fieldList.map(renderRow)}
+                    {hoItem && (
+                      <>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, margin:'10px 10px 2px' }}>
+                          <span style={{ fontSize:10.5, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.06em', whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:4 }}>
+                            <Building2 size={11}/> Kantor Pusat
+                          </span>
+                          <div style={{ flex:1, borderTop:'1px solid var(--border)' }} />
+                        </div>
+                        {renderRow(hoItem)}
+                      </>
+                    )}
+                  </>
                 );
-              })}
+              })()}
             </div>
           </div>
         </>
@@ -471,6 +465,7 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
         @keyframes shrink{from{width:100%}to{width:0%}}
         @keyframes slideIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
         @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
 
         .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:12.5px;font-weight:500;color:var(--muted2);cursor:pointer;transition:all .18s;position:relative;text-decoration:none;}
         .nav-item:hover{color:var(--text);background:rgba(128,128,128,.08);}
@@ -637,7 +632,7 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
         onCancel={()=>setConfirmLogout(false)}
         onConfirm={()=>router.post('/logout')}
         title="Logout"
-        icon=""
+        icon={<LogOut size={28} color="#E04545"/>}
         message="Kamu akan keluar dari sistem. Yakin mau logout?"
         confirmLabel="Ya, Logout"
         type="danger"
@@ -660,7 +655,7 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
             <img src="/images/logo-akm.png" alt="PT. AKM"
               style={{height:32,width:'auto',objectFit:'contain'}} />
           </div>
-          <div onClick={()=>setSidebarOpen(false)} style={{ cursor:'pointer', fontSize:18, color:'var(--muted)', padding:'4px 8px' }}>✕</div>
+          <div onClick={()=>setSidebarOpen(false)} style={{ cursor:'pointer', color:'var(--muted)', padding:'4px 8px', display:'flex' }}><X size={18}/></div>
         </div>
         <SidebarContent url={url} authUser={authUser} onLogout={()=>setConfirmLogout(true)} />
       </aside>
@@ -673,7 +668,7 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
 
           {/* Left: hamburger + title */}
           <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
-            <div className="hamburger" onClick={()=>setSidebarOpen(true)}>☰</div>
+            <div className="hamburger" onClick={()=>setSidebarOpen(true)}><Menu size={20}/></div>
             <div className="topbar-title" style={{ fontFamily:'Syne,sans-serif', fontSize:17, fontWeight:700, color:'var(--text)', whiteSpace:'nowrap', overflow:'visible', textOverflow:'ellipsis' }}>
               {title} <span style={{ color:'var(--accent)' }}>{subtitle}</span>
             </div>
@@ -687,7 +682,7 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
             </div>
             <ProjectDropdown authUser={authUser} />
             <div className="icon-btn" onClick={()=>setNotifOpen(!notifOpen)}>
-              🔔
+              <Bell size={18}/>
               <div style={{ position:'absolute', top:6, right:6, width:7, height:7, borderRadius:'50%', background:'var(--red)', animation:'blink 1.5s infinite' }}/>
             </div>
           </div>
@@ -707,11 +702,36 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
 // ── Sidebar content (shared desktop & mobile) ──────────────
 function SidebarContent({ url, authUser, onLogout }) {
   const { projects, active_project_id: activeProjectId } = usePage().props;
+  const permissions = authUser?.permissions || [];
   const userProject = authUser?.project;
   const isSuperAdmin = authUser?.can?.is_super_admin;
   const isViewer = authUser?.can?.is_viewer;
   const isMultiProject = !isSuperAdmin && authUser?.project_ids?.length > 1;
   const multiProjects = isMultiProject ? projects?.filter(p => authUser.project_ids.includes(p.id)) : [];
+
+  // Project HO (kantor pusat) tidak punya compliance/training/timesheet — sembunyikan menu itu.
+  const currentProjectKode = (projects?.find(p => p.id === activeProjectId)?.kode || userProject?.kode || '').toLowerCase();
+  const isHoProject = currentProjectKode === 'ho';
+  const HO_HIDDEN_KEYS = ['sim', 'mcu', 'badge', 'ppe', 'ccpm', 'driver', 'equipment', 'timesheet', 'training'];
+  // Kebalikannya: KPI cuma dipakai untuk Head Office, jadi sembunyikan menunya
+  // kalau project yang lagi difilter/aktif BUKAN HO (mis. admin lagi lihat project Giam).
+  const NON_HO_HIDDEN_KEYS = ['kpi'];
+  const restrictPayroll = authUser?.can?.restrict_payroll;
+  const PAYROLL_KEYS = ['slip-gaji', 'data-gaji'];
+  // Menu 'pengaturan' sengaja tidak dicek lewat permission matriks (tetap kelihatan untuk semua,
+  // aksesnya sendiri sudah digerbang lewat hasRole('super-admin') di controller-nya).
+  const canViewMenu = (key) => key === 'pengaturan' || permissions.includes(`view-${key}`);
+  const filteredNav = (isHoProject
+      ? NAV.filter(item => !item.key || !HO_HIDDEN_KEYS.includes(item.key))
+      : NAV.filter(item => !item.key || !NON_HO_HIDDEN_KEYS.includes(item.key)))
+    .filter(item => !restrictPayroll || !item.key || !PAYROLL_KEYS.includes(item.key))
+    .filter(item => !item.key || canViewMenu(item.key));
+  // Buang judul section yang jadi kosong setelah item-nya difilter (mis. "Compliance" tanpa isi).
+  const navItems = filteredNav.filter((item, i) => {
+    if (!item.section) return true;
+    const next = filteredNav[i + 1];
+    return next && !next.section;
+  });
 
   return (
     <>
@@ -734,45 +754,76 @@ function SidebarContent({ url, authUser, onLogout }) {
           </div>
         ) : isViewer ? (
           <div style={{marginTop:6,display:'inline-flex',alignItems:'center',gap:5,padding:'3px 8px',borderRadius:6,background:'rgba(58,143,224,.1)',border:'1px solid rgba(58,143,224,.2)'}}>
-            <span style={{fontSize:10,fontWeight:700,color:'var(--blue)'}}>👁️ Viewer</span>
+            <Eye size={11} color="var(--blue)"/>
+            <span style={{fontSize:10,fontWeight:700,color:'var(--blue)'}}>Viewer</span>
           </div>
         ) : null}
 
         {/* Kalau super admin, tampilkan semua project sebagai switcher */}
-        {(isSuperAdmin || isViewer) && projects?.length > 0 && (
-          <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:4}}>
-            {/* Tombol "Semua" */}
-            <a href="/?project=all"
-              style={{
-                fontSize:9, padding:'2px 8px', borderRadius:4, fontWeight:700,
-                background: !activeProjectId ? 'var(--accent)' : 'var(--border2)',
-                color: !activeProjectId ? '#0C0F14' : 'var(--text)',
-                border: !activeProjectId ? '1px solid var(--accent)' : '1px solid var(--border2)',
-                transition:'all .15s',
-                textDecoration:'none',
-              }}>
-              SEMUA
-            </a>
-            {projects.map(p => {
-              const isActive = activeProjectId === p.id;
-              const warna = PROJECT_COLORS[p.kode] || p.warna;
-              return (
-                <a key={p.id} href={`/?project=${p.kode}`}
+        {(isSuperAdmin || isViewer) && projects?.length > 0 && (() => {
+          const pillBase = {
+            appearance:'none', WebkitAppearance:'none', outline:'none', lineHeight:'normal',
+            fontFamily:"'Outfit',sans-serif",
+            fontSize:9, padding:'2px 6px', borderRadius:4, fontWeight:700,
+            cursor:'pointer', transition:'all .15s',
+          };
+          const fieldProjects = projects.filter(p => p.kode.toUpperCase() !== 'HO');
+          const hoProject = projects.find(p => p.kode.toUpperCase() === 'HO');
+          return (
+            <>
+              <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:4}}>
+                {/* Tombol "Semua" */}
+                <button onClick={()=>router.post('/switch-project',{project:'all'})}
                   style={{
-                    fontSize:9, padding:'2px 6px', borderRadius:4, fontWeight:700,
-                    background: isActive ? warna : 'var(--border2)',
-                    color: isActive ? '#fff' : 'var(--text)',
-                    border: isActive ? `1px solid ${warna}` : '1px solid var(--border2)',
-                    textDecoration:'none',
-                    boxShadow: isActive ? `0 0 8px ${warna}60` : 'none',
-                    transition:'all .15s',
+                    ...pillBase, padding:'2px 8px',
+                    background: !activeProjectId ? 'var(--accent)' : 'var(--border2)',
+                    color: !activeProjectId ? '#0C0F14' : 'var(--text)',
+                    border: !activeProjectId ? '1px solid var(--accent)' : '1px solid var(--border2)',
                   }}>
-                  {p.kode.toUpperCase()}
-                </a>
-              );
-            })}
-          </div>
-        )}
+                  SEMUA
+                </button>
+                {fieldProjects.map(p => {
+                  const isActive = activeProjectId === p.id;
+                  const warna = PROJECT_COLORS[p.kode] || p.warna;
+                  return (
+                    <button key={p.id} onClick={()=>router.post('/switch-project',{project:p.kode})}
+                      style={{
+                        ...pillBase,
+                        background: isActive ? warna : 'var(--border2)',
+                        color: isActive ? '#fff' : 'var(--text)',
+                        border: isActive ? `1px solid ${warna}` : '1px solid var(--border2)',
+                        boxShadow: isActive ? `0 0 8px ${warna}60` : 'none',
+                      }}>
+                      {p.kode.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+              {hoProject && (() => {
+                const isActive = activeProjectId === hoProject.id;
+                const warna = PROJECT_COLORS[hoProject.kode] || hoProject.warna;
+                return (
+                  <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid var(--border)',display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{fontSize:8.5,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.05em',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:4}}>
+                      <Building2 size={10}/> Kantor Pusat
+                    </span>
+                    <button onClick={()=>router.post('/switch-project',{project:hoProject.kode})}
+                      title="Kantor Pusat — bukan project lapangan"
+                      style={{
+                        ...pillBase,
+                        background: isActive ? warna : 'transparent',
+                        color: isActive ? '#fff' : warna,
+                        border: `1px solid ${warna}`,
+                        boxShadow: isActive ? `0 0 8px ${warna}60` : 'none',
+                      }}>
+                      {hoProject.kode.toUpperCase()}
+                    </button>
+                  </div>
+                );
+              })()}
+            </>
+          );
+        })()}
         {/* Multi-project user switcher (Dedi dll) */}
         {isMultiProject && multiProjects.length > 0 && (
           <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:4}}>
@@ -782,6 +833,8 @@ function SidebarContent({ url, authUser, onLogout }) {
               return (
                 <button key={p.id} onClick={()=>router.post('/switch-project',{project:p.kode})}
                   style={{
+                    appearance:'none', WebkitAppearance:'none', outline:'none', lineHeight:'normal',
+                    fontFamily:"'Outfit',sans-serif",
                     fontSize:9, padding:'2px 6px', borderRadius:4, fontWeight:700,
                     background: isActive ? warna : 'var(--border2)',
                     color: isActive ? '#fff' : 'var(--text)',
@@ -799,14 +852,14 @@ function SidebarContent({ url, authUser, onLogout }) {
       </div>
 
       <nav style={{ flex:1, padding:'12px 8px', display:'flex', flexDirection:'column', gap:2, overflowY:'auto' }}>
-        {NAV.map((item, i) => {
+        {navItems.map((item, i) => {
 
           return item.section ? (
             <div key={i} style={{fontSize:9.5,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.1em',fontWeight:600,padding:'10px 8px 4px'}}>{item.section}</div>
           ) : (
             <Link key={item.key} href={item.href}
               className={`nav-item ${url===item.href||(item.href!=='/'&&url.startsWith(item.href))?'active':''}`}>
-              <span style={{fontSize:15,width:18,textAlign:'center',flexShrink:0}}>{item.icon}</span>
+              <span style={{width:18,display:'flex',justifyContent:'center',flexShrink:0}}><item.icon size={15}/></span>
               {item.label}
               {item.badge && <span style={{marginLeft:'auto',background:'var(--blue)',color:'#fff',fontSize:9.5,fontWeight:700,borderRadius:99,padding:'1px 6px'}}>{item.badge}</span>}
             </Link>

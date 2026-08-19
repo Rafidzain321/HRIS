@@ -4,12 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\Employee;
+use App\Models\EmployeeHoDetail;
 use App\Models\EmployeePayroll;
+use App\Models\EmployeeSalaryHistory;
 use App\Models\Holiday;
 use App\Models\Project;
 use App\Models\Timesheet;
 use App\Models\TimesheetMember;
 use App\Models\ProjectTttItem;
+use App\Models\ProjectPotonganItem;
+use App\Models\ProjectBpjsConfig;
+use App\Models\ProjectTtdConfig;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -38,11 +43,7 @@ class PayrollController extends Controller
         $bulanNama  = $this->bulanNama();
         $projectId  = $this->activeProjectId();
 
-        $members = TimesheetMember::where('aktif', true)
-            ->when($projectId, fn($q, $pid) => $q->where('project_id', $pid))
-            ->with('employee.position')
-            ->orderBy('urutan')->orderBy('id_badge')
-            ->get();
+        $members = $this->getPayrollRoster($projectId, $tahun, $bulan);
 
         $employeeList = $members->map(fn($m) => [
             'id'           => $m->employee?->id,
@@ -60,126 +61,8 @@ class PayrollController extends Controller
             $employee = Employee::with(['position', 'project'])->find($employeeId);
 
             if ($employee) {
-                $isMd = $employee->project?->tipe_gaji === 'md';
-
-                // Ambil kelompok dari TimesheetMember
-                $member  = $members->firstWhere('id_badge', $employee->id_badge);
-                $isFlat  = $member?->kelompok === 'flat';
-
-                if ($isMd) {
-                    $tsData   = $this->getTimesheetData($employee->id, $tahun, $bulan);
-                    $slipData = $this->hitungSlipGajiMd($employee, $tahun, $bulan, $tsData);
-                } else {
-                    $slipData = $this->hitungSlipGaji($employee, $tahun, $bulan, $isFlat);
-                }
-
-                $hariDetails  = $slipData['hari_details'];
-                $savedPayroll = EmployeePayroll::where([
-                    'employee_id' => $employee->id,
-                    'tahun'       => $tahun,
-                    'bulan'       => $bulan,
-                ])->first();
-
-                if ($savedPayroll && $slipData) {
-                    // ── Override field-field dari data tersimpan (single source of truth) ──
-                    $slipData['tunj_makan']            = $savedPayroll->tunj_makan            ?? $slipData['tunj_makan'];
-                    $slipData['tunj_produksi']         = $savedPayroll->tunj_produksi         ?? $slipData['tunj_produksi'];
-                    $slipData['tunj_lapangan']         = $savedPayroll->tunj_lapangan         ?? $slipData['tunj_lapangan'];
-                    $slipData['tunj_kehadiran']        = $savedPayroll->tunj_kehadiran        ?? 0;
-                    $slipData['tunj_pulsa']            = $savedPayroll->tunj_pulsa            ?? 0;
-                    $slipData['kompensasi_kontrak']    = $savedPayroll->kompensasi_kontrak    ?? 0;
-                    $slipData['insentif']              = $savedPayroll->insentif              ?? $slipData['insentif'];
-                    $slipData['com_day']               = $savedPayroll->com_day               ?? $slipData['com_day'];
-                    $slipData['gaji_pokok']            = $savedPayroll->gaji_pokok !== null ? $savedPayroll->gaji_pokok : $slipData['gaji_pokok'];
-                    $slipData['tunj_tetap']            = $savedPayroll->tunj_tetap !== null ? $savedPayroll->tunj_tetap : $slipData['tunj_tetap'];
-
-                    // Field tambahan yg sebelumnya missing — inilah root cause slip UI salah
-                    $slipData['kompensasi_pwt']        = $savedPayroll->kompensasi_pwt        ?? $slipData['kompensasi_pwt'];
-                    $slipData['upah_lembur']           = $savedPayroll->upah_lembur           ?? $slipData['upah_lembur'];
-                    $slipData['total_lembur_flat']     = $savedPayroll->total_lembur_flat     ?? $slipData['total_lembur_flat'];
-                    $slipData['jml_jam_lembur']        = $savedPayroll->jml_jam_lembur        ?? $slipData['jml_jam_lembur'];
-                    $slipData['l_sabtu']               = $savedPayroll->l_sabtu               ?? $slipData['l_sabtu'];
-                    $slipData['l_libur']               = $savedPayroll->l_libur               ?? $slipData['l_libur'];
-                    $slipData['lembur_biasa']          = $savedPayroll->lembur_biasa          ?? $slipData['lembur_biasa'];
-                    $slipData['uang_hadir']            = $savedPayroll->uang_hadir            ?? $slipData['uang_hadir'];
-                    $slipData['potongan_alpa']         = $savedPayroll->potongan_alpa         ?? $slipData['potongan_alpa'];
-                    $slipData['potongan_insentif']     = $savedPayroll->potongan_insentif     ?? 0;
-                    $slipData['pot_tabung_oksigen']    = $savedPayroll->pot_tabung_oksigen    ?? 0;
-                    $slipData['kekurangan_bulan_lalu'] = $savedPayroll->kekurangan_bulan_lalu ?? 0;
-                    $slipData['stb']                   = $savedPayroll->stb                   ?? $slipData['stb'] ?? 0;
-
-                    if ($isMd) {
-                        $slipData['ttt_perhari'] = $savedPayroll->ttt_perhari ?? $slipData['ttt_perhari'];
-                        $slipData['h_kerja']     = $savedPayroll->h_kerja     ?? $slipData['h_kerja'];
-                        $slipData['h_basic']     = $savedPayroll->h_basic     ?? $slipData['h_basic'];
-                        $slipData['h_sabtu']     = $savedPayroll->h_sabtu     ?? $slipData['h_sabtu'];
-                    }
-
-                    // ── Recalc gaji_kotor & gaji_bersih (respect % BPJS live) ──
-                    $upahPenuh = $slipData['gaji_pokok'] + $slipData['tunj_tetap'];
-
-                    if (!$isMd) {
-                        $tttSum = $slipData['tunj_makan'] + $slipData['tunj_produksi'] + $slipData['tunj_lapangan']
-                                + $slipData['tunj_kehadiran'] + $slipData['tunj_pulsa'] + $slipData['kompensasi_kontrak']
-                                + $slipData['insentif'] + $slipData['com_day'];
-
-                        // Gunakan upah_lembur (per_jam) atau total_lembur_flat (flat)
-                        // Pakai `?:` supaya 0 fallback (bukan `??` yang hanya null-safe)
-                        $upahLembur = ($slipData['kelompok'] ?? '') === 'flat'
-                            ? ($slipData['total_lembur_flat'] ?: 0)
-                            : ($slipData['upah_lembur'] ?: 0);
-
-                        $slipData['gaji_kotor'] = round(
-                            $slipData['gaji_pokok']
-                            + $slipData['tunj_tetap']
-                            + $slipData['kompensasi_pwt']
-                            + $tttSum
-                            + $upahLembur
-                        );
-
-                        $slipData['gaji_bersih'] = round(
-                            $slipData['gaji_kotor']
-                            - round($upahPenuh * 0.02)  // JHT default 2%
-                            - round($upahPenuh * 0.01)  // Pensiun 1%
-                            - round($upahPenuh * 0.01)  // Kesehatan 1%
-                            - ($slipData['potongan_alpa']     ?? 0)
-                            - ($slipData['potongan_insentif'] ?? 0)
-                            - ($slipData['pot_tabung_oksigen'] ?? 0)
-                            + ($slipData['kekurangan_bulan_lalu'] ?? 0)
-                        );
-                    } else {
-                        // MD calc — sama seperti sebelumnya
-                        $hKerja      = $slipData['h_basic'] ?? 0;
-                        $hSabtu      = $slipData['h_sabtu'] ?? 0;
-                        $uBasic      = round($upahPenuh / 17 * min($hKerja, 17), 2);
-                        $uKerja      = round((($slipData['tunj_makan'] ?? 0) + ($slipData['tunj_kehadiran'] ?? 0)) * ($slipData['h_kerja'] ?? 0), 2);
-                        $comDayTotal = round(($slipData['com_day'] ?? 0) * $hSabtu, 2);
-                        $upahLembur  = $savedPayroll->upah_lembur ?? $slipData['upah_lembur'] ?? 0;
-
-                        $slipData['u_basic'] = $uBasic;
-                        $slipData['u_kerja'] = $uKerja;
-                        $slipData['upah_lembur'] = $upahLembur;
-
-                        $slipData['gaji_kotor'] = round(
-                            $uBasic
-                            + ($slipData['kompensasi_pwt'] ?? 0)
-                            + $uKerja
-                            + $comDayTotal
-                            + $upahLembur
-                            + ($slipData['tunj_pulsa'] ?? 0)
-                            + ($slipData['kekurangan_bulan_lalu'] ?? 0),
-                            2
-                        );
-                        $slipData['gaji_bersih'] = round(
-                            $slipData['gaji_kotor']
-                            - round($upahPenuh * 0.02)
-                            - round($upahPenuh * 0.01)
-                            - round($upahPenuh * 0.01)
-                            - ($slipData['potongan_alpa'] ?? 0),
-                            2
-                        );
-                    }
-                }
+                $slipData    = $this->getSlipData((int) $employeeId, $tahun, $bulan);
+                $hariDetails = $slipData['hari_details'] ?? [];
             }
         }
 
@@ -209,8 +92,16 @@ class PayrollController extends Controller
         $bulan     = (int) $request->get('bulan', now()->month);
         $bulanNama = $this->bulanNama();
         $projectId = $this->activeProjectId();
+        $isHo      = $projectId && Project::find($projectId)?->tipe_gaji === 'ho';
 
         $built = $this->buildPayrollRows($tahun, $bulan, $projectId);
+
+        // Simpan snapshot lembur/BPJS/potongan terbaru ke database setiap halaman ini
+        // dibuka, supaya data yang dibaca langsung dari tabel tersimpan (Dashboard, cetak
+        // slip dari riwayat) selalu ikut fresh tanpa perlu tombol "Hitung Ulang" manual.
+        if (!$this->isViewer()) {
+            $this->persistPayrollSnapshot($tahun, $bulan, $projectId);
+        }
 
         return Inertia::render('Timesheet/DataGaji', [
             'tahun'             => $tahun,
@@ -221,10 +112,124 @@ class PayrollController extends Controller
             'total_gaji_kotor'  => $built['total_gaji_kotor'],
             'total_gaji_bersih' => $built['total_gaji_bersih'],
             'ttt_items'         => $built['ttt_items'],
+            'potongan_items'    => $built['potongan_items'],
+            'bpjs_pct'          => $projectId ? $this->getBpjsPct($projectId, $tahun, $bulan) : ['jht' => 2.0, 'pensiun' => 1.0, 'kes' => 1.0],
+            'ttd_list'          => $projectId ? $this->getTtdList($projectId) : null,
             'project_info'      => $projectId
                 ? Project::find($projectId, ['id', 'kode', 'nama', 'tipe_gaji', 'tipe_timesheet'])
                 : null,
+            'salary_matrix'     => $isHo ? $this->buildHoSalaryMatrix($projectId, $tahun, $bulan) : null,
         ]);
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // MATRIKS RIWAYAT GAJI HO — kolom lebar ala Excel sumbernya (satu kolom per
+    // label historis 2018-2026), digabung untuk seluruh karyawan HO-1 & HO-2 dalam
+    // satu set kolom (union label dari kedua unit). Label diurutkan kronologis
+    // berdasarkan tahun/bulan hasil parsing; label tanpa tanggal (mis. "PENYESUAIAN",
+    // "KENAIKAN") disisipkan berdasarkan posisi kolom aslinya di spreadsheet ($urutan).
+    // Selain arsip Excel, kolom juga otomatis bertambah dari periode EmployeePayroll
+    // yang sudah pernah diisi lewat kolom "GAJI {BULAN} {TAHUN}" berjalan (di luar
+    // periode yang sedang aktif), supaya tabel ini terus bertambah tiap bulan/tahun
+    // berjalan tanpa perlu import manual lagi.
+    private function buildHoSalaryMatrix(int $projectId, int $currentTahun, int $currentBulan): array
+    {
+        $bulanNama = $this->bulanNama();
+
+        $employeeIds = EmployeeHoDetail::whereIn('unit', ['HO-1', 'HO-2'])
+            ->whereIn('employee_id', Employee::where('project_id', $projectId)->pluck('id'))
+            ->pluck('employee_id');
+
+        if ($employeeIds->isEmpty()) {
+            return ['labels' => [], 'values' => [], 'periods' => []];
+        }
+
+        $history = EmployeeSalaryHistory::whereIn('employee_id', $employeeIds)->get();
+
+        $labelInfo = [];
+        foreach ($history->groupBy('label') as $label => $rows) {
+            $labelInfo[$label] = [
+                'urutan' => $rows->avg('urutan'),
+                'tahun'  => $rows->pluck('tahun')->filter()->first(),
+                'bulan'  => $rows->pluck('bulan')->filter()->first(),
+            ];
+        }
+
+        // Periode EmployeePayroll di luar periode yang sedang dibuka & sudah diisi.
+        $payrolls = EmployeePayroll::whereIn('employee_id', $employeeIds)
+            ->where(fn ($q) => $q->where('tahun', '!=', $currentTahun)->orWhere('bulan', '!=', $currentBulan))
+            ->where('gaji_pokok', '>', 0)
+            ->get();
+
+        $periods = [];
+        $payrollValues = [];
+        foreach ($payrolls as $p) {
+            $label = 'GAJI ' . strtoupper($bulanNama[$p->bulan]) . ' ' . $p->tahun;
+            if (!isset($labelInfo[$label])) {
+                $labelInfo[$label] = ['urutan' => null, 'tahun' => $p->tahun, 'bulan' => $p->bulan];
+                $periods[$label]   = ['tahun' => $p->tahun, 'bulan' => $p->bulan];
+            }
+            $payrollValues[$p->employee_id][$label] = (float) $p->gaji_pokok;
+        }
+
+        // Urutan kronologis: label dengan tahun pasti diurutkan langsung; label
+        // tanpa tahun diinterpolasi di antara label bertanggal terdekat (berdasarkan
+        // kedekatan urutan kolom aslinya di Excel).
+        $dated = [];
+        foreach ($labelInfo as $label => $info) {
+            if ($info['tahun']) {
+                $dated[$label] = ((int) $info['tahun']) * 12 + ((int) ($info['bulan'] ?: 1));
+            }
+        }
+        $datedByUrutan = [];
+        foreach ($dated as $label => $key) {
+            if ($labelInfo[$label]['urutan'] !== null) {
+                $datedByUrutan[] = ['urutan' => $labelInfo[$label]['urutan'], 'key' => $key];
+            }
+        }
+        usort($datedByUrutan, fn ($a, $b) => $a['urutan'] <=> $b['urutan']);
+
+        $finalKey = [];
+        foreach ($labelInfo as $label => $info) {
+            if (isset($dated[$label])) {
+                $finalKey[$label] = $dated[$label];
+                continue;
+            }
+            $u = $info['urutan'];
+            if ($u === null || empty($datedByUrutan)) {
+                $finalKey[$label] = PHP_INT_MAX;
+                continue;
+            }
+            $before = null;
+            $after  = null;
+            foreach ($datedByUrutan as $d) {
+                if ($d['urutan'] <= $u) $before = $d;
+                if ($d['urutan'] >= $u && $after === null) $after = $d;
+            }
+            if ($before && $after) {
+                $finalKey[$label] = ($before['key'] + $after['key']) / 2;
+            } elseif ($before) {
+                $finalKey[$label] = $before['key'] + 0.5;
+            } elseif ($after) {
+                $finalKey[$label] = $after['key'] - 0.5;
+            } else {
+                $finalKey[$label] = PHP_INT_MAX;
+            }
+        }
+        asort($finalKey);
+        $labels = array_keys($finalKey);
+
+        $values = [];
+        foreach ($history as $h) {
+            $values[$h->employee_id][$h->label] = (float) $h->nominal;
+        }
+        foreach ($payrollValues as $empId => $labelVals) {
+            foreach ($labelVals as $label => $val) {
+                $values[$empId][$label] = $val;
+            }
+        }
+
+        return ['labels' => $labels, 'values' => $values, 'periods' => $periods];
     }
 
 
@@ -233,11 +238,7 @@ class PayrollController extends Controller
     // ════════════════════════════════════════════════════════════
     public function buildPayrollRows(int $tahun, int $bulan, ?int $projectId): array
     {
-        $members = TimesheetMember::where('aktif', true)
-            ->when($projectId, fn($q, $pid) => $q->where('project_id', $pid))
-            ->with('employee.position', 'employee.project')
-            ->orderBy('urutan')->orderBy('id_badge')
-            ->get();
+        $members = $this->getPayrollRoster($projectId, $tahun, $bulan);
 
         // Ambil semua EmployeePayroll tersimpan untuk periode ini dalam 1 query
         // (dipakai di loop utama & loop custom TTT di bawah — sebelumnya query per-karyawan berulang).
@@ -253,6 +254,22 @@ class PayrollController extends Controller
             ->get()
             ->keyBy('employee_id');
 
+        $tttItems      = $projectId ? $this->getTttItems($projectId) : collect();
+        $customKeys    = $tttItems->where('is_default', false)->pluck('key')->toArray();
+        $potonganItems = $projectId ? $this->getPotonganItems($projectId) : collect();
+        $potonganKeys  = $potonganItems->pluck('key')->toArray();
+
+        // Cache persentase BPJS per project_id — dipakai per baris di bawah supaya tidak query
+        // berulang, tapi tetap benar kalau roster mencakup lebih dari 1 project (mis. tampilan "semua project").
+        $bpjsPctCache = [];
+        $resolveBpjsPct = function (?int $pid) use (&$bpjsPctCache, $tahun, $bulan) {
+            if (!$pid) return ['jht' => 2.0, 'pensiun' => 1.0, 'kes' => 1.0];
+            if (!isset($bpjsPctCache[$pid])) {
+                $bpjsPctCache[$pid] = $this->getBpjsPct($pid, $tahun, $bulan);
+            }
+            return $bpjsPctCache[$pid];
+        };
+
         $rows            = [];
         $totalGajiKotor  = 0;
         $totalGajiBersih = 0;
@@ -262,11 +279,14 @@ class PayrollController extends Controller
             if (!$emp) continue;
 
             $isMd   = $emp->project?->tipe_gaji === 'md';
+            $isHo   = $emp->project?->tipe_gaji === 'ho';
             $isFlat = $m->kelompok === 'flat';
 
             $saved = $savedPayrolls->get($emp->id);
 
-            if ($isMd) {
+            if ($isHo) {
+                $slip = $this->hitungSlipGajiHo($emp, $tahun, $bulan);
+            } elseif ($isMd) {
                 $tsData = $this->getTimesheetData($emp->id, $tahun, $bulan);
                 $slip   = $this->hitungSlipGajiMd($emp, $tahun, $bulan, $tsData);
             } else {
@@ -281,131 +301,119 @@ class PayrollController extends Controller
                 $slip['tunj_lapangan']      = $saved->tunj_lapangan;
                 $slip['uang_hadir']         = $saved->uang_hadir;
                 $slip['lembur_biasa']       = $saved->lembur_biasa;
+                $slip['l_sabtu']            = $saved->l_sabtu ?? $slip['l_sabtu'];
+                $slip['l_libur']            = $saved->l_libur ?? $slip['l_libur'];
                 $slip['total_lembur_flat']  = $saved->total_lembur_flat ?? $slip['total_lembur_flat'];
                 $slip['upah_lembur'] = $saved->upah_lembur ?? $slip['upah_lembur'];
                 $slip['jml_jam_lembur']     = $saved->jml_jam_lembur ?? $slip['jml_jam_lembur'];
                 $slip['kekurangan_bulan_lalu'] = $saved->kekurangan_bulan_lalu;
                 $slip['tunj_kehadiran']     = $saved->tunj_kehadiran ?? 0;
                 $slip['tunj_pulsa']         = $saved->tunj_pulsa    ?? 0;
+                $slip['kompensasi_kontrak'] = $saved->kompensasi_kontrak ?? 0;
                 $slip['kompensasi_pwt']     = $saved->kompensasi_pwt ?: $slip['kompensasi_pwt'];
                 $slip['tunj_jabatan']       = $saved->tunj_jabatan ?? 0;
                 $slip['id']                 = $saved->id;
                 $slip['pot_tabung_oksigen'] = $saved->pot_tabung_oksigen ?? 0;
                 $slip['insentif'] = $saved->insentif ?? $slip['insentif'];
                 $slip['stb']                   = $saved->stb ?? $slip['stb'] ?? 0;
-
-
-                $projectKode = strtolower($emp->project?->kode ?? '');
-                if ($projectKode === 'nk') {
-                    $slip['potongan_insentif'] = round(
-                        $slip['insentif'] / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti'] + $slip['stb']),
-                        2
-                    );
-                    $slip['gaji_bersih'] = round(
-                        $slip['gaji_kotor']
-                        - $slip['potongan_jht']
-                        - $slip['potongan_pensiun']
-                        - $slip['potongan_kes']
-                        - $slip['potongan_alpa']
-                        - $slip['potongan_insentif']
-                        + ($slip['kekurangan_bulan_lalu'] ?? 0),
-                        2
-                    );
-                }
+                $slip['catatan']               = $saved->catatan ?? null;
+                $slip['dibuat_oleh']           = $saved->dibuat_oleh ?? null;
 
                 if ($isMd) {
                     $slip['ttt_perhari'] = $saved->ttt_perhari ?: $slip['ttt_perhari'];
                     $slip['com_day']     = $saved->com_day     ?: $slip['com_day'];
                 }
-            }
 
-            if ($isMd) {
-                $hKerja      = $slip['h_basic'] ?? 0;
-                $hSabtu      = $slip['h_sabtu'] ?? 0;
-                $uBasic      = round(($slip['gaji_pokok'] + $slip['tunj_tetap']) / 17 * min($hKerja, 17), 2);
-                $uKerja      = round((($slip['tunj_makan'] ?? 0) + ($slip['tunj_kehadiran'] ?? 0)) * ($slip['h_kerja'] ?? 0), 2);
-                $comDayTotal = round(($slip['com_day'] ?? 0) * $hSabtu, 2);
-                $upahPenuh   = $slip['gaji_pokok'] + $slip['tunj_tetap'];
-                $slip['gaji_kotor'] = round(
-                    $uBasic
-                    + ($slip['kompensasi_pwt'] ?? 0)
-                    + $uKerja
-                    + $comDayTotal
-                    + ($slip['upah_lembur'] ?? 0)
-                    + ($slip['tunj_pulsa'] ?? 0)
-                    + ($slip['kekurangan_bulan_lalu'] ?? 0),
-                    2
-                );
-                $slip['gaji_bersih'] = round(
-                    $slip['gaji_kotor']
-                    - round($upahPenuh * 0.02)
-                    - round($upahPenuh * 0.01)
-                    - round($upahPenuh * 0.01)
-                    - ($slip['potongan_alpa'] ?? 0),
-                    2
-                );
-                $slip['u_basic'] = $uBasic;
-                $slip['u_kerja'] = $uKerja;
+                // TTT custom (per-project, dinamis) — harus masuk ke gaji_kotor juga,
+                // bukan cuma ditampilkan sebagai kolom terpisah.
+                $customSum = 0;
+                foreach ($customKeys as $key) {
+                    $val = $saved->ttt_custom[$key] ?? 0;
+                    $slip[$key] = $val;
+                    $customSum += (float) $val;
+                }
+                $slip['custom_ttt_sum'] = $customSum;
+
+                // Potongan dinamis (khusus HO) — dihitung & ditampilkan saja, tidak dikurangkan
+                // dari gaji_bersih (lihat hitungGajiKotorBersih cabang $isHo).
+                $potonganCustomSum = 0;
+                foreach ($potonganKeys as $key) {
+                    $val = $saved->potongan_custom[$key] ?? 0;
+                    $slip['pot_custom_' . $key] = $val;
+                    $potonganCustomSum += (float) $val;
+                }
+                $slip['potongan_custom_sum'] = $potonganCustomSum;
+
+                // Recompute gaji_kotor/gaji_bersih/BPJS dari nilai yang sudah di-override —
+                // dipakai satu rumus yang sama untuk semua project (bukan cuma MD/NK).
+                $bpjsPct = $resolveBpjsPct($emp->project_id);
+                $slip = $this->hitungGajiKotorBersih($slip, $isMd, $isHo, $bpjsPct['jht'], $bpjsPct['pensiun'], $bpjsPct['kes']);
+            } else {
+                foreach ($customKeys as $key) {
+                    $slip[$key] = 0;
+                }
+                foreach ($potonganKeys as $key) {
+                    $slip['pot_custom_' . $key] = 0;
+                }
+                $slip['potongan_custom_sum'] = 0;
             }
 
             $slip['sub_group']    = $m->sub_group;
             $slip['urutan']       = $m->urutan ?? 999;
             $slip['project_kode'] = strtolower($emp->project?->kode ?? '');
-            $slip['nama_bank']    = $saved->nama_bank    ?? $emp->nama_bank    ?? null;
-            $slip['no_rekening']  = $saved->no_rekening  ?? $emp->no_rekening  ?? null;
+            // nama_bank/no_rekening/ptkp: data induk karyawan (kolom employees), sama seperti
+            // halaman Edit Karyawan — bukan snapshot per periode, supaya editnya nyambung ke sana.
+            $slip['nama_bank']    = $emp->nama_bank    ?? null;
+            $slip['no_rekening']  = $emp->no_rekening  ?? null;
             $slip['no_bpjs_tk']   = $saved->no_bpjs_tk   ?? $emp->no_bpjs_tk   ?? null;
             $slip['no_bpjs_kes']  = $saved->no_bpjs_kes  ?? $emp->no_bpjs_kes  ?? null;
-            $slip['ptkp']         = $saved->ptkp         ?? $emp->ptkp ?? '—';
+            $slip['ptkp']         = $emp->ptkp ?? '—';
             $rows[]             = $slip;
             $totalGajiKotor    += $slip['gaji_kotor']  ?? 0;
             $totalGajiBersih   += $slip['gaji_bersih'] ?? 0;
         }
-
-        $tttItems   = $projectId ? $this->getTttItems($projectId) : collect();
-        $customKeys = $tttItems->where('is_default', false)->pluck('key')->toArray();
-
-        foreach ($rows as &$row) {
-            $saved = $savedPayrolls->get($row['employee_id']);
-
-            foreach ($customKeys as $key) {
-                $row[$key] = $saved?->ttt_custom[$key] ?? 0;
-            }
-        }
-        unset($row);
 
         return [
             'rows'              => $rows,
             'total_gaji_kotor'  => $totalGajiKotor,
             'total_gaji_bersih' => $totalGajiBersih,
             'ttt_items'         => $tttItems,
+            'potongan_items'    => $potonganItems,
         ];
     }
 
     // ════════════════════════════════════════════════════════════
     // SIMPAN DATA GAJI (batch semua member)
     // ════════════════════════════════════════════════════════════
-    public function simpanDataGaji(Request $request)
+    // ════════════════════════════════════════════════════════════
+    // PERSIST SNAPSHOT — hitung ulang lembur/BPJS/potongan seluruh
+    // karyawan & simpan ke employee_payroll. Dipanggil otomatis tiap
+    // halaman Data Gaji dibuka (lihat dataGaji()), supaya tabel tersimpan
+    // (dipakai Dashboard, cetak slip dari riwayat, dll) selalu up-to-date
+    // tanpa perlu tombol manual. Nilai yang sudah diisi manual (Gaji Pokok,
+    // Tunjangan, TTT) tidak ditimpa.
+    // ════════════════════════════════════════════════════════════
+    private function persistPayrollSnapshot(int $tahun, int $bulan, ?int $projectId): void
     {
-        if ($this->isViewer()) {
-            return back()->with('error', 'Viewer tidak memiliki akses.');
-        }
+        $members = $this->getPayrollRoster($projectId, $tahun, $bulan);
 
-        $tahun     = (int) $request->get('tahun', now()->year);
-        $bulan     = (int) $request->get('bulan', now()->month);
-        $projectId = $this->activeProjectId();
-
-        $members = TimesheetMember::where('aktif', true)
-            ->when($projectId, fn($q, $pid) => $q->where('project_id', $pid))
-            ->with('employee.position', 'employee.project')
-            ->orderBy('urutan')->orderBy('id_badge')
-            ->get();
+        $bpjsPctCache = [];
+        $resolveBpjsPct = function (?int $pid) use (&$bpjsPctCache, $tahun, $bulan) {
+            if (!$pid) return ['jht' => 2.0, 'pensiun' => 1.0, 'kes' => 1.0];
+            if (!isset($bpjsPctCache[$pid])) {
+                $bpjsPctCache[$pid] = $this->getBpjsPct($pid, $tahun, $bulan);
+            }
+            return $bpjsPctCache[$pid];
+        };
 
         foreach ($members as $m) {
             $emp = $m->employee;
             if (!$emp) continue;
 
             $isMd   = $emp->project?->tipe_gaji === 'md';
+            $isHo   = $emp->project?->tipe_gaji === 'ho';
             $isFlat = $m->kelompok === 'flat';
+            $bpjsPct = $resolveBpjsPct($emp->project_id);
 
             // Ambil data yang sudah ada (manual) — supaya field manual tidak ditimpa
             $existing = EmployeePayroll::where([
@@ -414,7 +422,32 @@ class PayrollController extends Controller
                 'bulan'       => $bulan,
             ])->first();
 
-            if ($isMd) {
+            if ($isHo) {
+                // HO tidak punya timesheet — "Hitung Ulang" cuma refresh gaji_kotor/gaji_bersih
+                // dari nilai yang sudah tersimpan (gaji_pokok/tunj_tetap/TTT custom/izin-sakit-alpa-cuti manual).
+                $slip = $this->hitungSlipGajiHo($emp, $tahun, $bulan);
+
+                $existingTtt      = $existing?->ttt_custom ?? [];
+                $existingPotongan = $existing?->potongan_custom ?? [];
+
+                $customKeys = $emp->project_id ? $this->getTttItems($emp->project_id)->where('is_default', false)->pluck('key')->toArray() : [];
+                $customSum  = 0;
+                foreach ($customKeys as $key) {
+                    $slip[$key] = $existingTtt[$key] ?? 0;
+                    $customSum += (float) $slip[$key];
+                }
+                $slip['custom_ttt_sum'] = $customSum;
+
+                $potonganKeys = $emp->project_id ? $this->getPotonganItems($emp->project_id)->pluck('key')->toArray() : [];
+                $potonganCustomSum = 0;
+                foreach ($potonganKeys as $key) {
+                    $slip['pot_custom_' . $key] = $existingPotongan[$key] ?? 0;
+                    $potonganCustomSum += (float) $slip['pot_custom_' . $key];
+                }
+                $slip['potongan_custom_sum'] = $potonganCustomSum;
+
+                $slip = $this->hitungGajiKotorBersih($slip, false, true, $bpjsPct['jht'], $bpjsPct['pensiun'], $bpjsPct['kes']);
+            } elseif ($isMd) {
                 $tsData = $this->getTimesheetData($emp->id, $tahun, $bulan);
 
                 // Pakai nilai manual yang sudah ada sebagai override, supaya
@@ -438,100 +471,77 @@ class PayrollController extends Controller
 
                 // Override dengan nilai manual yang sudah ada (Non-MD)
                 if ($existing) {
-                    $gajiPokok    = $existing->gaji_pokok      ?? $slip['gaji_pokok'];
-                    $tunjTetap    = $existing->tunj_tetap      ?? $slip['tunj_tetap'];
-                    $tunjMakan    = $existing->tunj_makan      ?? $slip['tunj_makan'];
-                    $tunjProduksi = $existing->tunj_produksi   ?? $slip['tunj_produksi'];
-                    $tunjLapangan = $existing->tunj_lapangan   ?? $slip['tunj_lapangan'];
-                    $insentif     = $existing->insentif        ?? $slip['insentif'];
-                    $comDay       = $existing->com_day         ?? $slip['com_day'];
-                    $uangHadir    = $existing->uang_hadir      ?? $slip['uang_hadir'];
-                    $lemburBiasa  = $existing->lembur_biasa    ?? $slip['lembur_biasa'];
-                    $lSabtuManual = $existing->l_sabtu         ?? $slip['l_sabtu'];
-                    $lLiburManual = $existing->l_libur         ?? $slip['l_libur'];
-                    $kekurangan   = $existing->kekurangan_bulan_lalu ?? 0;
+                    $slip['gaji_pokok']     = $existing->gaji_pokok      ?? $slip['gaji_pokok'];
+                    $slip['tunj_tetap']     = $existing->tunj_tetap      ?? $slip['tunj_tetap'];
+                    $slip['tunj_makan']     = $existing->tunj_makan      ?? $slip['tunj_makan'];
+                    $slip['tunj_produksi']  = $existing->tunj_produksi   ?? $slip['tunj_produksi'];
+                    $slip['tunj_lapangan']  = $existing->tunj_lapangan   ?? $slip['tunj_lapangan'];
+                    $slip['insentif']       = $existing->insentif        ?? $slip['insentif'];
+                    $slip['com_day']        = $existing->com_day         ?? $slip['com_day'];
+                    $slip['uang_hadir']     = $existing->uang_hadir      ?? $slip['uang_hadir'];
+                    $slip['lembur_biasa']   = $existing->lembur_biasa    ?? $slip['lembur_biasa'];
+                    $slip['l_sabtu']        = $existing->l_sabtu         ?? $slip['l_sabtu'];
+                    $slip['l_libur']        = $existing->l_libur         ?? $slip['l_libur'];
+                    $slip['kekurangan_bulan_lalu'] = $existing->kekurangan_bulan_lalu ?? 0;
+                    $slip['tunj_kehadiran']     = $existing->tunj_kehadiran     ?? 0;
+                    $slip['tunj_pulsa']         = $existing->tunj_pulsa         ?? 0;
+                    $slip['kompensasi_kontrak'] = $existing->kompensasi_kontrak ?? 0;
 
-                    $kompensasiPwt = ($gajiPokok + $tunjTetap) / 12;
-                    $upahPenuh     = $gajiPokok + $tunjTetap;
-                    $nilaiPerJam   = $upahPenuh / 173;
+                    $upahPenuh   = $slip['gaji_pokok'] + $slip['tunj_tetap'];
+                    $nilaiPerJam = $upahPenuh / 173;
 
                     $projectKode = strtolower($emp->project?->kode ?? '');
                     $isKhawistaPilingFlat = $isFlat
                         && in_array($projectKode, ['khawista', 'nk'])
                         && strtolower($m->sub_group ?? '') === 'piling';
+                    // GIAM: lembur flat diimpor sebagai lump sum dari Excel sumber (tidak ada rincian
+                    // L Sabtu/L Libur/Lembur Biasa per hari), jadi jangan dihitung ulang dari tarif standar.
+                    $isGiamLumpSumFlat = $isFlat && $projectKode === 'giam';
 
-                    if ($isKhawistaPilingFlat) {
-                        // Piling pakai lump_sum dari overtime_custom — jangan recalc dari tarif standar
-                        $totalLemburFlat = $existing->total_lembur_flat ?? 0;
-                        $upahLembur       = $existing->upah_lembur       ?? 0;
+                    if ($isKhawistaPilingFlat || $isGiamLumpSumFlat) {
+                        // Piling & GIAM pakai lump_sum — jangan recalc dari tarif standar
+                        $slip['total_lembur_flat'] = $existing->total_lembur_flat ?? 0;
+                        $slip['upah_lembur']       = $existing->upah_lembur       ?? 0;
                     } elseif ($isFlat) {
-                        $totalLemburFlat = ($lSabtuManual * self::TARIF_SABTU)
-                            + ($lLiburManual * self::TARIF_LIBUR)
-                            + ($lemburBiasa * self::TARIF_BIASA);
-                        $upahLembur = $totalLemburFlat;
+                        $slip['total_lembur_flat'] = ($slip['l_sabtu'] * self::TARIF_SABTU)
+                            + ($slip['l_libur'] * self::TARIF_LIBUR)
+                            + ($slip['lembur_biasa'] * self::TARIF_BIASA);
+                        $slip['upah_lembur'] = $slip['total_lembur_flat'];
                     } else {
                         // Per jam: tetap pakai jam lembur HASIL HITUNG ULANG dari timesheet terbaru
-                        $upahLembur      = round($nilaiPerJam * $slip['jml_jam_lembur'], 2);
-                        $totalLemburFlat = $slip['total_lembur_flat'];
+                        $slip['upah_lembur'] = round($nilaiPerJam * $slip['jml_jam_lembur'], 2);
                     }
 
-                    $baseKomponen = $gajiPokok + $tunjTetap + $kompensasiPwt
-                        + $comDay + $insentif + $tunjMakan + $tunjProduksi + $tunjLapangan;
-
-                    $gajiKotor = $isFlat
-                        ? $baseKomponen + $totalLemburFlat + $uangHadir
-                        : $baseKomponen + $upahLembur;
-
-                    $potonganJht     = round($upahPenuh * 0.02);
-                    $potonganPensiun = round($upahPenuh * 0.01);
-                    $potonganKes     = round($upahPenuh * 0.01);
-
                     $izinDipotong = !in_array($projectKode, ['khawista', 'purnama']);
-                    $potonganAlpa = round($upahPenuh / 25 * ($slip['alpa'] + ($izinDipotong ? $slip['izin'] : 0)), 2);
+                    $slip['potongan_alpa'] = round($upahPenuh / 25 * ($slip['alpa'] + ($izinDipotong ? $slip['izin'] : 0)), 2);
 
                     $potonganInsentif = 0;
                     if ($projectKode === 'khawista') {
                         $subGroup = strtolower($m->sub_group ?? '');
                         if ($subGroup === 'construction') {
-                            $potonganInsentif = round($insentif / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti']), 2);
+                            $potonganInsentif = round($slip['insentif'] / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti']), 2);
                         } elseif ($subGroup === 'piling') {
-                            $potonganInsentif = round($tunjLapangan / 25 * $slip['izin'], 2);
+                            $potonganInsentif = round($slip['tunj_lapangan'] / 25 * $slip['izin'], 2);
                         }
                     } elseif ($projectKode === 'nk') {
                         $stbVal = $existing->stb ?? $slip['stb'] ?? 0;
-                        $potonganInsentif = round($insentif / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti'] + $stbVal), 2);
+                        $potonganInsentif = round($slip['insentif'] / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti'] + $stbVal), 2);
                     }
+                    $slip['potongan_insentif']  = $potonganInsentif;
+                    $slip['pot_tabung_oksigen'] = $existing->pot_tabung_oksigen ?? 0;
 
-                    $potTabungOksigen = $existing->pot_tabung_oksigen ?? 0;
-                    $gajiBersih = $gajiKotor - $potonganJht - $potonganPensiun - $potonganKes
-                        - $potonganAlpa - $potonganInsentif - $potTabungOksigen + $kekurangan;
+                    // TTT custom (per-project, dinamis) — harus masuk ke gaji_kotor juga.
+                    $pidForTtt  = $emp->project_id ?? $projectId;
+                    $customKeys = $pidForTtt ? $this->getTttItems($pidForTtt)->where('is_default', false)->pluck('key')->toArray() : [];
+                    $customSum  = 0;
+                    foreach ($customKeys as $key) {
+                        $slip[$key] = $existing->ttt_custom[$key] ?? 0;
+                        $customSum += (float) $slip[$key];
+                    }
+                    $slip['custom_ttt_sum'] = $customSum;
 
-
-                    $slip = array_merge($slip, [
-                        'gaji_pokok'            => $gajiPokok,
-                        'tunj_tetap'            => $tunjTetap,
-                        'kompensasi_pwt'        => round($kompensasiPwt, 2),
-                        'tunj_makan'            => $tunjMakan,
-                        'tunj_produksi'         => $tunjProduksi,
-                        'tunj_lapangan'         => $tunjLapangan,
-                        'insentif'              => $insentif,
-                        'com_day'               => $comDay,
-                        'uang_hadir'            => $uangHadir,
-                        'lembur_biasa'          => $lemburBiasa,
-                        'l_sabtu'               => $lSabtuManual,
-                        'l_libur'               => $lLiburManual,
-                        'total_lembur_flat'     => $totalLemburFlat,
-                        'upah_lembur'           => $upahLembur,
-                        'gaji_kotor'            => round($gajiKotor, 2),
-                        'potongan_jht'          => $potonganJht,
-                        'potongan_pensiun'      => $potonganPensiun,
-                        'potongan_kes'          => $potonganKes,
-                        'potongan_alpa'         => $potonganAlpa,
-                        'potongan_insentif'     => $potonganInsentif,
-                        'pot_tabung_oksigen'    => $potTabungOksigen,
-                        'kekurangan_bulan_lalu' => $kekurangan,
-                        'gaji_bersih'           => round($gajiBersih, 2),
-                    ]);
+                    // Satu sumber perhitungan yang sama dengan Data Gaji & Slip Gaji
+                    $slip = $this->hitungGajiKotorBersih($slip, false, false, $bpjsPct['jht'], $bpjsPct['pensiun'], $bpjsPct['kes']);
                 }
             }
 
@@ -540,7 +550,7 @@ class PayrollController extends Controller
                 [
                     'gaji_pokok'            => $slip['gaji_pokok'],
                     'tunj_tetap'            => $slip['tunj_tetap'],
-                    'tunj_jabatan'          => $existing->tunj_jabatan ?? $slip['tunj_jabatan'] ?? 0,
+                    'tunj_jabatan'          => $existing?->tunj_jabatan ?? $slip['tunj_jabatan'] ?? 0,
                     'kompensasi_pwt'        => $slip['kompensasi_pwt'],
                     'ttt_perhari'           => $slip['ttt_perhari']       ?? 0,
                     'com_day'               => $slip['com_day']           ?? 0,
@@ -572,24 +582,15 @@ class PayrollController extends Controller
                     'sakit'                 => $slip['sakit'],
                     'alpa'                  => $slip['alpa'],
                     'cuti'                  => $slip['cuti'],
-                    'stb'                   => $existing->stb ?? $slip['stb'] ?? 0,
-                    'ptkp'                  => $emp->ptkp,
-                    'tunj_kehadiran'        => $existing->tunj_kehadiran  ?? 0,
-                    'tunj_pulsa'            => $existing->tunj_pulsa      ?? 0,
-                    'ttt_custom'            => $existing->ttt_custom      ?? null,
+                    'stb'                   => $existing?->stb ?? $slip['stb'] ?? 0,
+                    'tunj_kehadiran'        => $existing?->tunj_kehadiran  ?? 0,
+                    'tunj_pulsa'            => $existing?->tunj_pulsa      ?? 0,
+                    'ttt_custom'            => $existing?->ttt_custom      ?? null,
+                    'potongan_custom'       => $existing?->potongan_custom ?? null,
                     'dibuat_oleh'           => auth()->user()?->name ?? 'System',
                 ]
             );
         }
-
-        ActivityLog::record(
-            'update',
-            'Data Gaji',
-            null,
-            "Hitung ulang lembur & potongan {$tahun}/{$bulan} — {$members->count()} karyawan (nilai manual dipertahankan)"
-        );
-
-        return back()->with('success', "Lembur & potongan berhasil dihitung ulang untuk {$tahun}/{$bulan}. Nilai manual yang sudah diisi tetap dipertahankan.");
     }
 
     // ════════════════════════════════════════════════════════════
@@ -619,8 +620,6 @@ class PayrollController extends Controller
             'insentif'               => 'nullable|numeric|min:0',
             'com_day'                => 'nullable|numeric|min:0',
             'uang_hadir'             => 'nullable|numeric|min:0',
-            'nama_bank'              => 'nullable|string|max:50',
-            'no_rekening'            => 'nullable|string|max:50',
             'no_bpjs_tk'             => 'nullable|string|max:50',
             'no_bpjs_kes'            => 'nullable|string|max:50',
             'catatan'                => 'nullable|string|max:500',
@@ -630,18 +629,40 @@ class PayrollController extends Controller
             'kompensasi_pwt'         => 'nullable|numeric|min:0',
             'ttt_custom'             => 'nullable|array',
             'ttt_custom.*'           => 'nullable|numeric|min:0',
+            'potongan_custom'        => 'nullable|array',
+            'potongan_custom.*'      => 'nullable|numeric|min:0',
+            'izin'                   => 'nullable|integer|min:0',
+            'sakit'                  => 'nullable|integer|min:0',
+            'alpa'                   => 'nullable|integer|min:0',
+            'cuti'                   => 'nullable|integer|min:0',
         ]);
 
         $tahun = $data['tahun'];
         $bulan = $data['bulan'];
         $emp   = Employee::with(['position', 'project'])->findOrFail($employeeId);
         $isMd  = $emp->project?->tipe_gaji === 'md';
+        $isHo  = $emp->project?->tipe_gaji === 'ho';
+        $bpjsPct = $emp->project_id
+            ? $this->getBpjsPct($emp->project_id, $data['tahun'], $data['bulan'])
+            : ['jht' => 2.0, 'pensiun' => 1.0, 'kes' => 1.0];
 
         $payroll = EmployeePayroll::firstOrNew([
             'employee_id' => $employeeId,
             'tahun'       => $tahun,
             'bulan'       => $bulan,
         ]);
+
+        // Merge ttt_custom dengan yang sudah ada, tidak overwrite semua
+        $mergedTttCustom = $payroll->ttt_custom ?? [];
+        if (!empty($data['ttt_custom'])) {
+            $mergedTttCustom = array_merge($mergedTttCustom, $data['ttt_custom']);
+        }
+
+        // Merge potongan_custom dengan yang sudah ada, tidak overwrite semua
+        $mergedPotonganCustom = $payroll->potongan_custom ?? [];
+        if (!empty($data['potongan_custom'])) {
+            $mergedPotonganCustom = array_merge($mergedPotonganCustom, $data['potongan_custom']);
+        }
 
         if ($isMd) {
             $tsData = $this->getTimesheetData($emp->id, $tahun, $bulan);
@@ -664,6 +685,38 @@ class PayrollController extends Controller
 
             $slip = $this->hitungSlipGajiMd($emp, $tahun, $bulan, $tsData, $overrideInput);
 
+        } elseif ($isHo) {
+            $slip = $this->hitungSlipGajiHo($emp, $tahun, $bulan);
+
+            $slip['gaji_pokok']     = isset($data['gaji_pokok']) ? (float) $data['gaji_pokok'] : $slip['gaji_pokok'];
+            $slip['tunj_tetap']     = isset($data['tunj_tetap']) ? (float) $data['tunj_tetap'] : $slip['tunj_tetap'];
+            $slip['kompensasi_pwt'] = isset($data['kompensasi_pwt'])
+                ? (float) $data['kompensasi_pwt']
+                : round(($slip['gaji_pokok'] + $slip['tunj_tetap']) / 12, 2);
+            $slip['kekurangan_bulan_lalu'] = $data['kekurangan_bulan_lalu'] ?? 0;
+            $slip['izin']  = isset($data['izin'])  ? (int) $data['izin']  : $slip['izin'];
+            $slip['sakit'] = isset($data['sakit']) ? (int) $data['sakit'] : $slip['sakit'];
+            $slip['alpa']  = isset($data['alpa'])  ? (int) $data['alpa']  : $slip['alpa'];
+            $slip['cuti']  = isset($data['cuti'])  ? (int) $data['cuti']  : $slip['cuti'];
+
+            $customKeys = $emp->project_id ? $this->getTttItems($emp->project_id)->where('is_default', false)->pluck('key')->toArray() : [];
+            $customSum  = 0;
+            foreach ($customKeys as $key) {
+                $slip[$key] = $mergedTttCustom[$key] ?? 0;
+                $customSum += (float) $slip[$key];
+            }
+            $slip['custom_ttt_sum'] = $customSum;
+
+            $potonganKeys = $emp->project_id ? $this->getPotonganItems($emp->project_id)->pluck('key')->toArray() : [];
+            $potonganCustomSum = 0;
+            foreach ($potonganKeys as $key) {
+                $slip['pot_custom_' . $key] = $mergedPotonganCustom[$key] ?? 0;
+                $potonganCustomSum += (float) $slip['pot_custom_' . $key];
+            }
+            $slip['potongan_custom_sum'] = $potonganCustomSum;
+
+            $slip = $this->hitungGajiKotorBersih($slip, false, true, $bpjsPct['jht'], $bpjsPct['pensiun'], $bpjsPct['kes']);
+
         } else {
             // Baca kelompok dari TimesheetMember
             $member = TimesheetMember::where('id_badge', $emp->id_badge)
@@ -671,139 +724,192 @@ class PayrollController extends Controller
                 ->first();
             $isFlat = $member?->kelompok === 'flat';
 
-            $slip      = $this->hitungSlipGaji($emp, $tahun, $bulan, $isFlat);
-            $gajiPokok = isset($data['gaji_pokok']) ? (float) $data['gaji_pokok'] : $slip['gaji_pokok'];
-            $tunjTetap = isset($data['tunj_tetap']) ? (float) $data['tunj_tetap'] : $slip['tunj_tetap'];
+            $slip = $this->hitungSlipGaji($emp, $tahun, $bulan, $isFlat);
 
-            $kompensasiPwt   = ($gajiPokok + $tunjTetap) / 12;
-            $dul             = $gajiPokok + $tunjTetap;
-            $upahPenuh       = $dul;
-            $lemburBiasa     = $data['lembur_biasa'] ?? $slip['lembur_biasa'];
-            $lSabtu          = isset($data['l_sabtu']) ? (int) $data['l_sabtu'] : $slip['l_sabtu'];
-            $lLibur          = isset($data['l_libur']) ? (int) $data['l_libur'] : $slip['l_libur'];
-            $totalLemburFlat = ($lSabtu * self::TARIF_SABTU) + ($lLibur * self::TARIF_LIBUR) + ($lemburBiasa * self::TARIF_BIASA);
-            $tunjMakan       = $data['tunj_makan']       ?? $slip['tunj_makan'];
-            $tunjProduksi    = $data['tunj_produksi']    ?? $slip['tunj_produksi'];
-            $tunjLapangan    = $data['tunj_lapangan']    ?? $slip['tunj_lapangan'];
-            $insentif        = $data['insentif']         ?? $slip['insentif'];
-            $comDay          = $data['com_day']          ?? $slip['com_day'];
-            $uangHadir       = $data['uang_hadir']       ?? $slip['uang_hadir'];
-            $kekurangan      = $data['kekurangan_bulan_lalu'] ?? 0;
-            $nilaiPerJam     = $dul / 173;
-            $upahLembur      = $isFlat
-                ? $totalLemburFlat
+            $slip['gaji_pokok']  = isset($data['gaji_pokok']) ? (float) $data['gaji_pokok'] : $slip['gaji_pokok'];
+            $slip['tunj_tetap']  = isset($data['tunj_tetap']) ? (float) $data['tunj_tetap'] : $slip['tunj_tetap'];
+            $slip['lembur_biasa'] = $data['lembur_biasa'] ?? $slip['lembur_biasa'];
+            $slip['l_sabtu']     = isset($data['l_sabtu']) ? (int) $data['l_sabtu'] : $slip['l_sabtu'];
+            $slip['l_libur']     = isset($data['l_libur']) ? (int) $data['l_libur'] : $slip['l_libur'];
+            $slip['total_lembur_flat'] = ($slip['l_sabtu'] * self::TARIF_SABTU)
+                + ($slip['l_libur'] * self::TARIF_LIBUR) + ($slip['lembur_biasa'] * self::TARIF_BIASA);
+            $slip['tunj_makan']     = $data['tunj_makan']    ?? $slip['tunj_makan'];
+            $slip['tunj_produksi']  = $data['tunj_produksi'] ?? $slip['tunj_produksi'];
+            $slip['tunj_lapangan']  = $data['tunj_lapangan'] ?? $slip['tunj_lapangan'];
+            $slip['insentif']       = $data['insentif']      ?? $slip['insentif'];
+            $slip['com_day']        = $data['com_day']       ?? $slip['com_day'];
+            $slip['uang_hadir']     = $data['uang_hadir']    ?? $slip['uang_hadir'];
+            $slip['kekurangan_bulan_lalu'] = $data['kekurangan_bulan_lalu'] ?? 0;
+            $slip['tunj_kehadiran']     = $data['tunj_kehadiran'] ?? ($payroll->tunj_kehadiran ?? 0);
+            $slip['tunj_pulsa']         = $data['tunj_pulsa']     ?? ($payroll->tunj_pulsa ?? 0);
+            $slip['kompensasi_kontrak'] = $payroll->kompensasi_kontrak ?? 0;
+
+            $upahPenuh   = $slip['gaji_pokok'] + $slip['tunj_tetap'];
+            $nilaiPerJam = $upahPenuh / 173;
+            $slip['upah_lembur'] = $isFlat
+                ? $slip['total_lembur_flat']
                 : round($slip['jml_jam_lembur'] * $nilaiPerJam, 2);
-
-
-            $baseKomponen = $gajiPokok + $tunjTetap + $kompensasiPwt
-                + $comDay + $insentif + $tunjMakan + $tunjProduksi + $tunjLapangan;
-
-            $gajiKotor = $isFlat
-                ? $baseKomponen + $totalLemburFlat + $uangHadir
-                : $baseKomponen + $upahLembur;
-
-            $potonganJht     = round($upahPenuh * 0.02);
-            $potonganPensiun = round($upahPenuh * 0.01);
-            $potonganKes     = round($upahPenuh * 0.01);
 
             $projectKode  = strtolower($emp->project?->kode ?? '');
             $izinDipotong = !in_array($projectKode, ['khawista', 'purnama']);
-            $potonganAlpa = round($upahPenuh / 25 * ($slip['alpa'] + ($izinDipotong ? $slip['izin'] : 0)), 2);
+            $slip['potongan_alpa'] = round($upahPenuh / 25 * ($slip['alpa'] + ($izinDipotong ? $slip['izin'] : 0)), 2);
 
             // Potongan khusus Khawista & NK
             $potonganInsentif = 0;
             if ($projectKode === 'khawista') {
                 $subGroup = strtolower($member?->sub_group ?? '');
                 if ($subGroup === 'construction') {
-                    $potonganInsentif = round($insentif / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti']), 2);
+                    $potonganInsentif = round($slip['insentif'] / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti']), 2);
                 } elseif ($subGroup === 'piling') {
-                    $potonganInsentif = round($tunjLapangan / 25 * $slip['izin'], 2);
+                    $potonganInsentif = round($slip['tunj_lapangan'] / 25 * $slip['izin'], 2);
                 }
             } elseif ($projectKode === 'nk') {
                 $stbVal = $slip['stb'] ?? 0;
-                $potonganInsentif = round($insentif / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti'] + $stbVal), 2);
+                $potonganInsentif = round($slip['insentif'] / 25 * ($slip['izin'] + $slip['sakit'] + $slip['cuti'] + $stbVal), 2);
+            } 
+            $slip['potongan_insentif']  = $potonganInsentif;
+            $slip['pot_tabung_oksigen'] = $data['pot_tabung_oksigen'] ?? ($payroll->pot_tabung_oksigen ?? 0);
+
+            // TTT custom (per-project, dinamis) — harus masuk ke gaji_kotor juga.
+            $customKeys = $emp->project_id ? $this->getTttItems($emp->project_id)->where('is_default', false)->pluck('key')->toArray() : [];
+            $customSum  = 0;
+            foreach ($customKeys as $key) {
+                $slip[$key] = $mergedTttCustom[$key] ?? 0;
+                $customSum += (float) $slip[$key];
             }
+            $slip['custom_ttt_sum'] = $customSum;
 
-            $potTabungOksigen = $data['pot_tabung_oksigen'] ?? ($payroll->pot_tabung_oksigen ?? 0);
-            $gajiBersih = $gajiKotor - $potonganJht - $potonganPensiun - $potonganKes - $potonganAlpa - $potonganInsentif - $potTabungOksigen + $kekurangan;
-
-
-            $slip = array_merge($slip, [
-                'gaji_pokok'            => $gajiPokok,
-                'tunj_tetap'            => $tunjTetap,
-                'kompensasi_pwt'        => round($kompensasiPwt, 2),
-                'lembur_biasa'          => $lemburBiasa,
-                'l_sabtu'               => $lSabtu,
-                'l_libur'               => $lLibur,
-                'total_lembur_flat'     => $totalLemburFlat,
-                'upah_lembur'           => $upahLembur,
-                'tunj_makan'            => $tunjMakan,
-                'tunj_produksi'         => $tunjProduksi,
-                'tunj_lapangan'         => $tunjLapangan,
-                'insentif'              => $insentif,
-                'com_day'               => $comDay,
-                'uang_hadir'            => $uangHadir,
-                'gaji_kotor'            => round($gajiKotor, 2),
-                'potongan_jht'          => $potonganJht,
-                'potongan_pensiun'      => $potonganPensiun,
-                'potongan_kes'          => $potonganKes,
-                'potongan_alpa'         => $potonganAlpa,
-                'potongan_insentif'     => $potonganInsentif,
-                'pot_tabung_oksigen'    => $potTabungOksigen,
-                'kekurangan_bulan_lalu' => $kekurangan,
-                'gaji_bersih'           => round($gajiBersih, 2),
-                'tunj_kehadiran'        => $data['tunj_kehadiran'] ?? 0,
-                'tunj_pulsa'            => $data['tunj_pulsa']     ?? 0,
-            ]);
+            // Satu sumber perhitungan yang sama dengan Data Gaji & Slip Gaji
+            $slip = $this->hitungGajiKotorBersih($slip, false, false, $bpjsPct['jht'], $bpjsPct['pensiun'], $bpjsPct['kes']);
         }
 
+        // no_bpjs_tk/no_bpjs_kes dikirim bertahap (bukan selalu bareng semua field lain), jadi
+        // kalau tidak ada di payload jangan ditimpa null — pertahankan nilai yang sudah tersimpan.
         $updateData = array_merge($slip, [
-            'tunj_kehadiran' => $data['tunj_kehadiran'] ?? 0,
-            'tunj_pulsa'     => $data['tunj_pulsa']     ?? 0,
-            'nama_bank'      => $data['nama_bank']      ?? null,
-            'no_rekening'    => $data['no_rekening']    ?? null,
-            'no_bpjs_tk'     => $data['no_bpjs_tk']     ?? null,
-            'no_bpjs_kes'    => $data['no_bpjs_kes']    ?? null,
+            'no_bpjs_tk'     => array_key_exists('no_bpjs_tk', $data)  ? $data['no_bpjs_tk']  : $payroll->no_bpjs_tk,
+            'no_bpjs_kes'    => array_key_exists('no_bpjs_kes', $data) ? $data['no_bpjs_kes'] : $payroll->no_bpjs_kes,
             'catatan'        => $data['catatan']         ?? null,
             'dibuat_oleh'    => auth()->user()?->name   ?? 'System',
+            'ttt_custom'     => $mergedTttCustom ?: null,
+            'potongan_custom'=> $mergedPotonganCustom ?: null,
         ]);
-
-        // Merge ttt_custom dengan yang sudah ada, tidak overwrite semua
-        if (!empty($data['ttt_custom'])) {
-            $existing = $payroll->ttt_custom ?? [];
-            $updateData['ttt_custom'] = array_merge($existing, $data['ttt_custom']);
-        }
 
         $allowedColumns = [
             'gaji_pokok','tunj_tetap','tunj_jabatan','kompensasi_pwt','upah_penuh',
             'ttt_perhari','dul','com_day','insentif','tunj_makan','tunj_produksi',
             'tunj_lapangan','tunj_kehadiran','tunj_pulsa','kompensasi_kontrak',
-            'ttt_custom','jml_jam_lembur','total_jam_ot_15x','total_jam_ot_2x',
+            'ttt_custom','potongan_custom','jml_jam_lembur','total_jam_ot_15x','total_jam_ot_2x',
             'upah_lembur','l_sabtu','l_libur','lembur_biasa','total_lembur_flat',
             'uang_hadir','h_kerja','h_sabtu','h_minggu_libur',
             'gaji_kotor','potongan_jht','potongan_pensiun','potongan_kes',
             'potongan_alpa','potongan_insentif','pot_tabung_oksigen','kekurangan_bulan_lalu','gaji_bersih',
             'izin','sakit','alpa','cuti','stb',
-            'nama_bank','no_rekening','ptkp','no_bpjs_tk','no_bpjs_kes',
+            'no_bpjs_tk','no_bpjs_kes',
             'dibuat_oleh','catatan',
         ];
+
+        // Ambil nilai asli SEBELUM ditimpa, untuk dibandingkan manual di bawah —
+        // isDirty() bawaan Eloquent kurang cocok di sini karena kolom desimal yang belum
+        // punya $casts akan dibaca sebagai string ("0.00") dari database, sehingga
+        // dibandingkan dengan angka PHP (0) akan selalu dianggap "berubah" padahal
+        // nilainya sama persis.
+        $originalAttrs = $payroll->getOriginal();
 
         foreach ($updateData as $k => $v) {
             if (in_array($k, $allowedColumns)) {
                 $payroll->$k = $v;
             }
         }
+
+        // Hanya catat ke Log Aktivitas kalau memang ada nilai yang benar-benar berubah —
+        // klik "Edit" lalu blur tanpa mengubah angka apapun tidak perlu tercatat sebagai
+        // update. "dibuat_oleh" dikecualikan karena selalu ikut ter-set ulang ke user yang
+        // sedang login setiap kali baris disimpan, walau tidak ada perubahan nilai lain.
+        $hasChanges = false;
+        foreach (array_diff($allowedColumns, ['dibuat_oleh']) as $col) {
+            $old = $originalAttrs[$col] ?? null;
+            $new = $payroll->$col;
+            if (is_array($old) || is_array($new)) {
+                $changed = json_encode($old) !== json_encode($new);
+            } elseif (is_numeric($old) && is_numeric($new)) {
+                $changed = (float) $old !== (float) $new;
+            } else {
+                $changed = (string) $old !== (string) $new;
+            }
+            if ($changed) {
+                $hasChanges = true;
+                break;
+            }
+        }
+
         $payroll->save();
 
-        $empLog = Employee::find($employeeId);
-        ActivityLog::record(
-            'update',
-            'Data Gaji',
-            $empLog?->nama_lengkap ?? "ID:{$employeeId}",
-            "Update manual data gaji {$tahun}/{$bulan}: {$empLog?->nama_lengkap} ({$empLog?->id_badge})"
-        );
+        if ($hasChanges) {
+            $empLog = Employee::find($employeeId);
+            ActivityLog::record(
+                'update',
+                'Data Gaji',
+                $empLog?->nama_lengkap ?? "ID:{$employeeId}",
+                "Update manual data gaji {$tahun}/{$bulan}: {$empLog?->nama_lengkap} ({$empLog?->id_badge})"
+            );
+        }
 
         return response()->json(['ok' => true, 'message' => 'Berhasil disimpan.']);
+    }
+
+    // Update data induk karyawan (bukan snapshot payroll per periode) langsung dari tabel Data
+    // Gaji — tanggal masuk, PTKP, no rekening, bank (kolom employees) & status karyawan HO
+    // (employee_ho_details). Ditulis ke data induk (sama seperti dari halaman Edit Karyawan),
+    // BUKAN ke snapshot EmployeePayroll, supaya nyambung ke halaman Data Karyawan juga.
+    public function updateEmployeeInfo(Request $request, Employee $employee)
+    {
+        if ($this->isViewer()) {
+            return response()->json(['ok' => false, 'message' => 'Viewer tidak memiliki akses.'], 403);
+        }
+
+        $data = $request->validate([
+            'tanggal_masuk'      => 'nullable|date',
+            'ho_status_karyawan' => 'nullable|string|max:40',
+            'ptkp'               => 'nullable|string|max:20',
+            'no_rekening'        => 'nullable|string|max:50',
+            'nama_bank'          => 'nullable|string|max:50',
+        ]);
+
+        $employeeData = array_intersect_key($data, array_flip(['tanggal_masuk', 'ptkp', 'no_rekening', 'nama_bank']));
+        if ($employeeData) {
+            $employee->update($employeeData);
+        }
+        if (array_key_exists('ho_status_karyawan', $data)) {
+            EmployeeHoDetail::updateOrCreate(
+                ['employee_id' => $employee->id],
+                ['status_karyawan' => $data['ho_status_karyawan']]
+            );
+        }
+
+        ActivityLog::record('update', 'Data Gaji', $employee->nama_lengkap, "Update data karyawan dari Data Gaji: {$employee->nama_lengkap}");
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function updateSalaryHistory(Request $request, int $employeeId)
+    {
+        if ($this->isViewer()) {
+            return response()->json(['ok' => false, 'message' => 'Viewer tidak memiliki akses.'], 403);
+        }
+
+        $data = $request->validate([
+            'label'   => 'required|string|max:150',
+            'nominal' => 'nullable|numeric|min:0',
+        ]);
+
+        $urutan = EmployeeSalaryHistory::where('label', $data['label'])->value('urutan');
+
+        EmployeeSalaryHistory::updateOrCreate(
+            ['employee_id' => $employeeId, 'label' => $data['label']],
+            ['nominal' => $data['nominal'] ?? 0, 'urutan' => $urutan]
+        );
+
+        return response()->json(['ok' => true]);
     }
 
 
@@ -815,14 +921,10 @@ class PayrollController extends Controller
         $tahun      = (int) $request->get('tahun', now()->year);
         $bulan      = (int) $request->get('bulan', now()->month);
         $employeeId = $request->get('employee_id');
-        $pctJht     = (float) $request->get('pct_jht', 2);
-        $pctPensiun = (float) $request->get('pct_pensiun', 1);
-        $pctKes     = (float) $request->get('pct_kes', 1);
-        $ttdRaw     = $request->get('ttd', '[]');
-        $ttdList    = json_decode($ttdRaw, true) ?: [];
 
         $employee = Employee::with(['position', 'project'])->findOrFail($employeeId);
         $isMd     = $employee->project?->tipe_gaji === 'md';
+        $isHo     = $employee->project?->tipe_gaji === 'ho';
 
         // Ambil kelompok dari TimesheetMember
         $projectId = $this->activeProjectId();
@@ -831,102 +933,31 @@ class PayrollController extends Controller
             ->first();
         $isFlat    = $member?->kelompok === 'flat';
 
-        if ($isMd) {
-            $tsData = $this->getTimesheetData($employee->id, $tahun, $bulan);
-            $slip   = $this->hitungSlipGajiMd($employee, $tahun, $bulan, $tsData);
-        } else {
-            $slip = $this->hitungSlipGaji($employee, $tahun, $bulan, $isFlat);
-        }
-
-        // Override dengan data yang sudah disimpan di DB (sama seperti slipGaji())
-        $savedPayroll = EmployeePayroll::where([
-            'employee_id' => $employee->id,
-            'tahun'       => $tahun,
-            'bulan'       => $bulan,
-        ])->first();
-
-        if ($savedPayroll) {
-            $slip['tunj_makan']         = $savedPayroll->tunj_makan         ?? $slip['tunj_makan'];
-            $slip['tunj_produksi']      = $savedPayroll->tunj_produksi      ?? $slip['tunj_produksi'];
-            $slip['tunj_lapangan']      = $savedPayroll->tunj_lapangan      ?? $slip['tunj_lapangan'];
-            $slip['tunj_kehadiran']     = $savedPayroll->tunj_kehadiran     ?? 0;
-            $slip['tunj_pulsa']         = $savedPayroll->tunj_pulsa         ?? 0;
-            $slip['kompensasi_kontrak'] = $savedPayroll->kompensasi_kontrak ?? 0;
-            $slip['insentif']           = $savedPayroll->insentif           ?? $slip['insentif'];
-            $slip['com_day']            = $savedPayroll->com_day            ?? $slip['com_day'];
-            $slip['gaji_pokok']         = $savedPayroll->gaji_pokok !== null ? $savedPayroll->gaji_pokok : $slip['gaji_pokok'];
-            $slip['tunj_tetap']         = $savedPayroll->tunj_tetap !== null ? $savedPayroll->tunj_tetap : $slip['tunj_tetap'];
-            $slip['kekurangan_bulan_lalu'] = $savedPayroll->kekurangan_bulan_lalu ?? 0;
-            $slip['upah_lembur']        = $savedPayroll->upah_lembur        ?? $slip['upah_lembur'];
-            $slip['potongan_alpa']      = $savedPayroll->potongan_alpa      ?? $slip['potongan_alpa'];
-            $slip['potongan_insentif']  = $savedPayroll->potongan_insentif  ?? 0;
-
-            $upahPenuh = $slip['gaji_pokok'] + $slip['tunj_tetap'];
-
-
-            if (!$isMd) {
-                $kompPwt    = $upahPenuh / 12;
-                $tttSum     = ($slip['tunj_makan'] ?? 0) + ($slip['tunj_produksi'] ?? 0)
-                            + ($slip['tunj_lapangan'] ?? 0) + ($slip['tunj_kehadiran'] ?? 0)
-                            + ($slip['tunj_pulsa'] ?? 0) + ($slip['kompensasi_kontrak'] ?? 0)
-                            + ($slip['insentif'] ?? 0) + ($slip['com_day'] ?? 0);
-                $slip['kompensasi_pwt'] = round($kompPwt, 2);
-                $slip['gaji_kotor']     = round(
-                    $slip['gaji_pokok'] + $slip['tunj_tetap'] + $kompPwt + $tttSum + $slip['upah_lembur']
-                );
-                $slip['gaji_bersih']    = round(
-                    $slip['gaji_kotor']
-                    - round($upahPenuh * 0.02)
-                    - round($upahPenuh * 0.01)
-                    - round($upahPenuh * 0.01)
-                    - ($slip['potongan_alpa'] ?? 0)
-                    - ($slip['potongan_insentif'] ?? 0)
-                );
-            } else {
-                $hKerja      = $slip['h_basic'] ?? 0;
-                $hSabtu      = $slip['h_sabtu'] ?? 0;
-                $uBasic      = round($upahPenuh / 17 * min($hKerja, 17), 2);
-                $uKerja      = round((($slip['tunj_makan'] ?? 0) + ($slip['tunj_kehadiran'] ?? 0)) * ($slip['h_kerja'] ?? 0), 2);
-                $comDayTotal = round(($slip['com_day'] ?? 0) * $hSabtu, 2);
-                $slip['u_basic']        = $uBasic;
-                $slip['u_kerja']        = $uKerja;
-                $slip['kompensasi_pwt'] = $savedPayroll->kompensasi_pwt ?? round($upahPenuh / 12, 2);
-                $slip['gaji_kotor']     = round(
-                    $uBasic
-                    + $slip['kompensasi_pwt']
-                    + $uKerja
-                    + $comDayTotal
-                    + ($slip['upah_lembur'] ?? 0)
-                    + ($slip['tunj_pulsa'] ?? 0)
-                    + ($slip['kekurangan_bulan_lalu'] ?? 0),
-                    2
-                );
-                $slip['gaji_bersih']    = round(
-                    $slip['gaji_kotor']
-                    - round($upahPenuh * 0.02)
-                    - round($upahPenuh * 0.01)
-                    - round($upahPenuh * 0.01)
-                    - ($slip['potongan_alpa'] ?? 0),
-                    2
-                );
-            }
-        }
-
+        // Satu sumber perhitungan yang sama dengan halaman Slip Gaji & Data Gaji —
+        // persentase BPJS & daftar TTD diambil dari konfigurasi project (bukan lagi dari query string).
+        $slip = $this->getSlipData((int) $employeeId, $tahun, $bulan)
+            ?? $this->hitungSlipGaji($employee, $tahun, $bulan, $isFlat);
+        $pctJht     = $slip['pct_jht']     ?? 2.0;
+        $pctPensiun = $slip['pct_pensiun'] ?? 1.0;
+        $pctKes     = $slip['pct_kes']     ?? 1.0;
+        $ttdList    = $slip['ttd_list']    ?? [];
 
         $bulanNama  = $this->bulanNama();
         $periodeStr = $bulanNama[$bulan] . ' ' . $tahun;
-        $upahPenuh  = $slip['gaji_pokok'] + $slip['tunj_tetap'];
-        $potJht     = round($upahPenuh * $pctJht / 100);
-        $potPensiun = round($upahPenuh * $pctPensiun / 100);
-        $potKes     = round($upahPenuh * $pctKes / 100);
-        $potAlpa    = $slip['potongan_alpa'];
-        $totalPot   = $potJht + $potPensiun + $potKes + $potAlpa;
+        $potJht     = $slip['potongan_jht'];
+        $potPensiun = $slip['potongan_pensiun'];
+        $potKes     = $slip['potongan_kes'];
+        $potAlpa    = $slip['potongan_alpa'] ?? 0;
+        $potInsentif = $slip['potongan_insentif'] ?? 0;
+        $potOksigen  = $slip['pot_tabung_oksigen'] ?? 0;
+        $kekurangan  = $slip['kekurangan_bulan_lalu'] ?? 0;
+        $totalPot   = $potJht + $potPensiun + $potKes + $potAlpa + $potInsentif + $potOksigen;
         $gajiPokok  = $slip['gaji_pokok'];
         $tunjTetap  = $slip['tunj_tetap'];
         $kompPwt    = $slip['kompensasi_pwt'];
         $upahLembur = $slip['upah_lembur'];
         $gajiKotor  = $slip['gaji_kotor'];
-        $gajiBersih = $gajiKotor - $totalPot + ($slip['kekurangan_bulan_lalu'] ?? 0);
+        $gajiBersih = $slip['gaji_bersih'];
 
         $ss = new Spreadsheet();
         $ws = $ss->getActiveSheet();
@@ -988,7 +1019,7 @@ class PayrollController extends Controller
         $r += 5;
 
         foreach ([
-            [$rowNoReg,   'No. Register',  $employee->id_badge],
+            [$rowNoReg,   'No. Badge',     $employee->id_badge],
             [$rowNama,    'Nama Karyawan', $employee->nama_lengkap],
             [$rowJabatan, 'Jabatan',       $employee->position?->nama_jabatan ?? '-'],
             [$rowNoRek,   'No. Rekening',  "\t" . ($employee->no_rekening ?? '-')],
@@ -1060,60 +1091,134 @@ class PayrollController extends Controller
             $r++;
         };
 
+        // Huruf section (A/B/C/D...) mengikuti section mana yang benar-benar tampil —
+        // sama seperti di PDF/slip layar (SlipCetak), supaya tidak ada huruf yang "bolong"
+        // kalau TTT/Lembur di-skip.
+        $letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        $li = 0;
+
         // A. Perolehan
-        $addSectionHeader('A', 'PEROLEHAN');
+        $addSectionHeader($letters[$li++], 'PEROLEHAN');
         $addItem('1.', 'Gaji Pokok / Upah', $gajiPokok);
         $addItem('2.', 'Tunjangan Tetap (Tunj. Jabatan)', $tunjTetap);
         $addItem('3.', 'Kompensasi PWT', $kompPwt);
+        $perolehanSubtotal = $gajiPokok + $tunjTetap + $kompPwt;
 
-        // B. TTT
+        // B. TTT — kalau semua nilai TTT kosong, section ini (header + isi) di-skip total
+        // dan langsung lanjut ke Lembur, sama seperti PDF. Daftar item disamakan dengan
+        // TTT_LABELS di SlipCetak (Timesheet/SlipGaji.jsx) supaya kontennya konsisten.
+        $tttSubtotal = 0;
         if ($isMd) {
-            $addSectionHeader('B', 'TUNJANGAN TIDAK TETAP (MD)');
+            $addSectionHeader($letters[$li++], 'TUNJANGAN TIDAK TETAP (MD)');
             $addItem('1.', 'TTT per Hari (× ' . ($slip['h_kerja'] ?? 0) . ' hari)', $slip['ttt_total'] ?? 0, 'Rp ' . number_format($slip['ttt_perhari'] ?? 0, 0, ',', '.') . ' × ' . ($slip['h_kerja'] ?? 0));
             $addItem('2.', 'Uang Makan per Hari (× ' . ($slip['h_kerja'] ?? 0) . ' hari)', $slip['tunj_makan_total'] ?? 0, 'Rp ' . number_format($slip['tunj_makan'] ?? 0, 0, ',', '.') . ' × ' . ($slip['h_kerja'] ?? 0));
             $addItem('3.', 'Com Day (× ' . ($slip['h_kerja'] ?? 0) . ' hari)', $slip['com_day_total'] ?? 0, 'Rp ' . number_format($slip['com_day'] ?? 0, 0, ',', '.') . ' × ' . ($slip['h_kerja'] ?? 0));
-            if ($slip['insentif'] ?? 0) $addItem('4.', 'Insentif', $slip['insentif']);
+            if ((float)($slip['insentif'] ?? 0) > 0) $addItem('4.', 'Insentif', $slip['insentif']);
+            $tttSubtotal = ($slip['ttt_total'] ?? 0) + ($slip['tunj_makan_total'] ?? 0) + ($slip['com_day_total'] ?? 0) + ($slip['insentif'] ?? 0);
         } else {
-            $addSectionHeader('B', 'TUNJANGAN TIDAK TETAP');
-            if ($slip['tunj_makan']    ?? 0) $addItem('1.', 'Uang Makan',      $slip['tunj_makan']);
-            if ($slip['tunj_produksi'] ?? 0) $addItem('2.', 'Tunj. Produksi',  $slip['tunj_produksi']);
-            if ($slip['tunj_lapangan'] ?? 0) $addItem('3.', 'Tunj. Lapangan',  $slip['tunj_lapangan']);
-            if ($slip['insentif']      ?? 0) $addItem('4.', 'Insentif',        $slip['insentif']);
+            $tttItems = [];
+            if ((float)($slip['tunj_makan']         ?? 0) > 0) $tttItems[] = ['Uang Makan',       $slip['tunj_makan']];
+            if ((float)($slip['tunj_produksi']      ?? 0) > 0) $tttItems[] = ['Tunj. Produksi',   $slip['tunj_produksi']];
+            if ((float)($slip['tunj_lapangan']      ?? 0) > 0) $tttItems[] = ['Tunj. Lapangan',   $slip['tunj_lapangan']];
+            if ((float)($slip['tunj_kehadiran']     ?? 0) > 0) $tttItems[] = ['Tunj. Kehadiran',  $slip['tunj_kehadiran']];
+            if ((float)($slip['tunj_pulsa']         ?? 0) > 0) $tttItems[] = ['Tunj. Pulsa',      $slip['tunj_pulsa']];
+            if ((float)($slip['kompensasi_kontrak'] ?? 0) > 0) $tttItems[] = ['Komp. Kontrak',    $slip['kompensasi_kontrak']];
+            if ((float)($slip['insentif']           ?? 0) > 0) $tttItems[] = ['Insentif',         $slip['insentif']];
+            if ((float)($slip['com_day']            ?? 0) > 0) $tttItems[] = ['Com Day',          $slip['com_day']];
+
+            if (count($tttItems) > 0) {
+                $addSectionHeader($letters[$li++], 'TUNJANGAN TIDAK TETAP');
+                foreach ($tttItems as $i => [$label, $val]) {
+                    $addItem(($i + 1) . '.', $label, $val);
+                }
+                $tttSubtotal = array_sum(array_column($tttItems, 1));
+            }
         }
 
-        // C. Lembur
-        $addSectionHeader('C', 'LEMBUR');
-        if ($isMd) {
-            $addItem('1.', 'OT 1,5× — ' . ($slip['total_ot_15x'] ?? 0) . ' jam', null, ($slip['total_ot_15x'] ?? 0) . ' × 1,5 × Rp ' . number_format($slip['nilai_lembur_per_jam'] ?? 0, 0, ',', '.') . '/jam');
-            $addItem('2.', 'OT 2×   — ' . ($slip['total_ot_2x']  ?? 0) . ' jam', null, ($slip['total_ot_2x']  ?? 0) . ' × 2 × Rp '   . number_format($slip['nilai_lembur_per_jam'] ?? 0, 0, ',', '.') . '/jam');
-            $addItem('', 'Total Upah Lembur', $upahLembur);
-        } elseif ($isFlat) {
-            $addItem('1.', 'Lembur Sabtu × ' . ($slip['l_sabtu'] ?? 0) . ' hari', ($slip['l_sabtu'] ?? 0) * ($slip['tarif_sabtu'] ?? 0), ($slip['l_sabtu'] ?? 0) . ' × Rp ' . number_format($slip['tarif_sabtu'] ?? 0, 0, ',', '.'));
-            $addItem('2.', 'Lembur Libur × ' . ($slip['l_libur'] ?? 0) . ' hari', ($slip['l_libur'] ?? 0) * ($slip['tarif_libur'] ?? 0), ($slip['l_libur'] ?? 0) . ' × Rp ' . number_format($slip['tarif_libur'] ?? 0, 0, ',', '.'));
-            if ($slip['lembur_biasa'] ?? 0) $addItem('3.', 'Lembur Biasa × ' . ($slip['lembur_biasa'] ?? 0) . ' hari', ($slip['lembur_biasa'] ?? 0) * ($slip['tarif_biasa'] ?? 0), ($slip['lembur_biasa'] ?? 0) . ' × Rp ' . number_format($slip['tarif_biasa'] ?? 0, 0, ',', '.'));
-            $addItem('', 'Total Lembur Flat', $slip['total_lembur_flat'] ?? 0);
-        } else {
-            $addItem('1.', 'Upah Lembur (' . ($slip['jml_jam_lembur'] ?? 0) . ' jam)', $upahLembur);
+        // C. Lembur (HO tidak punya lembur — timesheet cuma berlaku untuk project lapangan)
+        $lemburSubtotal = 0;
+        if (!$isHo) {
+            $addSectionHeader($letters[$li++], 'LEMBUR');
+            if ($isMd) {
+                $addItem('1.', 'OT 1,5× — ' . ($slip['total_ot_15x'] ?? 0) . ' jam', null, ($slip['total_ot_15x'] ?? 0) . ' × 1,5 × Rp ' . number_format($slip['nilai_lembur_per_jam'] ?? 0, 0, ',', '.') . '/jam');
+                $addItem('2.', 'OT 2×   — ' . ($slip['total_ot_2x']  ?? 0) . ' jam', null, ($slip['total_ot_2x']  ?? 0) . ' × 2 × Rp '   . number_format($slip['nilai_lembur_per_jam'] ?? 0, 0, ',', '.') . '/jam');
+                $addItem('', 'Total Upah Lembur', $upahLembur);
+                $lemburSubtotal = $upahLembur;
+            } elseif ($isFlat) {
+                $addItem('1.', 'Lembur Sabtu × ' . ($slip['l_sabtu'] ?? 0) . ' hari', ($slip['l_sabtu'] ?? 0) * ($slip['tarif_sabtu'] ?? 0), ($slip['l_sabtu'] ?? 0) . ' × Rp ' . number_format($slip['tarif_sabtu'] ?? 0, 0, ',', '.'));
+                $addItem('2.', 'Lembur Libur × ' . ($slip['l_libur'] ?? 0) . ' hari', ($slip['l_libur'] ?? 0) * ($slip['tarif_libur'] ?? 0), ($slip['l_libur'] ?? 0) . ' × Rp ' . number_format($slip['tarif_libur'] ?? 0, 0, ',', '.'));
+                if ((float)($slip['lembur_biasa'] ?? 0) > 0) $addItem('3.', 'Lembur Biasa × ' . ($slip['lembur_biasa'] ?? 0) . ' hari', ($slip['lembur_biasa'] ?? 0) * ($slip['tarif_biasa'] ?? 0), ($slip['lembur_biasa'] ?? 0) . ' × Rp ' . number_format($slip['tarif_biasa'] ?? 0, 0, ',', '.'));
+                $addItem('', 'Total Lembur Flat', $slip['total_lembur_flat'] ?? 0);
+                $lemburSubtotal = $slip['total_lembur_flat'] ?? 0;
+            } else {
+                $addItem('1.', 'Upah Lembur (' . ($slip['jml_jam_lembur'] ?? 0) . ' jam)', $upahLembur);
+                $lemburSubtotal = $upahLembur;
+            }
         }
 
         $addTotal('GAJI SEBULAN (KOTOR)', $gajiKotor, true);
 
+        // Rincian formula gaji kotor — biar kelihatan dari mana totalnya berasal
+        // (jumlah semua subtotal section di atas), bukan cuma angka akhir.
+        $rincianKotorParts = [$fmtRp($perolehanSubtotal) . ' (Perolehan)'];
+        if ($tttSubtotal > 0)   $rincianKotorParts[] = $fmtRp($tttSubtotal) . ' (TTT)';
+        if ($lemburSubtotal > 0) $rincianKotorParts[] = $fmtRp($lemburSubtotal) . ' (Lembur)';
+        $ws->mergeCells("A{$r}:G{$r}");
+        $ws->setCellValue("A{$r}", '= Rp ' . implode(' + Rp ', $rincianKotorParts));
+        $ws->getStyle("A{$r}")->applyFromArray(['font' => ['italic' => true, 'size' => 7.5, 'name' => 'Arial', 'color' => ['argb' => 'FF888888']]]);
+        $ws->getRowDimension($r)->setRowHeight(11);
+        $r++;
+
         // D. Potongan
-        $addSectionHeader('D', 'POTONGAN WAJIB');
+        $addSectionHeader($letters[$li++], 'POTONGAN WAJIB');
         $addItem('1.', "BPJS TK – JHT ({$pctJht}%)",        $potJht);
         $addItem('2.', "BPJS TK – Pensiun ({$pctPensiun}%)", $potPensiun);
         $addItem('3.', "BPJS Kesehatan ({$pctKes}%)",        $potKes);
         if ($potAlpa > 0) $addItem('4.', 'Potongan Alpa (' . ($slip['alpa'] ?? 0) . ' hari)', $potAlpa, '(Gapok+Tunj) / 25 × ' . ($slip['alpa'] ?? 0));
+        if ($potInsentif > 0) $addItem('5.', 'Pot. Insentif (' . ($slip['sub_group'] ?? '') . ')', $potInsentif);
+        if ($potOksigen > 0) $addItem('6.', 'Potongan Tabung Oksigen', $potOksigen);
         $addTotal('TOTAL POTONGAN', $totalPot);
+        if ($isHo && (($slip['potongan_simulasi'] ?? 0) > 0 || ($slip['potongan_custom_sum'] ?? 0) > 0)) {
+            $addItem('', 'Info: potensi potongan cuti/alpa & lainnya (belum dipotong)', ($slip['potongan_simulasi'] ?? 0) + ($slip['potongan_custom_sum'] ?? 0));
+        }
         $r++;
 
-        // Netto
+        // ── Rincian Penghasilan Bersih — ringkasan akhir, sama seperti box di PDF/slip layar ──
+        $rincianStart = $r;
+        $ws->mergeCells("A{$r}:G{$r}");
+        $ws->setCellValue("A{$r}", 'Rincian Penghasilan Bersih:');
+        $ws->getStyle("A{$r}")->applyFromArray(['font' => ['italic' => true, 'size' => 8, 'name' => 'Arial', 'color' => ['argb' => 'FF666666']]]);
+        $r++;
+
+        $addRincianRow = function (string $label, string $displayVal) use ($ws, &$r) {
+            $ws->mergeCells("A{$r}:F{$r}");
+            $ws->setCellValue("A{$r}", $label);
+            $ws->setCellValue("G{$r}", $displayVal);
+            $ws->getStyle("A{$r}:G{$r}")->getFont()->setSize(8.5)->setName('Arial');
+            $ws->getStyle("G{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $ws->getRowDimension($r)->setRowHeight(13);
+            $r++;
+        };
+        $addRincianRow('Gaji Kotor', 'Rp ' . $fmtRp($gajiKotor));
+        $addRincianRow('Total Potongan', '- Rp ' . $fmtRp($totalPot));
+        if ($kekurangan != 0) {
+            $addRincianRow('Kekurangan Bulan Lalu', ($kekurangan > 0 ? '+ ' : '') . 'Rp ' . $fmtRp($kekurangan));
+        }
+
+        // Netto — jadi baris penutup box Rincian (border+fill supaya kelihatan menyatu jadi 1 box)
         $ws->mergeCells("A{$r}:F{$r}");
-        $ws->setCellValue("A{$r}", 'PENGHASILAN BERSIH (NETTO)');
+        $ws->setCellValue("A{$r}", 'NETTO DITERIMA');
         $ws->setCellValue("G{$r}", 'Rp ' . $fmtRp($gajiBersih));
-        $ws->getStyle("A{$r}:G{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 11, 'name' => 'Arial'], 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFF0F0F0']], 'borders' => ['top' => ['borderStyle' => Border::BORDER_MEDIUM], 'bottom' => ['borderStyle' => Border::BORDER_MEDIUM]]]);
+        $ws->getStyle("A{$r}:G{$r}")->applyFromArray(['font' => ['bold' => true, 'size' => 11, 'name' => 'Arial'], 'borders' => ['top' => ['borderStyle' => Border::BORDER_MEDIUM]]]);
         $ws->getStyle("G{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $ws->getRowDimension($r)->setRowHeight(18);
+        $rincianEnd = $r;
+        $r++;
+
+        $ws->getStyle("A{$rincianStart}:G{$rincianEnd}")->applyFromArray([
+            'fill'    => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFF7F7F7']],
+            'borders' => ['outline' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFDDDDDD']]],
+        ]);
         $r++;
         $r++;
 
@@ -1403,6 +1508,7 @@ class PayrollController extends Controller
             'total_lembur_flat'   => round($totalLemburFlat, 2),
             'uang_hadir'          => $uangHadir,
             'h_kerja'             => $hKerja,
+            'gaji_kotor'          => round($gajiKotor, 2),
             'potongan_jht'        => $potonganJht,
             'potongan_pensiun'    => $potonganPensiun,
             'potongan_kes'        => $potonganKes,
@@ -1617,6 +1723,317 @@ class PayrollController extends Controller
 
 
     // ════════════════════════════════════════════════════════════
+    // CORE: Hitung slip gaji HO (kantor pusat) — tidak ada timesheet,
+    // gaji ditentukan langsung dari nilai yang tersimpan di EmployeePayroll.
+    // ════════════════════════════════════════════════════════════
+    private function hitungSlipGajiHo(Employee $emp, int $tahun, int $bulan): array
+    {
+        if (!$emp->relationLoaded('project')) {
+            $emp->load('project');
+        }
+        if (!$emp->relationLoaded('hoDetail')) {
+            $emp->load('hoDetail');
+        }
+
+        $saved = EmployeePayroll::where([
+            'employee_id' => $emp->id,
+            'tahun'       => $tahun,
+            'bulan'       => $bulan,
+        ])->first();
+
+        $gajiPokok = (float) ($saved->gaji_pokok ?? 0);
+        $tunjTetap = (float) ($saved->tunj_tetap ?? 0);
+
+        return [
+            'employee_id'           => $emp->id,
+            'id_badge'              => $emp->id_badge,
+            'nama_lengkap'          => $emp->nama_lengkap,
+            'no_ktp'                => $emp->no_ktp,
+            'jabatan'               => $emp->position?->nama_jabatan ?? '—',
+            'kelompok'              => null,
+            'tipe_project'          => 'ho',
+            'project_kode'          => strtolower($emp->project?->kode ?? ''),
+            'ptkp'                  => $emp->ptkp ?? '—',
+            'tanggal_masuk'         => $emp->tanggal_masuk?->format('d-m-Y'),
+            'ho_unit'               => $emp->hoDetail?->unit,
+            'ho_status_karyawan'    => $emp->hoDetail?->status_karyawan,
+            'tahun'                 => $tahun,
+            'bulan'                 => $bulan,
+            'gaji_pokok'            => $gajiPokok,
+            'tunj_tetap'            => $tunjTetap,
+            'tunj_jabatan'          => 0,
+            'kompensasi_pwt'        => $saved->kompensasi_pwt ?? round(($gajiPokok + $tunjTetap) / 12, 2),
+            'upah_penuh'            => $gajiPokok + $tunjTetap,
+            'ttt_perhari'           => 0,
+            'com_day'               => 0,
+            'insentif'              => 0,
+            'tunj_makan'            => 0,
+            'tunj_produksi'         => 0,
+            'tunj_lapangan'         => 0,
+            'jml_jam_lembur'        => 0,
+            'upah_lembur'           => 0,
+            'l_sabtu'               => 0,
+            'l_libur'               => 0,
+            'lembur_biasa'          => 0,
+            'total_lembur_flat'     => 0,
+            'uang_hadir'            => 0,
+            'h_kerja'               => 0,
+            'gaji_kotor'            => 0,
+            'potongan_jht'          => 0,
+            'potongan_pensiun'      => 0,
+            'potongan_kes'          => 0,
+            'potongan_alpa'         => 0,
+            'potongan_insentif'     => 0,
+            'pot_tabung_oksigen'    => 0,
+            'kekurangan_bulan_lalu' => (float) ($saved->kekurangan_bulan_lalu ?? 0),
+            'gaji_bersih'           => 0,
+            'izin'                  => (int) ($saved->izin ?? 0),
+            'sakit'                 => (int) ($saved->sakit ?? 0),
+            'alpa'                  => (int) ($saved->alpa ?? 0),
+            'cuti'                  => (int) ($saved->cuti ?? 0),
+            'stb'                   => 0,
+            'hari_details'          => [],
+        ];
+    }
+
+
+    // ════════════════════════════════════════════════════════════
+    // SATU-SATUNYA SUMBER PERHITUNGAN: Gaji Kotor / Gaji Bersih / BPJS
+    // Dipanggil setelah semua override manual (EmployeePayroll) diterapkan
+    // ke $slip, supaya Data Gaji, Slip Gaji (layar/Excel/print), dan yang
+    // tersimpan di DB selalu memakai rumus yang sama persis.
+    // ════════════════════════════════════════════════════════════
+    private function hitungGajiKotorBersih(array $slip, bool $isMd, bool $isHo = false, float $pctJht = 2.0, float $pctPensiun = 1.0, float $pctKes = 1.0): array
+    {
+        $gajiPokok = (float) ($slip['gaji_pokok'] ?? 0);
+        $tunjTetap = (float) ($slip['tunj_tetap'] ?? 0);
+        $upahPenuh = $gajiPokok + $tunjTetap;
+
+        $potonganJht     = round($upahPenuh * $pctJht / 100);
+        $potonganPensiun = round($upahPenuh * $pctPensiun / 100);
+        $potonganKes     = round($upahPenuh * $pctKes / 100);
+
+        if ($isHo) {
+            // HO: tidak ada potongan alpa/izin sungguhan — hanya disimulasikan untuk info
+            // (lihat blok $isHo di bawah), jadi gaji_bersih tidak dikurangi di sini.
+            $slip['potongan_alpa'] = 0;
+
+            $kompPwt = round($upahPenuh / 12, 2);
+            $slip['kompensasi_pwt'] = $kompPwt;
+            $gajiKotor = round($gajiPokok + $tunjTetap + $kompPwt + ($slip['custom_ttt_sum'] ?? 0), 2);
+            $gajiBersih = round(
+                $gajiKotor - $potonganJht - $potonganPensiun - $potonganKes
+                + ($slip['kekurangan_bulan_lalu'] ?? 0),
+                2
+            );
+
+            $alpaCount = (float) ($slip['alpa'] ?? 0);
+            $cutiCount = (float) ($slip['cuti'] ?? 0);
+            $slip['potongan_simulasi'] = round($upahPenuh / 25 * ($alpaCount + $cutiCount), 2);
+            $slip['potongan_custom_sum'] = (float) ($slip['potongan_custom_sum'] ?? 0);
+
+            $slip['potongan_jht']     = $potonganJht;
+            $slip['potongan_pensiun'] = $potonganPensiun;
+            $slip['potongan_kes']     = $potonganKes;
+            $slip['gaji_kotor']       = $gajiKotor;
+            $slip['gaji_bersih']      = $gajiBersih;
+
+            return $slip;
+        }
+
+        // Potongan alpa dihitung ulang langsung dari kehadiran (izin/alpa) yang selalu live dari
+        // timesheet — jangan pakai nilai tersimpan yang bisa basi kalau kehadiran berubah setelah disimpan.
+        $alpaCount = (float) ($slip['alpa'] ?? 0);
+        if ($isMd) {
+            $potonganAlpa = $alpaCount > 0 ? round($upahPenuh / 25 * $alpaCount) : 0;
+        } else {
+            $projectKode  = strtolower($slip['project_kode'] ?? '');
+            $izinDipotong = !in_array($projectKode, ['khawista', 'purnama'], true);
+            $izinCount    = (float) ($slip['izin'] ?? 0);
+            $potonganAlpa = round($upahPenuh / 25 * ($alpaCount + ($izinDipotong ? $izinCount : 0)), 2);
+        }
+        $slip['potongan_alpa'] = $potonganAlpa;
+
+        if ($isMd) {
+            $hBasic      = $slip['h_basic'] ?? 0;
+            $hSabtu      = $slip['h_sabtu'] ?? 0;
+            $uBasic      = round($upahPenuh / 17 * min($hBasic, 17), 2);
+            $uKerja      = round((($slip['tunj_makan'] ?? 0) + ($slip['tunj_kehadiran'] ?? 0)) * ($slip['h_kerja'] ?? 0), 2);
+            $comDayTotal = round(($slip['com_day'] ?? 0) * $hSabtu, 2);
+
+            $slip['u_basic']           = $uBasic;
+            $slip['u_kerja']           = $uKerja;
+            $slip['com_day_total']     = $comDayTotal;
+            $slip['ttt_total']         = round(($slip['ttt_perhari'] ?? 0) * ($slip['h_kerja'] ?? 0), 2);
+            $slip['tunj_makan_total']  = round(($slip['tunj_makan'] ?? 0) * ($slip['h_kerja'] ?? 0), 2);
+
+            $gajiKotor = round(
+                $uBasic
+                + ($slip['kompensasi_pwt'] ?? 0)
+                + $uKerja
+                + $comDayTotal
+                + ($slip['upah_lembur'] ?? 0)
+                + ($slip['tunj_pulsa'] ?? 0)
+                + ($slip['kekurangan_bulan_lalu'] ?? 0),
+                2
+            );
+            $gajiBersih = round(
+                $gajiKotor - $potonganJht - $potonganPensiun - $potonganKes - ($slip['potongan_alpa'] ?? 0),
+                2
+            );
+        } else {
+            $isFlat  = ($slip['kelompok'] ?? '') === 'flat';
+            $kompPwt = round($upahPenuh / 12, 2);
+            $tttSum  = ($slip['tunj_makan'] ?? 0) + ($slip['tunj_produksi'] ?? 0) + ($slip['tunj_lapangan'] ?? 0)
+                     + ($slip['tunj_kehadiran'] ?? 0) + ($slip['tunj_pulsa'] ?? 0) + ($slip['kompensasi_kontrak'] ?? 0)
+                     + ($slip['insentif'] ?? 0) + ($slip['com_day'] ?? 0)
+                     + ($slip['custom_ttt_sum'] ?? 0);
+
+            $upahLembur = $isFlat ? (float) ($slip['total_lembur_flat'] ?? 0) : (float) ($slip['upah_lembur'] ?? 0);
+            $uangHadir  = $isFlat ? (float) ($slip['uang_hadir'] ?? 0) : 0;
+
+            $slip['kompensasi_pwt'] = $kompPwt;
+            $slip['upah_lembur']    = $upahLembur;
+
+            $gajiKotor = round($upahPenuh + $kompPwt + $tttSum + $upahLembur + $uangHadir, 2);
+
+            $gajiBersih = round(
+                $gajiKotor
+                - $potonganJht - $potonganPensiun - $potonganKes
+                - ($slip['potongan_alpa']      ?? 0)
+                - ($slip['potongan_insentif']  ?? 0)
+                - ($slip['pot_tabung_oksigen'] ?? 0)
+                + ($slip['kekurangan_bulan_lalu'] ?? 0),
+                2
+            );
+        }
+
+        $slip['potongan_jht']     = $potonganJht;
+        $slip['potongan_pensiun'] = $potonganPensiun;
+        $slip['potongan_kes']     = $potonganKes;
+        $slip['gaji_kotor']       = $gajiKotor;
+        $slip['gaji_bersih']      = $gajiBersih;
+        // Simpan persentase yang benar-benar dipakai — supaya tampilan (Excel/print) selalu
+        // menampilkan angka yang sesuai dengan konfigurasi project & periode ini, bukan asumsi tetap 2/1/1.
+        $slip['pct_jht']     = $pctJht;
+        $slip['pct_pensiun'] = $pctPensiun;
+        $slip['pct_kes']     = $pctKes;
+
+        return $slip;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // SLIP GAJI SATU KARYAWAN — dipakai bersama oleh slipGaji(), exportSlipExcel(),
+    // dan SlipGajiExportController (print/export legacy)
+    // ════════════════════════════════════════════════════════════
+    public function getSlipData(int $employeeId, int $tahun, int $bulan): ?array
+    {
+        $employee = Employee::with(['position', 'project'])->find($employeeId);
+        if (!$employee) {
+            return null;
+        }
+
+        $isMd      = $employee->project?->tipe_gaji === 'md';
+        $isHo      = $employee->project?->tipe_gaji === 'ho';
+        // Pakai project milik karyawan itu sendiri (bukan project yang sedang aktif di sesi
+        // viewer) — supaya kelompok/sub_group/TTT custom-nya selalu benar untuk karyawan ini,
+        // apapun project yang sedang dipilih di UI.
+        $projectId = $employee->project_id ?? $this->activeProjectId();
+        $member    = TimesheetMember::where('id_badge', $employee->id_badge)
+            ->when($projectId, fn($q) => $q->where('project_id', $projectId))
+            ->first();
+        $isFlat = $member?->kelompok === 'flat';
+
+        if ($isHo) {
+            $slip = $this->hitungSlipGajiHo($employee, $tahun, $bulan);
+            $slip['sub_group'] = $employee->hoDetail?->unit;
+        } else {
+            if ($isMd) {
+                $tsData = $this->getTimesheetData($employee->id, $tahun, $bulan);
+                $slip   = $this->hitungSlipGajiMd($employee, $tahun, $bulan, $tsData);
+            } else {
+                $slip = $this->hitungSlipGaji($employee, $tahun, $bulan, $isFlat);
+            }
+            $slip['sub_group'] = $member?->sub_group;
+        }
+
+        $savedPayroll = EmployeePayroll::where([
+            'employee_id' => $employee->id,
+            'tahun'       => $tahun,
+            'bulan'       => $bulan,
+        ])->first();
+
+        if ($savedPayroll) {
+            $slip['tunj_makan']            = $savedPayroll->tunj_makan            ?? $slip['tunj_makan'];
+            $slip['tunj_produksi']         = $savedPayroll->tunj_produksi         ?? $slip['tunj_produksi'];
+            $slip['tunj_lapangan']         = $savedPayroll->tunj_lapangan         ?? $slip['tunj_lapangan'];
+            $slip['tunj_kehadiran']        = $savedPayroll->tunj_kehadiran        ?? 0;
+            $slip['tunj_pulsa']            = $savedPayroll->tunj_pulsa           ?? 0;
+            $slip['kompensasi_kontrak']    = $savedPayroll->kompensasi_kontrak   ?? 0;
+            $slip['insentif']              = $savedPayroll->insentif             ?? $slip['insentif'];
+            $slip['com_day']               = $savedPayroll->com_day             ?? $slip['com_day'];
+            $slip['gaji_pokok']            = $savedPayroll->gaji_pokok !== null ? $savedPayroll->gaji_pokok : $slip['gaji_pokok'];
+            $slip['tunj_tetap']            = $savedPayroll->tunj_tetap !== null ? $savedPayroll->tunj_tetap : $slip['tunj_tetap'];
+            $slip['tunj_jabatan']          = $savedPayroll->tunj_jabatan          ?? 0;
+            $slip['kompensasi_pwt']        = $savedPayroll->kompensasi_pwt       ?? $slip['kompensasi_pwt'];
+            $slip['upah_lembur']           = $savedPayroll->upah_lembur          ?? $slip['upah_lembur'];
+            $slip['total_lembur_flat']     = $savedPayroll->total_lembur_flat    ?? $slip['total_lembur_flat'];
+            $slip['jml_jam_lembur']        = $savedPayroll->jml_jam_lembur       ?? $slip['jml_jam_lembur'];
+            $slip['l_sabtu']               = $savedPayroll->l_sabtu             ?? $slip['l_sabtu'];
+            $slip['l_libur']               = $savedPayroll->l_libur             ?? $slip['l_libur'];
+            $slip['lembur_biasa']          = $savedPayroll->lembur_biasa        ?? $slip['lembur_biasa'];
+            $slip['uang_hadir']            = $savedPayroll->uang_hadir          ?? $slip['uang_hadir'];
+            $slip['potongan_insentif']     = $savedPayroll->potongan_insentif   ?? 0;
+            $slip['pot_tabung_oksigen']    = $savedPayroll->pot_tabung_oksigen  ?? 0;
+            $slip['kekurangan_bulan_lalu'] = $savedPayroll->kekurangan_bulan_lalu ?? 0;
+            $slip['stb']                   = $savedPayroll->stb                 ?? $slip['stb'] ?? 0;
+            $slip['id']                    = $savedPayroll->id;
+
+            if ($isMd) {
+                $slip['ttt_perhari'] = $savedPayroll->ttt_perhari ?? $slip['ttt_perhari'];
+                $slip['h_kerja']     = $savedPayroll->h_kerja     ?? $slip['h_kerja'];
+                $slip['h_basic']     = $savedPayroll->h_basic     ?? $slip['h_basic'];
+                $slip['h_sabtu']     = $savedPayroll->h_sabtu     ?? $slip['h_sabtu'];
+            }
+
+            // TTT custom (per-project, dinamis) — harus masuk ke gaji_kotor juga.
+            $customKeys = $projectId ? $this->getTttItems($projectId)->where('is_default', false)->pluck('key')->toArray() : [];
+            $customSum  = 0;
+            foreach ($customKeys as $key) {
+                $val = $savedPayroll->ttt_custom[$key] ?? 0;
+                $slip[$key] = $val;
+                $customSum += (float) $val;
+            }
+            $slip['custom_ttt_sum'] = $customSum;
+
+            // Potongan dinamis (khusus HO) — info saja, tidak dikurangkan dari gaji_bersih.
+            $potonganKeys = $projectId ? $this->getPotonganItems($projectId)->pluck('key')->toArray() : [];
+            $potonganCustomSum = 0;
+            foreach ($potonganKeys as $key) {
+                $val = $savedPayroll->potongan_custom[$key] ?? 0;
+                $slip['pot_custom_' . $key] = $val;
+                $potonganCustomSum += (float) $val;
+            }
+            $slip['potongan_custom_sum'] = $potonganCustomSum;
+
+            $bpjsPct = $projectId
+                ? $this->getBpjsPct($projectId, $tahun, $bulan)
+                : ['jht' => 2.0, 'pensiun' => 1.0, 'kes' => 1.0];
+            $slip = $this->hitungGajiKotorBersih($slip, $isMd, $isHo, $bpjsPct['jht'], $bpjsPct['pensiun'], $bpjsPct['kes']);
+        }
+
+        $slip['no_rekening'] = $employee->no_rekening ?? null;
+        $slip['ttd_list']    = $projectId
+            ? $this->getTtdList($projectId)
+            : [
+                ['label' => 'Disetujui Oleh,', 'name' => 'H. Syahrul Akmal', 'jabatan' => 'Direktur Utama'],
+                ['label' => 'Dibayar Oleh,',   'name' => 'Yulhamdani',       'jabatan' => 'Finance'],
+            ];
+
+        return $slip;
+    }
+
+    // ════════════════════════════════════════════════════════════
     // HELPERS
     // ════════════════════════════════════════════════════════════
     private function getTimesheetData(int $employeeId, int $tahun, int $bulan): array
@@ -1657,6 +2074,90 @@ class PayrollController extends Controller
         }
 
         return $items;
+    }
+
+    // ── Konfigurasi BPJS % & TTD per project, berlaku per tanggal ──
+    // Ambil versi konfigurasi yang berlaku untuk periode (tahun, bulan) tertentu — versi dengan
+    // berlaku_mulai terbesar yang masih <= tanggal 1 periode itu. Kalau belum pernah dikonfigurasi,
+    // pakai default lama (2%/1%/1%, TTD Direktur Utama & Finance) supaya tidak mengubah perilaku
+    // yang sudah berjalan untuk project yang belum diatur.
+    public function getBpjsPct(int $projectId, int $tahun, int $bulan): array
+    {
+        $periodeAwal = Carbon::create($tahun, $bulan, 1);
+        $cfg = ProjectBpjsConfig::where('project_id', $projectId)
+            ->where('berlaku_mulai', '<=', $periodeAwal)
+            ->orderByDesc('berlaku_mulai')
+            ->first();
+
+        return [
+            'jht'     => $cfg->pct_jht ?? 2.0,
+            'pensiun' => $cfg->pct_pensiun ?? 1.0,
+            'kes'     => $cfg->pct_kes ?? 1.0,
+        ];
+    }
+
+    // TTD (tanda tangan) tidak perlu histori tanggal seperti BPJS — cuma 1 konfigurasi aktif
+    // per project (siapa yang menandatangani slip SEKARANG).
+    public function getTtdList(int $projectId): array
+    {
+        $cfg = ProjectTtdConfig::where('project_id', $projectId)->first();
+
+        return $cfg->ttd_list ?? [
+            ['label' => 'Disetujui Oleh,', 'name' => 'H. Syahrul Akmal', 'jabatan' => 'Direktur Utama'],
+            ['label' => 'Dibayar Oleh,',   'name' => 'Yulhamdani',       'jabatan' => 'Finance'],
+        ];
+    }
+
+    // Potongan dinamis (khusus HO) — mirip getTttItems() tapi tanpa auto-seed default,
+    // karena tidak ada set potongan baku yang berlaku untuk semua project.
+    private function getPotonganItems(int $projectId): \Illuminate\Support\Collection
+    {
+        return ProjectPotonganItem::where('project_id', $projectId)
+            ->orderBy('urutan')
+            ->get(['id', 'key', 'label', 'is_default', 'aktif']);
+    }
+
+    // Roster karyawan untuk Data Gaji / Slip Gaji. Project lapangan (giam/md/dst) memakai
+    // TimesheetMember sebagai roster; project HO tidak punya timesheet sama sekali sehingga
+    // rosternya diambil langsung dari tabel employees.
+    private function getPayrollRoster(?int $projectId, ?int $tahun = null, ?int $bulan = null): \Illuminate\Support\Collection
+    {
+        $isHoProject = $projectId && Project::find($projectId)?->tipe_gaji === 'ho';
+
+        if ($isHoProject) {
+            return Employee::where('project_id', $projectId)
+                ->where('status', 'AKTIF')
+                ->with(['position', 'project', 'hoDetail'])
+                ->orderBy('nama_lengkap')
+                ->get()
+                ->values()
+                ->map(function ($emp, $idx) {
+                    $m = new \stdClass();
+                    $m->employee  = $emp;
+                    $m->kelompok  = null;
+                    $m->sub_group = $emp->hoDetail?->unit;
+                    $m->urutan    = $idx + 1;
+                    $m->id_badge  = null;
+                    $m->tipe      = '7jam';
+                    return $m;
+                });
+        }
+
+        // Karyawan yang di-terminate tetap tampil sampai akhir bulan keluarnya (supaya gaji
+        // bulan terakhirnya masih bisa diproses), tapi harus hilang otomatis di bulan-bulan
+        // sesudahnya — bukan cuma sekali dicek waktu terminate (TimesheetMember.aktif dulu
+        // hanya di-set false satu kali di titik itu, jadi nyangkut terus kalau bulan keluarnya
+        // sama dengan bulan saat di-terminate).
+        $periodeAwal = ($tahun && $bulan) ? Carbon::create($tahun, $bulan, 1) : null;
+
+        return TimesheetMember::where('aktif', true)
+            ->when($projectId, fn($q, $pid) => $q->where('project_id', $pid))
+            ->when($periodeAwal, fn($q) => $q->whereHas('employee', function ($eq) use ($periodeAwal) {
+                $eq->whereNull('tanggal_keluar')->orWhere('tanggal_keluar', '>=', $periodeAwal);
+            }))
+            ->with('employee.position', 'employee.project')
+            ->orderBy('urutan')->orderBy('id_badge')
+            ->get();
     }
 
     private function bulanNama(): array

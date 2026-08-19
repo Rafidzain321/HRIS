@@ -4,6 +4,10 @@ import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import ImportModal from '@/Components/ImportModal';
+import {
+  Pencil, X, TriangleAlert, Loader2, Save, Plus, BookOpen, Settings,
+  Upload, Download, Search, Check, Trash2, Lightbulb,
+} from 'lucide-react';
 
 const STATUS_CONFIG = {
   expired:  { label:'Expired',      bg:'rgba(224,69,69,.12)',   color:'#E04545' },
@@ -61,15 +65,15 @@ function EditTrainingModal({ training, types, onClose, onSaved }) {
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(500px,calc(100vw - 24px))',maxHeight:'90vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:1}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:14,fontWeight:700}}>✏️ Edit Training — {training.nama_lengkap}</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:17,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:14,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Pencil size={15}/> Edit Training — {training.nama_lengkap}</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={17}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:12}}>
-            {error && <div style={{background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#E04545'}}>⚠️ {error}</div>}
+            {error && <div style={{background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={14}/> {error}</div>}
 
             {/* Jenis training - readonly */}
             <div>
@@ -120,8 +124,8 @@ function EditTrainingModal({ training, types, onClose, onSaved }) {
             </div>
 
             {selectedType?.masa_berlaku_tahun && (
-              <div style={{fontSize:11,color:'var(--muted)',background:'var(--bg3)',borderRadius:8,padding:'8px 12px'}}>
-                💡 Expired otomatis dihitung: Tgl Training + {selectedType.masa_berlaku_tahun} tahun
+              <div style={{fontSize:11,color:'var(--muted)',background:'var(--bg3)',borderRadius:8,padding:'8px 12px',display:'flex',alignItems:'center',gap:6}}>
+                <Lightbulb size={14}/> Expired otomatis dihitung: Tgl Training + {selectedType.masa_berlaku_tahun} tahun
               </div>
             )}
 
@@ -139,8 +143,8 @@ function EditTrainingModal({ training, types, onClose, onSaved }) {
               Batal
             </button>
             <button type="submit" disabled={loading}
-              style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-              {loading ? '⏳...' : '💾 Simpan'}
+              style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1,display:'inline-flex',alignItems:'center',gap:6}}>
+              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : <Save size={14}/>} {loading ? '...' : 'Simpan'}
             </button>
           </div>
         </form>
@@ -177,15 +181,15 @@ function TrainingTypeModal({ mode, item, onClose }) {
   }
   return (
     <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(420px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>{mode==='add'?'➕ Tambah Jenis Training':'✏️ Edit Jenis Training'}</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}>{mode==='add'?<><Plus size={16}/> Tambah Jenis Training</>:<><Pencil size={15}/> Edit Jenis Training</>}</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:13}}>
-            {error&&<div style={{background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#E04545'}}>⚠️ {error}</div>}
+            {error&&<div style={{background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={14}/> {error}</div>}
             <div>
               <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Nama Training *</label>
               <input type="text" style={{...inp,borderColor:error?'#E04545':'var(--border)'}}
@@ -209,8 +213,8 @@ function TrainingTypeModal({ mode, item, onClose }) {
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-              {loading?'⏳...':mode==='add'?'➕ Tambah':'💾 Simpan'}
+            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1,display:'inline-flex',alignItems:'center',gap:6}}>
+              {loading ? <><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> ...</> : mode==='add' ? <><Plus size={14}/> Tambah</> : <><Save size={14}/> Simpan</>}
             </button>
           </div>
         </form>
@@ -221,7 +225,7 @@ function TrainingTypeModal({ mode, item, onClose }) {
 
 export default function TrainingIndex({ trainings=[], types=[], filters={}, stats={} }) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [showImport, setShowImport] = useState(false);
   const [mainTab, setMainTab] = useState('data');
   const [search,     setSearch]     = useState(filters.search || '');
@@ -295,8 +299,8 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
       {/* Tab switcher utama */}
       <div style={{display:'flex',gap:4,marginBottom:16}}>
         {[
-          {key:'data',  label:'📚 Data Training'},
-          {key:'jenis', label:'⚙️ Jenis Training', count:types.length},
+          {key:'data',  label:'Data Training', icon:BookOpen},
+          {key:'jenis', label:'Jenis Training', icon:Settings, count:types.length},
         ].map(t=>(
           <div key={t.key} onClick={()=>setMainTab(t.key)}
             style={{
@@ -307,7 +311,7 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
               color:mainTab===t.key?'#0C0F14':'var(--muted)',
               border:`1px solid ${mainTab===t.key?'transparent':'var(--border)'}`,
             }}>
-            {t.label}
+            <t.icon size={14}/> {t.label}
             {t.count!==undefined&&(
               <span style={{background:mainTab===t.key?'rgba(0,0,0,.2)':'var(--bg3)',color:mainTab===t.key?'#0C0F14':'var(--muted2)',fontSize:10.5,fontWeight:700,padding:'1px 7px',borderRadius:99}}>
                 {t.count}
@@ -358,23 +362,23 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">📚 Data Training Karyawan</div>
+          <div className="panel-title" style={{display:'flex',alignItems:'center',gap:8}}><BookOpen size={14}/> Data Training Karyawan</div>
           <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
             <div style={{ fontSize:11.5, color:'var(--muted)' }}>{trainings.length} record</div>
             {!isViewer && (
               <button onClick={()=>setShowImport(true)}
-                style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                📥 Import
+                style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'inline-flex',alignItems:'center',gap:6}}>
+                <Upload size={14}/> Import
               </button>
             )}
-            <a href="/export/training" style={{fontSize:11.5,color:'var(--accent)',cursor:'pointer',textDecoration:'none'}}>📤 Export</a>
+            <a href="/export/training" style={{fontSize:11.5,color:'var(--accent)',cursor:'pointer',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:6}}><Download size={13}/> Export</a>
           </div>
         </div>
 
         {/* Search */}
         <div style={{ padding:'14px 16px 0' }}>
           <div style={{ position:'relative', marginBottom:14 }}>
-            <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', fontSize:15, color:'var(--muted)' }}>🔍</span>
+            <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'var(--muted)', display:'flex' }}><Search size={15}/></span>
             <input className="search-input" type="text" value={search}
               placeholder="Cari nama atau NIK..."
               onChange={e=>{ setSearch(e.target.value); doFilter(e.target.value, typeFilter, statusFilter); }}
@@ -444,8 +448,8 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
                   <td style={{textAlign:'center'}}>
                     {!isViewer && (
                       <a href={`/employees/${t.employee_id}/edit`}
-                        style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',textDecoration:'none',display:'inline-block'}}>
-                        ✏️ Edit
+                        style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:5}}>
+                        <Pencil size={12}/> Edit
                       </a>
                     )}
                   </td>
@@ -463,11 +467,11 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
       {mainTab==='jenis' && (
         <div className="panel">
           <div className="panel-head">
-            <div className="panel-title">⚙️ Jenis Training</div>
+            <div className="panel-title" style={{display:'flex',alignItems:'center',gap:8}}><Settings size={14}/> Jenis Training</div>
             {!isViewer && (
               <button onClick={()=>setTrainingTypeModal({mode:'add'})}
-                style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                ➕ Tambah Jenis
+                style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'inline-flex',alignItems:'center',gap:6}}>
+                <Plus size={14}/> Tambah Jenis
               </button>
             )}
           </div>
@@ -493,7 +497,7 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
                         {t.masa_berlaku_tahun?`${t.masa_berlaku_tahun} Tahun`:'∞ Seumur Hidup'}
                       </span>
                     </td>
-                    <td style={{textAlign:'center',fontSize:13}}>{t.has_nilai?'✅':'—'}</td>
+                    <td style={{textAlign:'center',fontSize:13}}>{t.has_nilai?<Check size={14} color="#22C97A"/>:'—'}</td>
                     <td style={{textAlign:'center'}}>
                       <span style={{background:'rgba(58,143,224,.1)',color:'var(--blue)',padding:'2px 10px',borderRadius:99,fontSize:11,fontWeight:600}}>{t.trainings_count} karyawan</span>
                     </td>
@@ -501,10 +505,10 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
                       <td>
                         <div style={{display:'flex',gap:5,justifyContent:'center'}}>
                           <button onClick={()=>setTrainingTypeModal({mode:'edit',item:t})}
-                            style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>✏️</button>
+                            style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'inline-flex',alignItems:'center'}}><Pencil size={12}/></button>
                           <button disabled={t.trainings_count>0}
                             onClick={()=>{ if(t.trainings_count>0) return; handleDeleteType(t); }}
-                            style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:t.trainings_count>0?'rgba(128,128,128,.08)':'rgba(224,69,69,.1)',color:t.trainings_count>0?'var(--muted)':'#E04545',border:`1px solid ${t.trainings_count>0?'var(--border)':'rgba(224,69,69,.2)'}`,cursor:t.trainings_count>0?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:t.trainings_count>0?.5:1}}>🗑️</button>
+                            style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:t.trainings_count>0?'rgba(128,128,128,.08)':'rgba(224,69,69,.1)',color:t.trainings_count>0?'var(--muted)':'#E04545',border:`1px solid ${t.trainings_count>0?'var(--border)':'rgba(224,69,69,.2)'}`,cursor:t.trainings_count>0?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:t.trainings_count>0?.5:1,display:'inline-flex',alignItems:'center'}}><Trash2 size={12}/></button>
                         </div>
                       </td>
                     )}

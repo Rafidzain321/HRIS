@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import ImportModal from '@/Components/ImportModal';
+import { Settings, X, Check, Plus, Pencil, Save, ClipboardList, Upload, Download, Search, Trash2 } from 'lucide-react';
 
 const CCPM_COLS = [
   { key:'id_card',          label:'NIK / KTP' },
@@ -26,11 +27,11 @@ function ColPickerModal({ selected, onClose, onApply }) {
   }
   return (
     <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(480px, calc(100vw - 24px))',maxHeight:'80vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:1}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>⚙️ Pilih Kolom Tampilan</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Settings size={16}/> Pilih Kolom Tampilan</div>
+          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <div style={{padding:'16px 20px'}}>
           <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:16,padding:'8px 12px',background:'var(--bg3)',borderRadius:8}}>
@@ -40,10 +41,11 @@ function ColPickerModal({ selected, onClose, onApply }) {
             {CCPM_COLS.map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
                 style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',
+                  display:'flex',alignItems:'center',gap:6,
                   background:sel.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
                   color:sel.includes(col.key)?'var(--accent)':'var(--muted2)',
                   border:`1px solid ${sel.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
-                {sel.includes(col.key)?'✓ ':''}{col.label}
+                {sel.includes(col.key) && <Check size={13}/>}{col.label}
               </div>
             ))}
           </div>
@@ -58,8 +60,8 @@ function ColPickerModal({ selected, onClose, onApply }) {
             Batal
           </button>
           <button type="button" onClick={()=>{ onApply(sel); onClose(); }}
-            style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-            ✓ Terapkan
+            style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}>
+            <Check size={14}/> Terapkan
           </button>
         </div>
       </div>
@@ -137,10 +139,10 @@ function CcpmModal({ mode, data, onClose, onSave }) {
       }}>
         {/* Header */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ fontFamily:'Syne,sans-serif', fontSize:15, fontWeight:700, color:'var(--text)' }}>
-            {mode === 'add' ? '➕ Tambah Manpower CCPM' : '✏️ Edit Manpower CCPM'}
+          <div style={{ fontFamily:'Syne,sans-serif', fontSize:15, fontWeight:700, color:'var(--text)', display:'flex', alignItems:'center', gap:8 }}>
+            {mode === 'add' ? <><Plus size={16}/> Tambah Manpower CCPM</> : <><Pencil size={16}/> Edit Manpower CCPM</>}
           </div>
-          <div onClick={onClose} style={{ cursor:'pointer', fontSize:18, color:'var(--muted)', padding:'0 4px' }}>✕</div>
+          <div onClick={onClose} style={{ cursor:'pointer', fontSize:18, color:'var(--muted)', padding:'0 4px', display:'flex' }}><X size={18}/></div>
         </div>
 
         {/* Form */}
@@ -205,8 +207,9 @@ function CcpmModal({ mode, data, onClose, onSave }) {
             background:'linear-gradient(135deg,#E8A020,#A06010)',
             color:'#0C0F14', fontSize:12.5, fontWeight:700,
             cursor:'pointer', fontFamily:"'Outfit',sans-serif",
+            display:'flex', alignItems:'center', gap:6,
           }}>
-            {mode === 'add' ? '➕ Tambah' : '💾 Simpan'}
+            {mode === 'add' ? <><Plus size={14}/> Tambah</> : <><Save size={14}/> Simpan</>}
           </button>
         </div>
       </div>
@@ -217,7 +220,7 @@ function CcpmModal({ mode, data, onClose, onSave }) {
 // ── MAIN PAGE ────────────────────────────────────────────────
 export default function CcpmIndex({ manpower = { data:[], total:0 }, filters = {} }) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [showImport, setShowImport] = useState(false);
   const [search, setSearch]       = useState(filters.search || '');
   const [statusFilter, setStatus] = useState(filters.status || '');
@@ -346,7 +349,7 @@ export default function CcpmIndex({ manpower = { data:[], total:0 }, filters = {
 
       <div className="panel">
         <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', flexWrap: 'wrap', gap: 10 }}>
-          <div className="panel-title" style={{ fontWeight: 700 }}>📋 Data Manpower CCPM — Facility Engineering</div>
+          <div className="panel-title" style={{ fontWeight: 700, display:'flex', alignItems:'center', gap:8 }}><ClipboardList size={15}/> Data Manpower CCPM — Facility Engineering</div>
           <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
             <select value={statusFilter} onChange={e => { setStatus(e.target.value); doFilter(search, e.target.value, jobFilter); }}>
               <option value="">Semua Status</option>
@@ -360,26 +363,26 @@ export default function CcpmIndex({ manpower = { data:[], total:0 }, filters = {
               {(manpower?.job_titles || []).map(j => <option key={j} value={j}>{j}</option>)}
             </select>
             {!isViewer && (
-              <button onClick={openAdd} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>➕ Tambah</button>
+              <button onClick={openAdd} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah</button>
             )}
             {!isViewer && (
               <button onClick={()=>setShowImport(true)}
-                style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                📥 Import
+                style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}>
+                <Upload size={14}/> Import
               </button>
             )}
             <button onClick={()=>setShowColPicker(true)}
               style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}>
-              ⚙️ Kolom
+              <Settings size={14}/> Kolom
             </button>
-          <a href="/export/ccpm" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif"}}>📤 Export</a>
+          <a href="/export/ccpm" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Download size={14}/> Export</a>
           </div>
         </div>
 
         <div style={{ padding:'14px 16px' }}>
           {/* Search */}
           <div style={{ position:'relative', marginBottom:14 }}>
-            <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', fontSize:15, color:'var(--muted)', pointerEvents:'none' }}>🔍</span>
+            <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'var(--muted)', pointerEvents:'none', display:'flex' }}><Search size={15}/></span>
             <input className="search-input" type="text" value={search}
               placeholder="Cari nama, badge, HES passport, jabatan..."
               onChange={e => { setSearch(e.target.value); doFilter(e.target.value, statusFilter, jobFilter); }}
@@ -423,10 +426,10 @@ export default function CcpmIndex({ manpower = { data:[], total:0 }, filters = {
                     {!isViewer && (
                       <td>
                         <div style={{ display:'flex', gap:5, justifyContent:'center' }}>
-                          <button onClick={() => openEdit(e)} style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer'}}>✏️ Edit</button>
+                          <button onClick={() => openEdit(e)} style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}><Pencil size={12}/> Edit</button>
                           <button onClick={()=>setConfirmHapus(e)}
-                            style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer'}}>
-                            🗑️ Hapus
+                            style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}>
+                            <Trash2 size={12}/> Hapus
                           </button>
                         </div>
                       </td>

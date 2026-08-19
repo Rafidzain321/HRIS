@@ -202,7 +202,13 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function karyawan(Request $request)
     {
-        $pid = $this->getProjectId();
+        $pid   = $this->getProjectId();
+        $isHo  = $pid && Project::find($pid)?->tipe_gaji === 'ho';
+
+        if ($isHo) {
+            return $this->karyawanHo($pid);
+        }
+
         $employees = Employee::aktif()->with(['position','ppe'])
             ->when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('nama_lengkap')->get();
@@ -291,6 +297,111 @@ class ExportController extends Controller
         $this->printSettings($sheet, 'E5', "A{$hRow}:AH{$hRow}");
 
         return $this->streamExcel($wb, 'DataKaryawan_'.now()->format('Ymd_His').'.xlsx');
+    }
+
+    // ── Export Data Karyawan khusus HO — kolomnya beda dari project lapangan:
+    // tidak ada SIM/SIO/MCU/Badge/PPE (tidak relevan untuk staf kantor pusat),
+    // diganti kolom EmployeeHoDetail (unit, NIK HO, alamat KTP, dsb).
+    private function karyawanHo(int $pid)
+    {
+        $employees = Employee::aktif()->with(['position', 'hoDetail'])
+            ->where('project_id', $pid)
+            ->orderBy('nama_lengkap')->get();
+
+        // Kelompokkan per unit (HO-1 dulu, baru HO-2, lalu yang belum ada unit-nya)
+        // supaya tidak tercampur seperti sebelumnya — sesuai struktur sumber data aslinya.
+        $unitOrder = ['HO-1' => 1, 'HO-2' => 2];
+        $groups = $employees->groupBy(fn ($e) => $e->hoDetail?->unit ?: 'Belum Ada Unit')
+            ->sortBy(fn ($g, $unit) => $unitOrder[$unit] ?? 99);
+
+        $wb    = new Spreadsheet();
+        $sheet = $wb->getActiveSheet()->setTitle('Data Karyawan HO');
+
+        $this->makeTitle($sheet, 'Data Karyawan HO Aktif', 'AA', $employees->count());
+
+        $headers = [
+            'A'=>['No.',4],'B'=>['Nama Lengkap',28],'C'=>['NIK / KTP',20],
+            'D'=>['Unit',7],'E'=>['NIK HO',16],
+            'F'=>['Jabatan',22],'G'=>['No. Telepon',14],'H'=>['Tempat Lahir',16],
+            'I'=>['Tgl Lahir',13],'J'=>['Tgl Masuk',13],'K'=>['Agama',12],'L'=>['Alamat',32],'M'=>['PTKP',8],
+            'N'=>['No. Rekening',18],
+            'O'=>['Status Karyawan',16],'P'=>['Nama (KTP)',26],'Q'=>['No. KK',20],'R'=>['RT/RW',10],
+            'S'=>['Kelurahan',18],'T'=>['Kecamatan',18],'U'=>['Propinsi',18],'V'=>['NPWP',20],'W'=>['Email',24],
+            'X'=>['Lokasi Kerja',20],
+            'Y'=>['Start PKWT',13],'Z'=>['End PKWT',13],'AA'=>['No. Kontrak',22],
+        ];
+
+        $hRow = 4;
+        $this->renderHeaderRow($sheet, $headers, $hRow);
+
+        $dateCols = ['Y','Z'];
+        $row  = 5;
+        $idx  = 0;
+
+        foreach ($groups as $unit => $group) {
+            // Baris judul section per unit
+            $sheet->mergeCells("A{$row}:AA{$row}");
+            $sheet->setCellValue("A{$row}", "{$unit} ({$group->count()} karyawan)");
+            $sheet->getStyle("A{$row}")->applyFromArray([
+                'font' => ['bold' => true, 'size' => 11],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F4A010']],
+            ]);
+            $sheet->getRowDimension($row)->setRowHeight(20);
+            $row++;
+
+            foreach ($group as $emp) {
+                $rowBg = ($idx % 2 === 0) ? self::ROW_ODD : self::ROW_EVEN;
+                $ho    = $emp->hoDetail;
+
+                $sheet->setCellValue('A'.$row, $idx+1);
+                $this->cellStyle($sheet, 'A'.$row, $rowBg);
+                $sheet->getStyle('A'.$row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+                $sheet->setCellValue('B'.$row, strtoupper($emp->nama_lengkap));
+                $this->cellStyle($sheet, 'B'.$row, $rowBg, true);
+
+                $sheet->setCellValueExplicit('C'.$row, $emp->no_ktp ?? '—', DataType::TYPE_STRING);
+                $this->cellStyle($sheet, 'C'.$row, $rowBg);
+
+                $textData = [
+                    'D'=>$ho?->unit,'E'=>$ho?->nik_ho,
+                    'F'=>$emp->position?->nama_jabatan,'G'=>$emp->no_telepon,'H'=>$emp->tempat_lahir,
+                    'I'=>$emp->tanggal_lahir?->format('d M Y'),'J'=>$emp->tanggal_masuk?->format('d M Y'),
+                    'K'=>$emp->agama,'L'=>$emp->alamat,'M'=>$emp->ptkp,
+                    'O'=>$ho?->status_karyawan,'P'=>$ho?->nama_ktp,'R'=>$ho?->rt_rw,
+                    'S'=>$ho?->kelurahan,'T'=>$ho?->kecamatan,'U'=>$ho?->propinsi,'W'=>$ho?->email,
+                    'X'=>$ho?->lokasi_kerja,
+                    'AA'=>$emp->no_contract,
+                ];
+
+                foreach ($textData as $col => $val) {
+                    $sheet->setCellValue($col.$row, $val ?? '—');
+                    $this->cellStyle($sheet, $col.$row, $rowBg);
+                }
+
+                $sheet->setCellValueExplicit('N'.$row, $emp->no_rekening ?? '—', DataType::TYPE_STRING);
+                $this->cellStyle($sheet, 'N'.$row, $rowBg);
+                $sheet->setCellValueExplicit('Q'.$row, $ho?->no_kk ?? '—', DataType::TYPE_STRING);
+                $this->cellStyle($sheet, 'Q'.$row, $rowBg);
+                $sheet->setCellValueExplicit('V'.$row, $ho?->npwp ?? '—', DataType::TYPE_STRING);
+                $this->cellStyle($sheet, 'V'.$row, $rowBg);
+
+                $this->setDateCell($sheet,'Y',$row,$emp->start_pkwt,$rowBg);
+                $this->setDateCell($sheet,'Z',$row,$emp->end_pkwt,$rowBg);
+
+                $sheet->getRowDimension($row)->setRowHeight(15);
+                $idx++;
+                $row++;
+            }
+        }
+
+        $lastRow = $row - 1;
+        foreach ($dateCols as $col) $this->addDateConditional($sheet, $col, 5, $lastRow);
+
+        $this->makeLegend($sheet, $lastRow + 2);
+        $this->printSettings($sheet, 'E5', "A{$hRow}:AA{$hRow}");
+
+        return $this->streamExcel($wb, 'DataKaryawanHO_'.now()->format('Ymd_His').'.xlsx');
     }
 
     // ═══════════════════════════════════════════════════

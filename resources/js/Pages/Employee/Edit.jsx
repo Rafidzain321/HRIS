@@ -5,6 +5,11 @@ import AppLayout from '@/Layouts/AppLayout';
 import DocumentPanel from '@/Components/DocumentPanel';
 import TrainingPanel from '@/Components/TrainingPanel';
 import axios from 'axios';
+import {
+  Plus, Check, TriangleAlert, X, Loader2, Trash2, LogOut, ClipboardList,
+  User, CreditCard, Car, HardHat, Stethoscope, Building2, FileText, Landmark, Save,
+  ScrollText, Wallet,
+} from 'lucide-react';
 
 function ComboBox({ value, onChange, options, placeholder, inputStyle }) {
   const [open,    setOpen]    = React.useState(false);
@@ -78,7 +83,7 @@ function ComboBox({ value, onChange, options, placeholder, inputStyle }) {
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(232,160,32,.12)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(232,160,32,.06)'}
             >
-              ➕ Gunakan "<b>{search}</b>"
+              <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}><Plus size={12}/> Gunakan "<b>{search}</b>"</span>
             </div>
           )}
  
@@ -102,7 +107,7 @@ function ComboBox({ value, onChange, options, placeholder, inputStyle }) {
               onMouseLeave={e => { if (opt !== value) e.currentTarget.style.background = 'transparent'; }}
             >
               {opt}
-              {opt === value && <span style={{ marginLeft:6, fontSize:10 }}>✓</span>}
+              {opt === value && <span style={{ marginLeft:6, display:'inline-flex' }}><Check size={11}/></span>}
             </div>
           ))}
         </div>
@@ -153,8 +158,8 @@ function TambahSpModal({ employeeId, onClose, onSaved }) {
     <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center'}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(480px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,color:'#E04545'}}>⚠️ Tambah Surat Peringatan</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,color:'#E04545',display:'flex',alignItems:'center',gap:8}}><TriangleAlert size={16}/> Tambah Surat Peringatan</div>
+          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -185,8 +190,8 @@ function TambahSpModal({ employeeId, onClose, onSaved }) {
             <button type="button" onClick={onClose}
               style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
             <button type="submit" disabled={loading}
-              style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E04545,#A03030)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-              {loading?'⏳...':'⚠️ Simpan SP'}
+              style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E04545,#A03030)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1,display:'flex',alignItems:'center',gap:6}}>
+              {loading?<><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> ...</>:<><TriangleAlert size={14}/> Simpan SP</>}
             </button>
           </div>
         </form>
@@ -231,17 +236,17 @@ function SpSection({ employeeId }) {
       {showAdd && <TambahSpModal employeeId={employeeId} onClose={()=>setShowAdd(false)} onSaved={load} />}
       <div style={{marginBottom:24}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>
-          <div style={{fontSize:12,fontWeight:600,color:'#E04545',textTransform:'uppercase',letterSpacing:'.08em'}}>
-            ⚠️ Surat Peringatan (SP)
+          <div style={{fontSize:12,fontWeight:600,color:'#E04545',textTransform:'uppercase',letterSpacing:'.08em',display:'flex',alignItems:'center',gap:6}}>
+            <TriangleAlert size={14}/> Surat Peringatan (SP)
           </div>
           <button type="button" onClick={()=>setShowAdd(true)}
-            style={{padding:'5px 12px',borderRadius:7,border:'1px solid rgba(224,69,69,.3)',background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-            ➕ Tambah SP
+            style={{padding:'5px 12px',borderRadius:7,border:'1px solid rgba(224,69,69,.3)',background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}>
+            <Plus size={13}/> Tambah SP
           </button>
         </div>
 
         {loading ? (
-          <div style={{padding:12,textAlign:'center',color:'var(--muted)',fontSize:12}}>⏳ Memuat...</div>
+          <div style={{padding:12,textAlign:'center',color:'var(--muted)',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Loader2 size={13} style={{animation:'spin .8s linear infinite'}}/> Memuat...</div>
         ) : spList.length === 0 ? (
           <div style={{padding:16,textAlign:'center',color:'var(--muted)',fontSize:12,borderRadius:8,border:'1px dashed var(--border)'}}>
             Tidak ada catatan SP
@@ -260,8 +265,8 @@ function SpSection({ employeeId }) {
                       <span style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{sp.tanggal_sp}</span>
                     </div>
                     <button type="button" onClick={()=>hapusSp(sp.id)}
-                      style={{padding:'2px 8px',borderRadius:5,fontSize:11,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",flexShrink:0}}>
-                      🗑️
+                      style={{padding:'2px 8px',borderRadius:5,fontSize:11,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",flexShrink:0,display:'flex',alignItems:'center'}}>
+                      <Trash2 size={13}/>
                     </button>
                   </div>
                   <div style={{fontSize:12.5,color:'var(--text)',marginTop:8,lineHeight:1.5}}>{sp.alasan}</div>
@@ -302,12 +307,12 @@ function HistoryKeluarSection({ employeeId }) {
 
   return (
     <div style={{marginBottom:24}}>
-      <div style={{fontSize:12,fontWeight:600,color:'var(--muted2)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>
-        🚪 History Keluar
+      <div style={{fontSize:12,fontWeight:600,color:'var(--muted2)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:6}}>
+        <LogOut size={14}/> History Keluar
       </div>
 
       {loading ? (
-        <div style={{padding:12,textAlign:'center',color:'var(--muted)',fontSize:12}}>⏳ Memuat...</div>
+        <div style={{padding:12,textAlign:'center',color:'var(--muted)',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Loader2 size={13} style={{animation:'spin .8s linear infinite'}}/> Memuat...</div>
       ) : logs.length === 0 ? (
         <div style={{padding:16,textAlign:'center',color:'var(--muted)',fontSize:12,borderRadius:8,border:'1px dashed var(--border)'}}>
           Tidak ada history keluar
@@ -337,8 +342,49 @@ function HistoryKeluarSection({ employeeId }) {
   );
 }
 
+// ── RIWAYAT GAJI (khusus HO) — arsip hasil ekstrak Excel lama, sifatnya referensi saja,
+// tidak dipakai untuk hitung Data Gaji berjalan (beda dari karyawan lapangan yang datanya
+// murni dari timesheet bulan berjalan).
+const BULAN_NAMA = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+function RiwayatGajiSection({ items = [] }) {
+  if (items.length === 0) return null;
+  return (
+    <div style={{marginBottom:24}}>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--muted2)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10,paddingBottom:8,borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:6}}>
+        <Wallet size={14}/> Riwayat Gaji (Arsip)
+      </div>
+      <div style={{fontSize:11,color:'var(--muted)',marginBottom:10,display:'flex',alignItems:'center',gap:5}}>
+        <TriangleAlert size={12}/> Data lama hasil ekstrak — cuma referensi, bukan sumber perhitungan Data Gaji berjalan. Periode kosong berarti tanggalnya tidak bisa dipastikan dari data sumber.
+      </div>
+      <div style={{maxHeight:320,overflowY:'auto',border:'1px solid var(--border)',borderRadius:9}}>
+        <table className="kar-table" style={{fontSize:11.5}}>
+          <thead>
+            <tr>
+              <th style={{position:'sticky',top:0,background:'var(--card)'}}>Keterangan</th>
+              <th style={{position:'sticky',top:0,background:'var(--card)',textAlign:'center',width:90}}>Periode</th>
+              <th style={{position:'sticky',top:0,background:'var(--card)',textAlign:'right',width:130}}>Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((h,i)=>(
+              <tr key={i}>
+                <td style={{color:'var(--muted2)'}}>{h.label}</td>
+                <td style={{textAlign:'center',color:h.bulan&&h.tahun?'var(--text)':'var(--muted)'}}>
+                  {h.bulan && h.tahun ? `${BULAN_NAMA[h.bulan]} ${h.tahun}` : (h.tahun || '—')}
+                </td>
+                <td style={{textAlign:'right',fontWeight:600}}>Rp {Math.round(h.nominal).toLocaleString('id-ID')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN COMPONENT ──
-export default function EmployeeEdit({ employee, positions = [] }) {
+export default function EmployeeEdit({ employee, positions = [], project_info = null, salary_history = [] }) {
+  const isHo = project_info?.tipe_gaji === 'ho';
   const { data, setData, put, processing, isDirty } = useForm({
     id_badge:             employee.id_badge             || '',
     nama_lengkap:         employee.nama_lengkap         || '',
@@ -389,7 +435,23 @@ export default function EmployeeEdit({ employee, positions = [] }) {
     no_contract:          employee.no_contract          || '',
     no_rekening:          employee.no_rekening          || '',
     nama_bank:            employee.nama_bank            || '',
+    // Detail HO (kantor pusat)
+    ho_detail: {
+      unit:            employee.ho_detail?.unit            || '',
+      nik_ho:          employee.ho_detail?.nik_ho          || '',
+      lokasi_kerja:    employee.ho_detail?.lokasi_kerja    || '',
+      status_karyawan: employee.ho_detail?.status_karyawan || '',
+      no_kk:           employee.ho_detail?.no_kk           || '',
+      rt_rw:           employee.ho_detail?.rt_rw           || '',
+      kelurahan:       employee.ho_detail?.kelurahan       || '',
+      kecamatan:       employee.ho_detail?.kecamatan       || '',
+      propinsi:        employee.ho_detail?.propinsi        || '',
+      npwp:            employee.ho_detail?.npwp            || '',
+      email:           employee.ho_detail?.email           || '',
+    },
   });
+
+  const setHo = (key, value) => setData('ho_detail', { ...data.ho_detail, [key]: value });
 
   const [badgeWarning, setBadgeWarning] = useState('');
 
@@ -426,8 +488,8 @@ export default function EmployeeEdit({ employee, positions = [] }) {
             <div style={{ fontSize:11.5, color:'var(--muted)' }}>{employee.id_badge}</div>
           </div>
           {isDirty && (
-            <div style={{ marginLeft:'auto', fontSize:11.5, color:'var(--accent)', background:'rgba(232,160,32,.12)', padding:'4px 10px', borderRadius:6 }}>
-              ⚠️ Ada perubahan belum disimpan
+            <div style={{ marginLeft:'auto', fontSize:11.5, color:'var(--accent)', background:'rgba(232,160,32,.12)', padding:'4px 10px', borderRadius:6, display:'flex', alignItems:'center', gap:6 }}>
+              <TriangleAlert size={13}/> Ada perubahan belum disimpan
             </div>
           )}
         </div>
@@ -436,22 +498,24 @@ export default function EmployeeEdit({ employee, positions = [] }) {
           <div className="panel" style={{ padding:24 }}>
 
             {/* DATA PRIBADI */}
-            <Section title="📋 Data Pribadi">
-              <Field label="ID Badge">
-                <input style={{...inputStyle, borderColor:badgeWarning?'#E04545':'var(--border)'}}
-                  value={data.id_badge}
-                  onChange={e=>{ setData('id_badge',e.target.value); setBadgeWarning(''); }}
-                  onBlur={e=>{
-                    const val = e.target.value.trim();
-                    if (!val || val === employee.id_badge) { setBadgeWarning(''); return; }
-                    fetch(`/employees/check-badge?badge=${encodeURIComponent(val)}&exclude=${employee.id}`)
-                      .then(r=>r.json())
-                      .then(res=>{ setBadgeWarning(res.exists ? `⚠️ ID Badge "${val}" sudah digunakan oleh ${res.nama}.` : ''); })
-                      .catch(()=>setBadgeWarning(''));
-                  }}
-                />
-                {badgeWarning && <div style={{fontSize:11,color:'#E04545',marginTop:4}}>{badgeWarning}</div>}
-              </Field>
+            <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13}/> Data Pribadi</span>}>
+              {!isHo && (
+                <Field label="ID Badge">
+                  <input style={{...inputStyle, borderColor:badgeWarning?'#E04545':'var(--border)'}}
+                    value={data.id_badge}
+                    onChange={e=>{ setData('id_badge',e.target.value); setBadgeWarning(''); }}
+                    onBlur={e=>{
+                      const val = e.target.value.trim();
+                      if (!val || val === employee.id_badge) { setBadgeWarning(''); return; }
+                      fetch(`/employees/check-badge?badge=${encodeURIComponent(val)}&exclude=${employee.id}`)
+                        .then(r=>r.json())
+                        .then(res=>{ setBadgeWarning(res.exists ? `ID Badge "${val}" sudah digunakan oleh ${res.nama}.` : ''); })
+                        .catch(()=>setBadgeWarning(''));
+                    }}
+                  />
+                  {badgeWarning && <div style={{fontSize:11,color:'#E04545',marginTop:4}}>{badgeWarning}</div>}
+                </Field>
+              )}
               <Field label="Nama Lengkap">
                 <input style={inputStyle} value={data.nama_lengkap} onChange={e=>setData('nama_lengkap',e.target.value)} />
               </Field>
@@ -475,14 +539,14 @@ export default function EmployeeEdit({ employee, positions = [] }) {
                     color:'var(--accent)', fontWeight:600,
                     display:'flex', alignItems:'center', gap:8,
                   }}>
-                    👤 {employee.umur} tahun
+                    <User size={12} style={{verticalAlign:-2}}/> {employee.umur} tahun
                     {employee.umur >= 53 && (
                       <span style={{
                         fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:99,
                         background: employee.umur >= 56 ? 'rgba(224,69,69,.15)' : 'rgba(232,160,32,.15)',
                         color: employee.umur >= 56 ? '#E04545' : 'var(--accent)',
                       }}>
-                        {employee.umur >= 56 ? '⚠️ Sudah memasuki usia pensiun' : `⚠️ ${56 - employee.umur} thn lagi masuk umur pensiun`}
+                        {employee.umur >= 56 ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><TriangleAlert size={11}/>Sudah memasuki usia pensiun</span> : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><TriangleAlert size={11}/>{56 - employee.umur} thn lagi masuk umur pensiun</span>}
                       </span>
                     )}
                   </div>
@@ -535,8 +599,10 @@ export default function EmployeeEdit({ employee, positions = [] }) {
               </Field>
             </Section>
 
+            {!isHo && (
+            <>
             {/* BADGE & KP */}
-            <Section title="💳 Badge & KP">
+            <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><CreditCard size={12}/> Badge & KP</span>}>
               <Field label="Expire Badge">
                 <input type="date" style={inputStyle} value={data.expire_badge} onChange={e=>setData('expire_badge',e.target.value)} />
               </Field>
@@ -555,7 +621,7 @@ export default function EmployeeEdit({ employee, positions = [] }) {
             </Section>
 
             {/* SIM */}
-            <Section title="🚗 SIM">
+            <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><Car size={12}/> SIM</span>}>
               <Field label="Type SIM">
                 <select style={selectStyle} value={data.type_sim} onChange={e=>setData('type_sim',e.target.value)}>
                   <option value="">— Pilih —</option>
@@ -574,7 +640,7 @@ export default function EmployeeEdit({ employee, positions = [] }) {
             </Section>
 
             {/* SIO */}
-            <Section title="🏗️ SIO">
+            <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><ScrollText size={12}/> SIO</span>}>
               <Field label="Punya SIO K3?">
                 <select style={selectStyle} value={data.sio_k3} onChange={e=>setData('sio_k3',e.target.value)}>
                   <option value="NO">Tidak</option>
@@ -596,7 +662,7 @@ export default function EmployeeEdit({ employee, positions = [] }) {
             </Section>
 
             {/* MCU */}
-            <Section title="🏥 MCU">
+            <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><Stethoscope size={12}/> MCU</span>}>
               <Field label="Tgl Pelaksanaan MCU">
                 <input type="date" style={inputStyle} value={data.tgl_mcu} onChange={e=>setData('tgl_mcu',e.target.value)} />
               </Field>
@@ -619,7 +685,7 @@ export default function EmployeeEdit({ employee, positions = [] }) {
             </Section>
 
             {/* PPE */}
-            <Section title="🦺 PPE">
+            <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><HardHat size={12}/> PPE</span>}>
               <Field label="Ukuran Baju (FRC)">
                 <ComboBox
                   value={data.ukuran_baju}
@@ -639,9 +705,53 @@ export default function EmployeeEdit({ employee, positions = [] }) {
                 />
               </Field>
             </Section>
+            </>
+            )}
+
+            {isHo && (
+              <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><Building2 size={12}/> Detail HO</span>}>
+                <Field label="Unit">
+                  <select style={selectStyle} value={data.ho_detail.unit} onChange={e=>setHo('unit',e.target.value)}>
+                    <option value="">— Pilih —</option>
+                    <option value="HO-1">HO-1</option>
+                    <option value="HO-2">HO-2</option>
+                  </select>
+                </Field>
+                <Field label="NIK HO">
+                  <input style={inputStyle} value={data.ho_detail.nik_ho} onChange={e=>setHo('nik_ho',e.target.value)} placeholder="cth: 2010-02-07-000254" />
+                </Field>
+                <Field label="Lokasi Kerja">
+                  <input style={inputStyle} value={data.ho_detail.lokasi_kerja} onChange={e=>setHo('lokasi_kerja',e.target.value)} />
+                </Field>
+                <Field label="Status Karyawan">
+                  <input style={inputStyle} value={data.ho_detail.status_karyawan} onChange={e=>setHo('status_karyawan',e.target.value)} placeholder="cth: PKWTT" />
+                </Field>
+                <Field label="No. KK">
+                  <input style={inputStyle} value={data.ho_detail.no_kk} onChange={e=>setHo('no_kk',e.target.value)} />
+                </Field>
+                <Field label="RT/RW">
+                  <input style={inputStyle} value={data.ho_detail.rt_rw} onChange={e=>setHo('rt_rw',e.target.value)} />
+                </Field>
+                <Field label="Kelurahan">
+                  <input style={inputStyle} value={data.ho_detail.kelurahan} onChange={e=>setHo('kelurahan',e.target.value)} />
+                </Field>
+                <Field label="Kecamatan">
+                  <input style={inputStyle} value={data.ho_detail.kecamatan} onChange={e=>setHo('kecamatan',e.target.value)} />
+                </Field>
+                <Field label="Propinsi">
+                  <input style={inputStyle} value={data.ho_detail.propinsi} onChange={e=>setHo('propinsi',e.target.value)} />
+                </Field>
+                <Field label="NPWP">
+                  <input style={inputStyle} value={data.ho_detail.npwp} onChange={e=>setHo('npwp',e.target.value)} />
+                </Field>
+                <Field label="Email">
+                  <input style={inputStyle} value={data.ho_detail.email} onChange={e=>setHo('email',e.target.value)} />
+                </Field>
+              </Section>
+            )}
 
             {/* PKWT */}
-            <Section title="📄 PKWT">
+            <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><FileText size={12}/> PKWT</span>}>
               <Field label="Start PKWT">
                 <input type="date" style={inputStyle} value={data.start_pkwt} onChange={e=>setData('start_pkwt',e.target.value)} />
               </Field>
@@ -654,7 +764,7 @@ export default function EmployeeEdit({ employee, positions = [] }) {
             </Section>
 
             {/* BANK & BPJS */}
-            <Section title="🏦 Bank & BPJS">
+            <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><Landmark size={12}/> Bank & BPJS</span>}>
               <Field label="Nama Bank">
                 <select style={selectStyle} value={data.nama_bank} onChange={e=>setData('nama_bank',e.target.value)}>
                   <option value="">— Pilih Bank —</option>
@@ -695,7 +805,7 @@ export default function EmployeeEdit({ employee, positions = [] }) {
                 opacity:processing?0.7:1,
                 fontFamily:"'Outfit',sans-serif",
               }}>
-                {processing ? '⏳ Menyimpan...' : '💾 Simpan Perubahan'}
+                {processing ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>Menyimpan...</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan Perubahan</span>}
               </button>
             </div>
           </div>
@@ -716,9 +826,18 @@ export default function EmployeeEdit({ employee, positions = [] }) {
           </div>
 
           {/* Training */}
-          <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px' }}>
-            <TrainingPanel employeeId={employee.id} />
-          </div>
+          {!isHo && (
+            <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px' }}>
+              <TrainingPanel employeeId={employee.id} />
+            </div>
+          )}
+
+          {/* Riwayat Gaji — cuma relevan/ada datanya untuk karyawan HO */}
+          {isHo && salary_history.length > 0 && (
+            <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px' }}>
+              <RiwayatGajiSection items={salary_history} />
+            </div>
+          )}
         </div>
 
       </div>

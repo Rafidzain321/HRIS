@@ -2,7 +2,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\EmployeeHoDetail;
 use App\Models\Position;
+use App\Models\Project;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
@@ -45,6 +47,13 @@ class EmployeeImportController extends Controller
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls|max:10240',
         ]);
+
+        $pid  = $this->activeProjectId();
+        $isHo = $pid && Project::find($pid)?->tipe_gaji === 'ho';
+
+        if ($isHo) {
+            return $this->importHo($request, $pid);
+        }
 
         $file        = $request->file('file');
         $spreadsheet = IOFactory::load($file->getRealPath());
@@ -229,6 +238,151 @@ class EmployeeImportController extends Controller
 
             try {
                 Employee::create($data);
+                $results['imported']++;
+            } catch (\Exception $e) {
+                $results['errors'][] = "Baris {$rowNum}: " . self::friendlyError($e, $nama);
+            }
+        }
+
+        return redirect()->back()->with('import_result', $results);
+    }
+
+    // ── Import Data Karyawan khusus HO — kolomnya beda dari project lapangan:
+    // tidak ada SIM/SIO/MCU/Badge/PPE (tidak relevan untuk staf kantor pusat),
+    // diganti kolom EmployeeHoDetail (unit, NIK HO, alamat KTP, dsb) yang ikut
+    // disimpan ke tabel employee_ho_details, bukan cuma tabel employees.
+    private function importHo(Request $request, int $pid)
+    {
+        $file        = $request->file('file');
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $sheet       = $spreadsheet->getActiveSheet();
+        $rows        = $sheet->toArray(null, true, true, true);
+
+        $colMap = [
+            'nama_lengkap'     => 'A',  // Wajib
+            'no_ktp'           => 'B',  // Wajib
+            'unit'             => 'C',  // HO-1 / HO-2
+            'nik_ho'           => 'D',
+            'no_telepon'       => 'E',
+            'tempat_lahir'     => 'F',
+            'tanggal_lahir'    => 'G',
+            'tanggal_masuk'    => 'H',
+            'jabatan'          => 'I',
+            'alamat'           => 'J',
+            'agama'            => 'K',
+            'ptkp'             => 'L',
+            'status'           => 'M',
+            'status_karyawan'  => 'N',
+            'nama_ktp'         => 'O',
+            'no_kk'            => 'P',
+            'rt_rw'            => 'Q',
+            'kelurahan'        => 'R',
+            'kecamatan'        => 'S',
+            'propinsi'         => 'T',
+            'npwp'             => 'U',
+            'email'            => 'V',
+            'lokasi_kerja'     => 'W',
+            'start_pkwt'       => 'X',
+            'end_pkwt'         => 'Y',
+            'no_contract'      => 'Z',
+            'no_rekening'      => 'AA',
+        ];
+
+        $dateCols = ['tanggal_lahir', 'tanggal_masuk', 'start_pkwt', 'end_pkwt'];
+
+        $positions = Position::pluck('id', 'nama_jabatan');
+
+        $results = [
+            'imported'     => 0,
+            'skipped'      => 0,
+            'errors'       => [],
+            'skipped_list' => [],
+        ];
+
+        $rowNum = 4;
+        foreach ($rows as $rowIndex => $row) {
+            $rowNum++;
+            if ($rowIndex < 5) continue;
+
+            $nama   = trim($row[$colMap['nama_lengkap']] ?? '');
+            $noKtp  = trim($row[$colMap['no_ktp']] ?? '');
+            $status = strtoupper(trim($row[$colMap['status']] ?? 'AKTIF'));
+
+            if (empty($nama) && empty($noKtp)) continue;
+
+            if (empty($nama)) {
+                $results['errors'][] = "Baris {$rowNum}: Nama Lengkap kosong.";
+                continue;
+            }
+            if (empty($noKtp)) {
+                $results['errors'][] = "Baris {$rowNum}: No. KTP kosong — {$nama}";
+                continue;
+            }
+
+            $nikExists = Employee::where('no_ktp', $noKtp)->where('project_id', $pid)->exists();
+            if ($nikExists) {
+                $results['skipped']++;
+                $results['skipped_list'][] = "{$nama} (NIK: {$noKtp} sudah ada)";
+                continue;
+            }
+
+            $jabatan    = trim($row[$colMap['jabatan']] ?? '');
+            $positionId = null;
+            if ($jabatan) {
+                if ($positions->has($jabatan)) {
+                    $positionId = $positions[$jabatan];
+                } else {
+                    $pos                 = Position::create(['nama_jabatan' => $jabatan]);
+                    $positions[$jabatan] = $pos->id;
+                    $positionId          = $pos->id;
+                }
+            }
+
+            $data = [
+                'nama_lengkap' => $nama,
+                'no_ktp'       => $noKtp,
+                'status'       => in_array($status, ['AKTIF', 'NONAKTIF']) ? $status : 'AKTIF',
+                'position_id'  => $positionId,
+                'project_id'   => $pid,
+            ];
+
+            $stringFields = ['no_telepon', 'tempat_lahir', 'alamat', 'agama', 'ptkp', 'no_contract', 'no_rekening'];
+            $nullValues   = ['-', '—', 'n/a', 'null', 'NULL', ''];
+
+            foreach ($stringFields as $field) {
+                $val          = trim($row[$colMap[$field]] ?? '');
+                $data[$field] = in_array(strtolower($val), array_map('strtolower', $nullValues))
+                    ? null
+                    : ($val ?: null);
+            }
+
+            foreach ($dateCols as $field) {
+                $val          = $row[$colMap[$field]] ?? null;
+                $data[$field] = self::parseDate($val);
+            }
+
+            $hoFields = [
+                'unit', 'nik_ho', 'status_karyawan', 'nama_ktp', 'no_kk', 'rt_rw',
+                'kelurahan', 'kecamatan', 'propinsi', 'npwp', 'email', 'lokasi_kerja',
+            ];
+            $hoData = [];
+            foreach ($hoFields as $field) {
+                $val = trim($row[$colMap[$field]] ?? '');
+                $hoData[$field] = in_array(strtolower($val), array_map('strtolower', $nullValues))
+                    ? null
+                    : ($val ?: null);
+            }
+            if (!empty($hoData['unit']) && !in_array(strtoupper($hoData['unit']), ['HO-1', 'HO-2'])) {
+                $hoData['unit'] = null;
+            } elseif (!empty($hoData['unit'])) {
+                $hoData['unit'] = strtoupper($hoData['unit']);
+            }
+
+            try {
+                $employee = Employee::create($data);
+                if (array_filter($hoData, fn ($v) => $v !== null)) {
+                    EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], $hoData);
+                }
                 $results['imported']++;
             } catch (\Exception $e) {
                 $results['errors'][] = "Baris {$rowNum}: " . self::friendlyError($e, $nama);

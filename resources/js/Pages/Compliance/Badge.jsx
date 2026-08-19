@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
+import { CreditCard, X, ClipboardList, Search, Pencil, Save, Download } from 'lucide-react';
 
 function StatusPill({ status }){
   if(status==='expired') return <span className="pill pill-red">Expired</span>;
@@ -27,11 +28,11 @@ function EditModal({ employee, tab, onClose }){
   const inp = { background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:8,padding:'8px 11px',fontSize:12.5,fontFamily:"'Outfit',sans-serif",outline:'none',width:'100%',boxSizing:'border-box' };
   function submit(e){ e.preventDefault(); router.put(`/compliance/badge/${employee.id}`, form, { preserveScroll:true, onSuccess:onClose }); }
   return (
-    <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(440px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>💳 Edit Badge/KP — {employee.nama_lengkap}</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><CreditCard size={15}/> Edit Badge/KP — {employee.nama_lengkap}</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:12}}>
@@ -49,7 +50,7 @@ function EditModal({ employee, tab, onClose }){
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-            <button type="submit" style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>💾 Simpan</button>
+            <button type="submit" style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Save size={13}/> Simpan</button>
           </div>
         </form>
       </div>
@@ -59,7 +60,7 @@ function EditModal({ employee, tab, onClose }){
 
 export default function BadgePage({ employees={data:[],total:0,links:[],current_page:1,last_page:1}, stats={}, filter='all', search='', tab='badge', highlight=null }){
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [searchVal, setSearchVal] = useState(search);
   const [activeTab, setActiveTab] = useState(tab);
   const [editEmp,   setEditEmp]   = useState(null);
@@ -126,13 +127,13 @@ export default function BadgePage({ employees={data:[],total:0,links:[],current_
 
       {/* Tab switcher */}
       <div style={{display:'flex',gap:4,marginBottom:16}}>
-        {[{key:'badge',label:'💳 Badge Site Access'},{key:'kp',label:'📋 Kartu Pengemudi (KP)'}].map(t=>(
+        {[{key:'badge',label:'Badge Site Access',icon:CreditCard},{key:'kp',label:'Kartu Pengemudi (KP)',icon:ClipboardList}].map(t=>(
           <div key={t.key} onClick={()=>switchTab(t.key)}
             style={{padding:'8px 18px',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,transition:'all .15s',
               background: activeTab===t.key ? 'linear-gradient(135deg,#E8A020,#A06010)' : 'var(--card)',
               color: activeTab===t.key ? '#0C0F14' : 'var(--muted)',
               border: `1px solid ${activeTab===t.key ? 'transparent' : 'var(--border)'}`,
-            }}>{t.label}</div>
+              display:'flex',alignItems:'center',gap:6}}><t.icon size={13}/> {t.label}</div>
         ))}
       </div>
 
@@ -149,12 +150,12 @@ export default function BadgePage({ employees={data:[],total:0,links:[],current_
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">{activeTab==='badge'?'💳 Data Badge Karyawan':'📋 Data KP Karyawan'}</div>
-          <a href="/export/badge" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif"}}>📤 Export</a>
+          <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}>{activeTab==='badge'?<><CreditCard size={13}/> Data Badge Karyawan</>:<><ClipboardList size={13}/> Data KP Karyawan</>}</div>
+          <a href="/export/badge" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Download size={13}/> Export</a>
         </div>
         <div style={{padding:'14px 16px'}}>
           <div style={{position:'relative',marginBottom:14}}>
-            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',fontSize:15,color:'var(--muted)'}}>🔍</span>
+            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={15}/></span>
             <input className="search-input" type="text" value={searchVal} placeholder="Cari nama atau NIK..."
               onChange={e=>{setSearchVal(e.target.value); doFilter(filter, e.target.value, activeTab);}}
               style={{paddingLeft:'36px'}} />
@@ -193,7 +194,7 @@ export default function BadgePage({ employees={data:[],total:0,links:[],current_
                     </>}
                     {!isViewer && (
                       <td style={{textAlign:'center'}}>
-                        <button onClick={()=>setEditEmp(e)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>✏️ Edit</button>
+                        <button onClick={()=>setEditEmp(e)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Pencil size={11}/> Edit</button>
                       </td>
                     )}
                   </tr>

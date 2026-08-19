@@ -91,6 +91,25 @@ class PayrollExportController extends Controller
         $namaBulan = $bulanNama[$bulan] ?? '';
         $namaProj  = $project?->nama ?? 'Semua Project';
 
+        // Persentase BPJS & daftar TTD — dari konfigurasi project (berlaku per periode), bukan hardcode lagi.
+        $bpjsPctDefault = ['jht' => 2.0, 'pensiun' => 1.0, 'kes' => 1.0];
+        $bpjsPct = $projectId ? $payroll->getBpjsPct($projectId, $tahun, $bulan) : $bpjsPctDefault;
+        $ttdList = $projectId ? $payroll->getTtdList($projectId) : [
+            ['label' => 'Disetujui Oleh,', 'name' => 'H. Syahrul Akmal', 'jabatan' => 'Direktur Utama'],
+            ['label' => 'Dibayar Oleh,',   'name' => 'Yulhamdani',       'jabatan' => 'Finance'],
+        ];
+        // Kalau tampilan "semua project" (super-admin, tidak pilih 1 project), tiap baris bisa beda
+        // project — cache persentase per kode supaya formula tetap benar per karyawan.
+        $bpjsPctByKode = [];
+        $resolveBpjsForRow = function (string $rowProjectKode) use (&$bpjsPctByKode, $projectId, $bpjsPct, $bpjsPctDefault, $payroll, $tahun, $bulan) {
+            if ($projectId) return $bpjsPct;
+            if (!isset($bpjsPctByKode[$rowProjectKode])) {
+                $pid = Project::where('kode', $rowProjectKode)->value('id');
+                $bpjsPctByKode[$rowProjectKode] = $pid ? $payroll->getBpjsPct($pid, $tahun, $bulan) : $bpjsPctDefault;
+            }
+            return $bpjsPctByKode[$rowProjectKode];
+        };
+
         // Kolom TTT default (selalu tampil walau kosong, sesuai keputusan)
         $tttDefaultKeys = [
             'tunj_makan'         => 'Tunj Makan',
@@ -115,6 +134,10 @@ class PayrollExportController extends Controller
 
         $hasSubGroup     = $rows && collect($rows)->pluck('sub_group')->filter()->isNotEmpty();
         $hasPotOksigen   = collect($rows)->sum('pot_tabung_oksigen') > 0;
+        $hasUangHadir    = collect($rows)->sum('uang_hadir') > 0;
+        $hasFlatLembur   = collect($rows)->contains(fn($r) => ($r['kelompok'] ?? '') === 'flat');
+        $hasStb          = collect($rows)->sum('stb') > 0;
+        $hasMdRow        = collect($rows)->contains(fn($r) => ($r['tipe_project'] ?? '') === 'md');
 
         // ── Susun kolom (urutan persis seperti contoh Excel) ──
         // Format kolom: [label, width, warna, grup, sub-grup]
@@ -143,16 +166,26 @@ class PayrollExportController extends Controller
         foreach ($allTttKeys as $key => $label) {
             $cols[$key] = [$label, 9, self::C_TTT, 'Tunjangan', 'Tunjangan Tidak Tetap'];
         }
-        if ($isMd) {
+        if ($hasMdRow) {
             $cols['ttt_perhari']      = ['TTT / Hari',      9, self::C_TTT, 'Tunjangan', 'Tunjangan Tidak Tetap'];
             $cols['ttt_total']        = ['TTT Total',      10, self::C_TTT, 'Tunjangan', 'Tunjangan Tidak Tetap'];
             $cols['tunj_makan_total'] = ['Tunj Makan Tot', 10, self::C_TTT, 'Tunjangan', 'Tunjangan Tidak Tetap'];
             $cols['com_day_total']    = ['Com Day Tot',    10, self::C_TTT, 'Tunjangan', 'Tunjangan Tidak Tetap'];
+            $cols['u_basic']          = ['U. Basic',       10, self::C_TTT, 'Tunjangan', 'Tunjangan Tidak Tetap'];
+            $cols['u_kerja']          = ['U. Kerja',       10, self::C_TTT, 'Tunjangan', 'Tunjangan Tidak Tetap'];
         }
 
         // ── Grup: LEMBUR & GAJI KOTOR (tanpa sub-grup) ──
+        if ($hasFlatLembur) {
+            $cols['l_sabtu']       = ['Lembur Sabtu',  6, self::C_LEMBUR, null, null];
+            $cols['l_libur']       = ['Lembur Libur',  6, self::C_LEMBUR, null, null];
+            $cols['lembur_biasa']  = ['Lembur Biasa',  6, self::C_LEMBUR, null, null];
+        }
         $cols['jml_jam_lembur'] = ['Jml Jam Lembur', 8,  self::C_LEMBUR, null, null];
         $cols['upah_lembur']    = ['Upah Lembur',    10, self::C_LEMBUR, null, null];
+        if ($hasUangHadir) {
+            $cols['uang_hadir'] = ['Uang Hadir',      9, self::C_TTT, null, null];
+        }
         $cols['h_kerja']        = ['H. Kerja',       7,  self::C_LEMBUR, null, null];
         if ($hasPotOksigen) {
             $cols['pot_tabung_oksigen'] = ['Pot. Oksigen', 9, self::C_TTT, null, null];
@@ -160,9 +193,9 @@ class PayrollExportController extends Controller
         $cols['gaji_kotor']     = ['Gaji Kotor',     11, self::C_LEMBUR, null, null];
 
         // ── Grup: POTONGAN ──
-        $cols['potongan_jht']     = ['BPJS TK-JHT (2%)',      9, self::C_BPJS, 'Potongan', null];
-        $cols['potongan_pensiun'] = ['BPJS TK-Pensiun (1%)',  9, self::C_BPJS, 'Potongan', null];
-        $cols['potongan_kes']     = ['BPJS Kesehatan (1%)',   9, self::C_BPJS, 'Potongan', null];
+        $cols['potongan_jht']     = ["BPJS TK-JHT ({$bpjsPct['jht']}%)",      9, self::C_BPJS, 'Potongan', null];
+        $cols['potongan_pensiun'] = ["BPJS TK-Pensiun ({$bpjsPct['pensiun']}%)",  9, self::C_BPJS, 'Potongan', null];
+        $cols['potongan_kes']     = ["BPJS Kesehatan ({$bpjsPct['kes']}%)",   9, self::C_BPJS, 'Potongan', null];
         $cols['potongan_alpa']    = ['Alpa / Pinjaman',       9, self::C_TTT,  'Potongan', null];
         if (collect($rows)->sum('potongan_insentif') > 0) {
             $cols['potongan_insentif'] = ['Pot. Insentif',    9, self::C_TTT,  'Potongan', null];
@@ -175,6 +208,13 @@ class PayrollExportController extends Controller
         $cols['sakit'] = ['Sakit', 5, self::C_IDENTITAS, 'Absensi', null];
         $cols['alpa']  = ['Alpa',  5, self::C_IDENTITAS, 'Absensi', null];
         $cols['cuti']  = ['Cuti',  5, self::C_IDENTITAS, 'Absensi', null];
+        if ($hasStb) {
+            $cols['stb'] = ['STB', 5, self::C_IDENTITAS, 'Absensi', null];
+        }
+
+        // ── Grup: CATATAN ──
+        $cols['catatan']     = ['Catatan',      16, self::C_IDENTITAS, null, null];
+        $cols['dibuat_oleh'] = ['Dibuat Oleh',   12, self::C_IDENTITAS, null, null];
 
         // ── Build workbook ──
         $wb    = new Spreadsheet();
@@ -297,10 +337,10 @@ class PayrollExportController extends Controller
         $startRow = $rDetail + 1;
         $moneyCols = [
             'gaji_pokok','tunj_tetap','kompensasi_pwt','upah_penuh',
-            'jml_jam_lembur','upah_lembur','gaji_kotor',
+            'jml_jam_lembur','upah_lembur','uang_hadir','gaji_kotor',
             'potongan_jht','potongan_pensiun','potongan_kes','potongan_alpa',
             'potongan_insentif','pot_tabung_oksigen','kekurangan_bulan_lalu','gaji_bersih',
-            'ttt_perhari','ttt_total','tunj_makan_total','com_day_total',
+            'ttt_perhari','ttt_total','tunj_makan_total','com_day_total','u_basic','u_kerja',
         ];
         foreach (array_keys($allTttKeys) as $k) $moneyCols[] = $k;
 
@@ -324,7 +364,9 @@ class PayrollExportController extends Controller
             $r = $startRow + $idx;
             $projectKode = strtolower($row['project_kode'] ?? '');
             $subGrp      = strtolower($row['sub_group']    ?? '');
-            $isMdRow     = $projectKode === 'md' || ($isMd && !$projectKode);
+            $isMdRow     = ($row['tipe_project'] ?? '') === 'md';
+            $isHoRow     = ($row['tipe_project'] ?? '') === 'ho';
+            $rowBpjs     = $resolveBpjsForRow($projectKode);
 
             // ── Ref shortcuts ──
             $refGP    = $L('gaji_pokok', $r);
@@ -357,10 +399,16 @@ class PayrollExportController extends Controller
             $sumTtt = empty($tttRefs) ? '0' : implode('+', $tttRefs);
 
             // ── Formula per-project ──
-            $izinDipotong = !in_array($projectKode, ['khawista', 'purnama'], true);
-            $formulaAlpa  = $izinDipotong
-                ? "={$refUP}/25*({$refAlpa}+{$refIzin})"
-                : "={$refUP}/25*{$refAlpa}";
+            // HO: tidak ada potongan alpa/izin sungguhan, cuma disimulasikan (alpa+cuti) untuk info —
+            // tidak dikurangkan dari gaji bersih (lihat $bersihParts di bawah).
+            if ($isHoRow) {
+                $formulaAlpa = "={$refUP}/25*({$refAlpa}+{$refCuti})";
+            } else {
+                $izinDipotong = !in_array($projectKode, ['khawista', 'purnama'], true);
+                $formulaAlpa  = $izinDipotong
+                    ? "={$refUP}/25*({$refAlpa}+{$refIzin})"
+                    : "={$refUP}/25*{$refAlpa}";
+            }
 
             $formulaPotIns = '';
             if ($projectKode === 'khawista' && $subGrp === 'construction') {
@@ -381,21 +429,21 @@ class PayrollExportController extends Controller
                 $formulaGajiKotor = "={$refUBasic}+{$refKP}+{$refUKerja}+{$refCDayTot}+{$refUL}+{$refTPls}+{$refKekur}";
             } else {
                 $formulaGajiKotor = "={$refUP}+{$refKP}+({$sumTtt})+{$refUL}";
-                if (isset($colLetter['uang_hadir'])) {
+                if (isset($colLetter['uang_hadir']) && ($row['kelompok'] ?? '') === 'flat') {
                     $refUH = $colLetter['uang_hadir'] . $r;
-                    if (($row['total_lembur_flat'] ?? 0) > 0 || ($row['uang_hadir'] ?? 0) > 0) {
-                        $formulaGajiKotor .= "+{$refUH}";
-                    }
+                    $formulaGajiKotor .= "+{$refUH}";
                 }
             }
 
             // Formula Gaji Bersih
-            $bersihParts = ["{$refGajiK}", "-{$refJht}", "-{$refPen}", "-{$refKes}", "-{$refPotAl}"];
+            // HO: Alpa/Pinjaman cuma simulasi info (lihat $formulaAlpa di atas) — tidak dikurangkan.
+            $bersihParts = ["{$refGajiK}", "-{$refJht}", "-{$refPen}", "-{$refKes}"];
+            if (!$isHoRow) $bersihParts[] = "-{$refPotAl}";
             if (isset($colLetter['potongan_insentif'])) $bersihParts[] = "-{$refPotIn}";
             if (isset($colLetter['pot_tabung_oksigen']) && ($row['pot_tabung_oksigen'] ?? 0) > 0) {
                 $bersihParts[] = "-{$refPotOk}";
             }
-            if ($projectKode === 'nk') {
+            if (!$isMdRow) {
                 $bersihParts[] = "+{$refKekur}";
             }
             $formulaGajiBersih = '=' . implode('', $bersihParts);
@@ -407,7 +455,7 @@ class PayrollExportController extends Controller
                 $cellRef = $colL . $r;
                 $isMoney = in_array($key, $moneyCols, true);
                 $align   = $key === 'no' ? Alignment::HORIZONTAL_CENTER
-                    : ($key === 'nama_lengkap' || $key === 'jabatan' ? Alignment::HORIZONTAL_LEFT
+                    : (in_array($key, ['nama_lengkap', 'jabatan', 'catatan'], true) ? Alignment::HORIZONTAL_LEFT
                     : ($isMoney ? Alignment::HORIZONTAL_RIGHT : Alignment::HORIZONTAL_CENTER));
 
                 $value = match ($key) {
@@ -426,11 +474,11 @@ class PayrollExportController extends Controller
                     } elseif ($key === 'kompensasi_pwt' && !$isMdRow) {
                         $sheet->setCellValue($cellRef, "=({$refGP}+{$refTT})/12");
                     } elseif ($key === 'potongan_jht') {
-                        $sheet->setCellValue($cellRef, "={$refUP}*2%");
+                        $sheet->setCellValue($cellRef, "={$refUP}*{$rowBpjs['jht']}%");
                     } elseif ($key === 'potongan_pensiun') {
-                        $sheet->setCellValue($cellRef, "={$refUP}*1%");
+                        $sheet->setCellValue($cellRef, "={$refUP}*{$rowBpjs['pensiun']}%");
                     } elseif ($key === 'potongan_kes') {
-                        $sheet->setCellValue($cellRef, "={$refUP}*1%");
+                        $sheet->setCellValue($cellRef, "={$refUP}*{$rowBpjs['kes']}%");
                     } elseif ($key === 'potongan_alpa') {
                         $sheet->setCellValue($cellRef, $formulaAlpa);
                     } elseif ($key === 'potongan_insentif') {
@@ -500,7 +548,7 @@ class PayrollExportController extends Controller
 
         // ── Build sheet SLIP GAJI (Tahap 4) — template interaktif dgn dropdown ──
         $this->buildSlipGajiSheet(
-            $wb, $rows, $colLetter, $startRow, $lastRow, $tahun, $bulan, $namaBulan
+            $wb, $rows, $colLetter, $startRow, $lastRow, $tahun, $bulan, $namaBulan, $bpjsPct, $ttdList
         );
 
         // ── Update kolom di DATA GAJI supaya link ke sheet TIMESHEET ──
@@ -803,7 +851,9 @@ class PayrollExportController extends Controller
         int $lastDgRow,
         int $tahun,
         int $bulan,
-        string $namaBulan
+        string $namaBulan,
+        array $bpjsPct = ['jht' => 2.0, 'pensiun' => 1.0, 'kes' => 1.0],
+        array $ttdList = []
     ): void {
         $sheet = $wb->createSheet();
         $sheet->setTitle('SLIP GAJI');
@@ -1091,9 +1141,9 @@ class PayrollExportController extends Controller
 
         // ── D. POTONGAN ──
         $sD = $addSectionHeader('D', 'POTONGAN WAJIB');
-        $addItem('1.', 'BPJS TK - JHT (2%)',     $idx('potongan_jht'));
-        $addItem('2.', 'BPJS TK - Pensiun (1%)', $idx('potongan_pensiun'));
-        $addItem('3.', 'BPJS Kesehatan (1%)',    $idx('potongan_kes'));
+        $addItem('1.', "BPJS TK - JHT ({$bpjsPct['jht']}%)",     $idx('potongan_jht'));
+        $addItem('2.', "BPJS TK - Pensiun ({$bpjsPct['pensiun']}%)", $idx('potongan_pensiun'));
+        $addItem('3.', "BPJS Kesehatan ({$bpjsPct['kes']}%)",    $idx('potongan_kes'));
         $addItem('4.', 'Alpa / Pinjaman',        $idx('potongan_alpa'));
         if (isset($colLetter['potongan_insentif'])) {
             $addItem('5.', 'Potongan Insentif',   $idx('potongan_insentif'));
@@ -1138,9 +1188,12 @@ class PayrollExportController extends Controller
         ]);
         $r += 2;
 
-        // ── TTD 3 kolom ──
+        // ── TTD 3 kolom — 2 slot pertama dari konfigurasi project, kolom terakhir selalu karyawan ──
+        $ttdSlot1 = $ttdList[0] ?? ['label' => 'Disetujui Oleh,', 'name' => 'H. Syahrul Akmal', 'jabatan' => 'Direktur Utama'];
+        $ttdSlot2 = $ttdList[1] ?? ['label' => 'Dibayar Oleh,',   'name' => 'Yulhamdani',       'jabatan' => 'Finance'];
+
         $ttdRow = $r;
-        foreach (['A' => 'Disetujui Oleh,', 'C' => 'Dibayar Oleh,', 'E' => 'Diterima Oleh,'] as $col => $label) {
+        foreach (['A' => $ttdSlot1['label'], 'C' => $ttdSlot2['label'], 'E' => 'Diterima Oleh,'] as $col => $label) {
             $sheet->setCellValue("{$col}{$ttdRow}", $label);
             $sheet->getStyle("{$col}{$ttdRow}")->applyFromArray([
                 'font' => ['bold' => true, 'size' => 9, 'name' => 'Arial'],
@@ -1148,7 +1201,7 @@ class PayrollExportController extends Controller
             ]);
         }
         $r += 4;
-        foreach (['A' => 'H. Syahrul Akmal', 'C' => 'Yulhamdani', 'E' => $idx('nama_lengkap')] as $col => $name) {
+        foreach (['A' => $ttdSlot1['name'], 'C' => $ttdSlot2['name'], 'E' => $idx('nama_lengkap')] as $col => $name) {
             $sheet->setCellValue("{$col}{$r}", $name);
             $sheet->getStyle("{$col}{$r}")->applyFromArray([
                 'font' => ['bold' => true, 'size' => 9, 'name' => 'Arial'],
@@ -1157,7 +1210,7 @@ class PayrollExportController extends Controller
             ]);
         }
         $r++;
-        foreach (['A' => 'Direktur Utama', 'C' => 'Finance', 'E' => $idx('jabatan')] as $col => $val) {
+        foreach (['A' => $ttdSlot1['jabatan'], 'C' => $ttdSlot2['jabatan'], 'E' => $idx('jabatan')] as $col => $val) {
             $sheet->setCellValue("{$col}{$r}", $val);
             $sheet->getStyle("{$col}{$r}")->applyFromArray([
                 'font' => ['italic' => true, 'size' => 9, 'name' => 'Arial'],

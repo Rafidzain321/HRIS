@@ -17,8 +17,10 @@ class OvertimeCustomController extends Controller
         $tahun = (int) $request->get('tahun', now()->year);
         $bulan = (int) $request->get('bulan', now()->month);
 
+        $periodeAwal = Carbon::create($tahun, $bulan, 1);
         $members = TimesheetMember::where('aktif', true)
             ->where('project_id', $pid)
+            ->whereHas('employee', fn($eq) => $eq->whereNull('tanggal_keluar')->orWhere('tanggal_keluar', '>=', $periodeAwal))
             ->with('employee.position')
             ->orderBy('urutan')
             ->get();

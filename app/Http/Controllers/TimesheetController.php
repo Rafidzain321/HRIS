@@ -83,9 +83,13 @@ class TimesheetController extends Controller
             }
         }
 
-        // Ambil members sesuai project
+        // Ambil members sesuai project — karyawan yang di-terminate tetap tampil sampai akhir
+        // bulan keluarnya, lalu otomatis hilang di bulan-bulan sesudahnya (dihitung dari bulan
+        // yang sedang dibuka, bukan sekali cek waktu terminate — lihat getPayrollRoster()).
+        $periodeAwal = Carbon::create($tahun, $bulan, 1);
         $members = TimesheetMember::where('aktif', true)
             ->when($projectId, fn($q, $pid) => $q->where('project_id', $pid))
+            ->whereHas('employee', fn($eq) => $eq->whereNull('tanggal_keluar')->orWhere('tanggal_keluar', '>=', $periodeAwal))
             ->orderBy('urutan')->orderBy('id_badge')->get();
 
         $badgeList = $members->pluck('id_badge')->toArray();
@@ -560,8 +564,10 @@ class TimesheetController extends Controller
         // Nama override
         $namaOverride = $this->namaOverrideHardcode();
 
+        $periodeAwal = Carbon::create($tahun, $bulan, 1);
         $members = TimesheetMember::where('aktif', true)
             ->when($projectId, fn($q, $pid) => $q->where('project_id', $pid))
+            ->whereHas('employee', fn($eq) => $eq->whereNull('tanggal_keluar')->orWhere('tanggal_keluar', '>=', $periodeAwal))
             ->orderBy('urutan')->orderBy('id_badge')->get();
         $badgeList = $members->pluck('id_badge')->toArray();
         $namaOverrideDb = $members->whereNotNull('nama_override')

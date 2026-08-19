@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\Position;
+use App\Models\Project;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -35,8 +36,10 @@ class EmployeeController extends Controller
             return $q;
         };
 
+        $projectInfo = $pid ? Project::find($pid, ['id', 'kode', 'nama', 'tipe_gaji']) : null;
+
         // Query utama untuk paginate
-        $query = $applyFilters(Employee::aktif()->with(['position', 'documents', 'project']))
+        $query = $applyFilters(Employee::aktif()->with(['position', 'documents', 'project', 'hoDetail']))
             ->orderBy('nama_lengkap');
 
         // Highlight: cari halaman yang mengandung employee id
@@ -77,8 +80,20 @@ class EmployeeController extends Controller
             'tanggal_masuk' => $e->tanggal_masuk?->format('d M Y'),
             'docs' => $e->documents->pluck('tipe')->unique()->values(),
             'umur' => $e->tanggal_lahir ? (int) $e->tanggal_lahir->age : null,
+            'masa_kerja' => $e->tanggal_masuk ? $this->formatMasaKerja($e->tanggal_masuk) : null,
             'project_id'   => $e->project_id,
             'project_nama' => $e->project?->nama ?? '-',
+            'ho_unit'      => $e->hoDetail?->unit,
+            'ho_nik'             => $e->hoDetail?->nik_ho,
+            'ho_lokasi_kerja'    => $e->hoDetail?->lokasi_kerja,
+            'ho_status_karyawan' => $e->hoDetail?->status_karyawan,
+            'ho_no_kk'           => $e->hoDetail?->no_kk,
+            'ho_rt_rw'           => $e->hoDetail?->rt_rw,
+            'ho_kelurahan'       => $e->hoDetail?->kelurahan,
+            'ho_kecamatan'       => $e->hoDetail?->kecamatan,
+            'ho_propinsi'        => $e->hoDetail?->propinsi,
+            'ho_npwp'            => $e->hoDetail?->npwp,
+            'ho_email'           => $e->hoDetail?->email,
         ]);
 
         $terminated = Employee::with('position')
@@ -107,8 +122,44 @@ class EmployeeController extends Controller
             'hes' => (clone $base)->whereHas('position', fn($q) => $q->where('nama_jabatan', 'HES Man'))->count(),
         ];
 
+        // HO tidak punya jabatan lapangan (dump truck/spotter/dll) — hitung total & jabatan
+        // terbanyak per unit (Semua/HO-1/HO-2) dari data aslinya, bukan hardcode.
+        if ($projectInfo && $projectInfo->tipe_gaji === 'ho') {
+            $hoEmployees = (clone $base)->with(['position', 'hoDetail'])->get();
+            $buildUnitStats = function ($collection) {
+                $topJabatan = $collection
+                    ->filter(fn($e) => $e->position?->nama_jabatan)
+                    ->groupBy(fn($e) => $e->position->nama_jabatan)
+                    ->map(fn($g, $label) => ['label' => $label, 'val' => $g->count()])
+                    ->sortByDesc('val')
+                    ->take(4)
+                    ->values();
+                return ['total' => $collection->count(), 'top_jabatan' => $topJabatan];
+            };
+            $stats['ho'] = [
+                'all'  => $buildUnitStats($hoEmployees),
+                'HO-1' => $buildUnitStats($hoEmployees->filter(fn($e) => $e->hoDetail?->unit === 'HO-1')),
+                'HO-2' => $buildUnitStats($hoEmployees->filter(fn($e) => $e->hoDetail?->unit === 'HO-2')),
+            ];
+        }
+
         $jabatan_list = Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']);
-        return Inertia::render('Employee/Index', compact('employees', 'terminated', 'jabatan_list', 'stats'));
+        return Inertia::render('Employee/Index', [
+            'employees'    => $employees,
+            'terminated'   => $terminated,
+            'jabatan_list' => $jabatan_list,
+            'stats'        => $stats,
+            'project_info' => $projectInfo,
+        ]);
+    }
+
+    private function formatMasaKerja($tanggalMasuk): string
+    {
+        $diff = $tanggalMasuk->diff(now());
+        $parts = [];
+        if ($diff->y > 0) $parts[] = "{$diff->y} thn";
+        $parts[] = "{$diff->m} bln";
+        return implode(' ', $parts);
     }
 
     public function store(Request $request)
@@ -117,29 +168,54 @@ class EmployeeController extends Controller
             return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
         }
 
+        $user = auth()->user();
+        $targetProjectId = $user->hasRole('super-admin') ? $request->input('project_id') : $user->project_id;
+        $isHoProject = $targetProjectId && Project::find($targetProjectId)?->tipe_gaji === 'ho';
+
+        // HO tidak pakai id_badge sama sekali — jangan wajibkan / unique-kan (sama seperti update()).
+        $idBadgeRules = $isHoProject
+            ? ['nullable', 'string', 'max:30']
+            : [
+                'required', 'string', 'max:30',
+                \Illuminate\Validation\Rule::unique('employees', 'id_badge')
+                    ->where('project_id', $targetProjectId)
+                    ->where('status', 'AKTIF'),
+            ];
+
         $data = $request->validate([
             'nama_lengkap' => 'required|string|max:200',
             'nama_ibu' => 'nullable|string|max:200',
-            'id_badge' => [
-                'required', 'string', 'max:30',
-                \Illuminate\Validation\Rule::unique('employees', 'id_badge')
-                    ->where('project_id', $request->input('project_id') ?? auth()->user()->project_id)
-                    ->where('status', 'AKTIF'),
-            ],
+            'id_badge' => $idBadgeRules,
             'no_ktp' => [
                 'nullable', 'string', 'max:20',
                 \Illuminate\Validation\Rule::unique('employees', 'no_ktp')
-                    ->where('project_id', $request->input('project_id') ?? auth()->user()->project_id),
+                    ->where('project_id', $targetProjectId),
             ],
             'no_telepon' => 'nullable|string|max:25',
             'tempat_lahir' => 'nullable|string|max:100',
             'tanggal_lahir' => 'nullable|date',
+            'tanggal_masuk' => 'nullable|date',
+            'alamat' => 'nullable|string',
+            'agama' => 'nullable|string|max:50',
             'position_id' => 'nullable|exists:positions,id',
             'ptkp' => 'nullable|in:TK/0,TK/1,TK/2,TK/3,K/0,K/1,K/2,K/3',
             'status' => 'required|in:AKTIF,NONAKTIF',
             'status_mcu' => 'nullable|string|max:20',
             'lokasi_mcu' => 'nullable|string|max:100',
             'exp_mcu' => 'nullable|date',
+            'ho_detail' => 'nullable|array',
+            'ho_detail.unit' => 'nullable|in:HO-1,HO-2',
+            'ho_detail.nik_ho' => 'nullable|string|max:40',
+            'ho_detail.lokasi_kerja' => 'nullable|string|max:255',
+            'ho_detail.status_karyawan' => 'nullable|string|max:40',
+            'ho_detail.nama_ktp' => 'nullable|string|max:255',
+            'ho_detail.no_kk' => 'nullable|string|max:40',
+            'ho_detail.rt_rw' => 'nullable|string|max:20',
+            'ho_detail.kelurahan' => 'nullable|string|max:255',
+            'ho_detail.kecamatan' => 'nullable|string|max:255',
+            'ho_detail.propinsi' => 'nullable|string|max:255',
+            'ho_detail.npwp' => 'nullable|string|max:40',
+            'ho_detail.email' => 'nullable|string|max:255',
         ], [
             'nama_lengkap.required' => 'Nama lengkap wajib diisi.',
             'id_badge.required'     => 'ID Badge wajib diisi.',
@@ -148,7 +224,9 @@ class EmployeeController extends Controller
             'status.required'       => 'Status wajib dipilih.',
         ]);
 
-        $user = auth()->user();
+        $hoDetailData = $data['ho_detail'] ?? null;
+        unset($data['ho_detail']);
+
         if (!$user->hasRole('super-admin')) {
             $data['project_id'] = $user->project_id;
         } else {
@@ -157,8 +235,12 @@ class EmployeeController extends Controller
 
         $employee = Employee::create($data);
 
+        if ($isHoProject && $hoDetailData && array_filter($hoDetailData, fn ($v) => $v !== null)) {
+            \App\Models\EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], $hoDetailData);
+        }
+
         ActivityLog::record('create', 'Karyawan', $data['nama_lengkap'],
-            "Tambah karyawan baru: {$data['nama_lengkap']} ({$data['id_badge']})"
+            "Tambah karyawan baru: {$data['nama_lengkap']} (" . ($data['id_badge'] ?? '-') . ")"
         );
 
         return redirect()->route('employees.index')
@@ -176,6 +258,11 @@ class EmployeeController extends Controller
             ? Carbon::parse($employee->tanggal_lahir)->age
             : null;
 
+        $employee->loadMissing('hoDetail', 'project');
+        $projectInfo = $employee->project
+            ? Project::find($employee->project_id, ['id', 'kode', 'nama', 'tipe_gaji'])
+            : null;
+
         return Inertia::render('Employee/Edit', [
             'employee' => array_merge($employee->toArray(), [
                 'tanggal_lahir' => $employee->tanggal_lahir?->format('Y-m-d'),
@@ -189,8 +276,14 @@ class EmployeeController extends Controller
                 'start_pkwt' => $employee->start_pkwt?->format('Y-m-d'),
                 'end_pkwt' => $employee->end_pkwt?->format('Y-m-d'),
                 'umur' => $umur,
+                'ho_detail' => $employee->hoDetail,
             ]),
             'positions' => \App\Models\Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']),
+            'project_info' => $projectInfo,
+            // Riwayat gaji mentah hasil import HO — arsip referensi, cuma relevan untuk karyawan HO.
+            'salary_history' => \App\Models\EmployeeSalaryHistory::where('employee_id', $employee->id)
+                ->orderByRaw('tahun IS NULL, tahun, bulan IS NULL, bulan, urutan')
+                ->get(['label', 'nominal', 'tahun', 'bulan']),
         ]);
     }
 
@@ -205,16 +298,36 @@ class EmployeeController extends Controller
             return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
         }
 
-        $data = $request->validate([
-            'nama_lengkap' => 'required|string|max:200',
-            'nama_ibu' => 'nullable|string|max:200',
-            'id_badge' => [
+        $isHoProject = $employee->project?->tipe_gaji === 'ho';
+
+        // HO tidak pakai id_badge sama sekali — jangan wajibkan / unique-kan.
+        $idBadgeRules = $isHoProject
+            ? ['nullable', 'string', 'max:30']
+            : [
                 'required', 'string', 'max:30',
                 \Illuminate\Validation\Rule::unique('employees', 'id_badge')
                     ->ignore($employee->id)
                     ->where('project_id', $employee->project_id)
                     ->where('status', 'AKTIF'),
-            ],
+            ];
+
+        $data = $request->validate([
+            'nama_lengkap' => 'required|string|max:200',
+            'nama_ibu' => 'nullable|string|max:200',
+            'id_badge' => $idBadgeRules,
+            'ho_detail' => 'nullable|array',
+            'ho_detail.unit' => 'nullable|in:HO-1,HO-2',
+            'ho_detail.nik_ho' => 'nullable|string|max:40',
+            'ho_detail.lokasi_kerja' => 'nullable|string|max:255',
+            'ho_detail.status_karyawan' => 'nullable|string|max:40',
+            'ho_detail.nama_ktp' => 'nullable|string|max:255',
+            'ho_detail.no_kk' => 'nullable|string|max:40',
+            'ho_detail.rt_rw' => 'nullable|string|max:20',
+            'ho_detail.kelurahan' => 'nullable|string|max:255',
+            'ho_detail.kecamatan' => 'nullable|string|max:255',
+            'ho_detail.propinsi' => 'nullable|string|max:255',
+            'ho_detail.npwp' => 'nullable|string|max:40',
+            'ho_detail.email' => 'nullable|string|max:255',
             'no_ktp' => [
                 'nullable', 'string', 'max:20',
                 \Illuminate\Validation\Rule::unique('employees', 'no_ktp')
@@ -283,7 +396,21 @@ class EmployeeController extends Controller
             }
         }
 
+        $hoDetailData = $data['ho_detail'] ?? null;
+        unset($data['ho_detail']);
+
+        if ($isHoProject) {
+            $data['id_badge'] = $data['id_badge'] ?: null;
+        }
+
         $employee->update($data);
+
+        if ($isHoProject && $hoDetailData) {
+            \App\Models\EmployeeHoDetail::updateOrCreate(
+                ['employee_id' => $employee->id],
+                $hoDetailData
+            );
+        }
 
         $desc = "Update data karyawan: {$employee->nama_lengkap} ({$employee->id_badge})";
         if (!empty($changed)) {
@@ -293,6 +420,46 @@ class EmployeeController extends Controller
 
         return redirect()->route('employees.index')
             ->with('success', "Data {$employee->nama_lengkap} berhasil diperbarui.");
+    }
+
+    public function pindahUnitHo(Request $request, Employee $employee)
+    {
+        if ($this->isViewer()) {
+            return response()->json(['ok' => false, 'message' => 'Viewer tidak memiliki akses.'], 403);
+        }
+
+        if ($employee->project?->tipe_gaji !== 'ho') {
+            return response()->json(['ok' => false, 'message' => 'Karyawan ini bukan karyawan Head Office.'], 422);
+        }
+
+        $data = $request->validate([
+            'unit'    => 'required|in:HO-1,HO-2',
+            'catatan' => 'nullable|string|max:500',
+        ]);
+
+        if ($employee->hoDetail?->unit === $data['unit']) {
+            return response()->json([
+                'ok'      => false,
+                'message' => "Karyawan sudah berada di unit {$data['unit']}. Silakan refresh halaman.",
+            ], 422);
+        }
+
+        \App\Models\EmployeeHoDetail::updateOrCreate(
+            ['employee_id' => $employee->id],
+            ['unit' => $data['unit']]
+        );
+
+        $desc = "Pindah unit: {$employee->nama_lengkap} ke {$data['unit']}";
+        if (!empty($data['catatan'])) {
+            $desc .= " | Catatan: {$data['catatan']}";
+        }
+        ActivityLog::record('update', 'Pindah Unit HO', $employee->nama_lengkap, $desc);
+
+        return response()->json([
+            'ok'       => true,
+            'message'  => "Karyawan berhasil dipindahkan ke unit {$data['unit']}.",
+            'new_unit' => $data['unit'],
+        ]);
     }
 
     public function terminate(Request $request, Employee $employee)

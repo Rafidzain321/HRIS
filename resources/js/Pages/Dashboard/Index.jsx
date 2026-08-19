@@ -3,6 +3,10 @@ import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router } from '@inertiajs/react';
 import { KaryawanPerProjectChart, PengeluaranGajiChart } from '@/Components/DashboardCharts';
+import {
+  TriangleAlert, X, User, Building2, Briefcase, CreditCard, Stethoscope, Siren,
+  CheckCircle2, BarChart3, Users, ClipboardList,
+} from 'lucide-react';
 
 const avatarColors = ['#3A8FE0','#22C97A','#E8A020','#E04545','#9B59B6','#E06A20','#3ABCDE','#C97A22'];
 function getAv(nama){ return (nama||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase(); }
@@ -40,7 +44,9 @@ export default function Dashboard({
   pengeluaranGaji=[],
   projectKeys=[],
   isMultiProject=false,
+  project_info=null,
 }){
+  const isHo = project_info?.tipe_gaji === 'ho';
   const [showAlert, closeAlert] = useSessionAlert('dashboard_alert_closed');
 
   const s = {
@@ -67,7 +73,7 @@ export default function Dashboard({
       return sisaB - sisaA;
     });
 
-  const hasAlert = s.simExp > 0 || s.mcuExp > 0 || s.badgeExp > 0 || s.badgeWarn > 0;
+  const hasAlert = !isHo && (s.simExp > 0 || s.mcuExp > 0 || s.badgeExp > 0 || s.badgeWarn > 0);
 
   const totalGaji12Bulan = pengeluaranGaji.reduce((acc, m) => acc + (m.total||0), 0);
   const totalKaryawanAktif = karyawanPerProject.reduce((acc, p) => acc + (p.total||0), 0);
@@ -78,7 +84,7 @@ export default function Dashboard({
       {/* BANNER ALERT */}
       {showAlert && hasAlert && (
         <div style={{display:'flex',alignItems:'center',gap:12,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.25)',borderRadius:10,padding:'11px 16px',marginBottom:20}}>
-          <span style={{fontSize:18}}>⚠️</span>
+          <span style={{display:'flex'}}><TriangleAlert size={18}/></span>
           <div style={{fontSize:12.5,color:'#F09090',flex:1}}>
             {s.simExp   > 0 && <><b style={{color:'#E04545'}}>{s.simExp} SIM</b> sudah expired · </>}
             {s.mcuExp   > 0 && <><b style={{color:'#E04545'}}>{s.mcuExp} MCU</b> expired · </>}
@@ -88,21 +94,26 @@ export default function Dashboard({
           <div onClick={closeAlert} style={{fontSize:11,color:'#6B7494',cursor:'pointer',padding:'4px 10px',borderRadius:6,border:'1px solid rgba(224,69,69,.2)',background:'rgba(224,69,69,.08)',display:'flex',alignItems:'center',gap:4,transition:'all .15s',userSelect:'none'}}
             onMouseEnter={e=>{e.currentTarget.style.background='rgba(224,69,69,.15)';e.currentTarget.style.color='#E04545';}}
             onMouseLeave={e=>{e.currentTarget.style.background='rgba(224,69,69,.08)';e.currentTarget.style.color='#6B7494';}}
-          >✕ Tutup</div>
+          ><X size={12}/> Tutup</div>
         </div>
       )}
 
       {/* STATS CARDS */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:20}} className="stat-grid-4">
-        {[
-          { label:'Total Manpower',   val:s.total,      sub:'Semua aktif — GROUP AKM',                              color:'#3A8FE0', icon:'👤', pct:100,                                                href:'/employees' },
-          { label:'SIM Expired',      val:s.simExp,     sub:'Perlu perpanjangan segera',                             color:'#E04545', icon:'💳', pct:Math.round(s.simExp/Math.max(s.total,1)*100),    href:'/compliance/sim' },
-          { label:'MCU Expired',      val:s.mcuExp,     sub:'Medical check-up lewat masa berlaku',                   color:'#E06A20', icon:'🏥', pct:Math.round(s.mcuExp/Math.max(s.total,1)*100),    href:'/compliance/mcu' },
-          { label:'Badge & KP Alert', val:s.badgeAlert, sub:`${s.badgeExp} expired + ${s.badgeWarn} dalam 30 hari`, color:'#E8C030', icon:'🚨', pct:Math.round(s.badgeAlert/Math.max(s.total,1)*100), href:'/compliance/badge' },
-        ].map((item,i)=>(
+        {(isHo ? [
+          { label:'Total Manpower',  val:s.total,                          sub:'Karyawan aktif — Kantor Pusat',   color:'#3A8FE0', icon:User, pct:100, href:'/employees' },
+          { label:'Karyawan HO-1',   val:stats.ho_unit?.['HO-1'] || 0,     sub:'Karyawan aktif di unit HO-1',     color:'#22C97A', icon:Building2, pct:Math.round((stats.ho_unit?.['HO-1']||0)/Math.max(s.total,1)*100), href:'/employees' },
+          { label:'Karyawan HO-2',   val:stats.ho_unit?.['HO-2'] || 0,     sub:'Karyawan aktif di unit HO-2',     color:'#9B59B6', icon:Building2, pct:Math.round((stats.ho_unit?.['HO-2']||0)/Math.max(s.total,1)*100), href:'/employees' },
+          { label:'Jabatan Terbanyak', val:stats.ho_top_jabatan?.val || 0, sub:stats.ho_top_jabatan?.label || '—', color:'#E8A020', icon:Briefcase, pct:Math.round((stats.ho_top_jabatan?.val||0)/Math.max(s.total,1)*100), href:'/employees' },
+        ] : [
+          { label:'Total Manpower',   val:s.total,      sub:'Semua aktif — GROUP AKM',                              color:'#3A8FE0', icon:User, pct:100,                                                href:'/employees' },
+          { label:'SIM Expired',      val:s.simExp,     sub:'Perlu perpanjangan segera',                             color:'#E04545', icon:CreditCard, pct:Math.round(s.simExp/Math.max(s.total,1)*100),    href:'/compliance/sim' },
+          { label:'MCU Expired',      val:s.mcuExp,     sub:'Medical check-up lewat masa berlaku',                   color:'#E06A20', icon:Stethoscope, pct:Math.round(s.mcuExp/Math.max(s.total,1)*100),    href:'/compliance/mcu' },
+          { label:'Badge & KP Alert', val:s.badgeAlert, sub:`${s.badgeExp} expired + ${s.badgeWarn} dalam 30 hari`, color:'#E8C030', icon:Siren, pct:Math.round(s.badgeAlert/Math.max(s.total,1)*100), href:'/compliance/badge' },
+        ]).map((item,i)=>(
           <div key={i} className="stat" onClick={()=>router.visit(item.href)}
             style={{animationDelay:`${i*0.05+0.05}s`,animation:'fadeUp .5s both',cursor:'pointer'}}>
-            <span style={{position:'absolute',top:16,right:16,fontSize:22,opacity:.25}}>{item.icon}</span>
+            <span style={{position:'absolute',top:16,right:16,opacity:.25,display:'flex'}}><item.icon size={22}/></span>
             <div style={{fontSize:10.5,color:'#6B7494',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:600}}>{item.label}</div>
             <div style={{fontFamily:'Syne,sans-serif',fontSize:34,fontWeight:700,lineHeight:1.1,margin:'6px 0 4px',color:item.color}}>{item.val}</div>
             <div style={{fontSize:11,color:'#6B7494'}}>{item.sub}</div>
@@ -115,13 +126,14 @@ export default function Dashboard({
       </div>
 
       {/* ROW: ALERTS + COMPLIANCE + CHART KARYAWAN */}
-      <div className="dash-grid-2" style={{display:'grid',gridTemplateColumns:'3fr 2fr',gap:16,marginBottom:16,alignItems:'stretch'}}>
+      <div className="dash-grid-2" style={{display:'grid',gridTemplateColumns:isHo?'1fr':'3fr 2fr',gap:16,marginBottom:16,alignItems:'start'}}>
 
         {/* ALERT TABLE */}
+        {!isHo && (
         <div className="panel" style={{display:'flex',flexDirection:'column',paddingBottom:0}}>
           <div className="panel-head" style={{flexShrink:0}}>
             <div className="panel-title">
-              🚨 Compliance Alerts
+              <Siren size={13} style={{verticalAlign:-2}}/> Compliance Alerts
               <span style={{marginLeft:6,background:'rgba(224,69,69,.15)',color:'#E04545',fontSize:10,fontWeight:700,borderRadius:99,padding:'1px 7px',display:'inline-block'}}>
                 {filteredAlerts.length}
               </span>
@@ -129,7 +141,7 @@ export default function Dashboard({
             <a href="/compliance/sim" style={{fontSize:11.5,color:'#E8A020',textDecoration:'none'}}>Lihat Semua →</a>
           </div>
 
-          <div className="table-wrap" style={{overflowY:'auto',overflowX:'auto',flex:1,minHeight:0,maxHeight:500}}>
+          <div className="table-wrap" style={{overflowY:'auto',overflowX:'auto',flex:1,minHeight:0,maxHeight:560}}>
             <table className="kar-table" style={{minWidth:560}}>
               <thead style={{position:'sticky',top:0,zIndex:2,background:'var(--card)'}}>
                 <tr>
@@ -204,7 +216,7 @@ export default function Dashboard({
                   );
                 })}
                 {filteredAlerts.length===0&&(
-                  <tr><td colSpan={5} style={{padding:'24px 16px',textAlign:'center',color:'#6B7494'}}>✅ Tidak ada compliance alert</td></tr>
+                  <tr><td colSpan={5} style={{padding:'24px 16px',textAlign:'center',color:'#6B7494'}}><CheckCircle2 size={13} style={{verticalAlign:-2}}/> Tidak ada compliance alert</td></tr>
                 )}
               </tbody>
             </table>
@@ -221,11 +233,13 @@ export default function Dashboard({
             </div>
           )}
         </div>
+        )}
 
         {/* RIGHT COL — Status Compliance + Karyawan per Project */}
         <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          {!isHo && (
           <div className="panel">
-            <div className="panel-head"><div className="panel-title">📊 Status Compliance</div></div>
+            <div className="panel-head"><div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><BarChart3 size={13}/> Status Compliance</div></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,padding:'14px 16px'}}>
               {[
                 { label:'KP Status',   pct: s.total>0?Math.round((stats.kp_ada||0)/s.total*100):0,    color:'#22C97A' },
@@ -252,12 +266,13 @@ export default function Dashboard({
               })}
             </div>
           </div>
+          )}
 
           {/* ── PANEL BARU: Karyawan per Project ── */}
           <div className="panel">
             <div className="panel-head">
               <div className="panel-title">
-                👥 Karyawan per Project
+                <Users size={13} style={{verticalAlign:-2}}/> Karyawan per Project
                 <span style={{marginLeft:6,fontSize:11,color:'var(--muted)',fontWeight:400}}>
                   — {totalKaryawanAktif} aktif
                 </span>
@@ -274,7 +289,7 @@ export default function Dashboard({
       <div className="dash-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,alignItems:'stretch'}}>
         <div className="panel" style={{display:'flex',flexDirection:'column'}}>
           <div className="panel-head" style={{flexShrink:0}}>
-            <div className="panel-title">📋 Komposisi Jabatan</div>
+            <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13}/> Komposisi Jabatan</div>
             <a href="/employees" style={{fontSize:11.5,color:'#E8A020',textDecoration:'none'}}>Detail →</a>
           </div>
           <div style={{display:'flex',flexDirection:'column',justifyContent:'center',gap:9,padding:'14px 16px',flex:1}}>

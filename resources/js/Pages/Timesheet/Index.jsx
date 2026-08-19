@@ -3,6 +3,12 @@ import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { SUB_GROUP_OPTIONS, subGroupMeta } from './subGroupOptions';
+import {
+    Calendar, X, Loader2, Save, Plus, Search, Check, TriangleAlert, Pencil, Trash2,
+    GripVertical, Circle, Users, User, ClipboardList, Upload, Download, Clock, Lightbulb,
+    Timer, CalendarX2,
+} from 'lucide-react';
 
 const BULAN_NAMA = ['','Januari','Februari','Maret','April','Mei','Juni',
                     'Juli','Agustus','September','Oktober','November','Desember'];
@@ -27,6 +33,7 @@ const TIPE_CONFIG = {
     libur_khusus:   { label:'Libur Khusus',   bg:'rgba(58,143,224,.12)', color:'var(--blue)' },
 };
 
+
 // ── TAB HARI LIBUR ────────────────────────────────────────────
 function TambahLiburModal({ onClose }) {
     const [form, setForm] = useState({ tanggal:'', keterangan:'', tipe:'libur_nasional' });
@@ -49,8 +56,8 @@ function TambahLiburModal({ onClose }) {
         <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}>
             <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(440px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-                    <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>🗓️ Tambah Hari Libur</div>
-                    <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+                    <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><CalendarX2 size={15}/> Tambah Hari Libur</div>
+                    <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
                 </div>
                 <form onSubmit={submit}>
                     <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -74,7 +81,7 @@ function TambahLiburModal({ onClose }) {
                     <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
                         <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
                         <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-                            {loading ? '⏳...' : '💾 Simpan'}
+                            {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan</span>}
                         </button>
                     </div>
                 </form>
@@ -123,7 +130,7 @@ function TabHariLibur({ all_holidays, isDark, isViewer }) {
                     </select>
                     {!isViewer && (
                         <button onClick={()=>setShowAdd(true)} style={{padding:'7px 14px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                            ➕ Tambah Hari Libur
+                            <Plus size={13} style={{verticalAlign:-2}}/> Tambah Hari Libur
                         </button>
                     )}
                 </div>
@@ -167,7 +174,7 @@ function TabHariLibur({ all_holidays, isDark, isViewer }) {
                                             borderBottom: `1px solid ${isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.07)'}`,
                                         }}>
                                             <span style={{fontFamily:'Syne,sans-serif',fontSize:12.5,fontWeight:700,color:'var(--accent)'}}>
-                                                📅 {BULAN_NAMA[+bulan]} {filterTahun}
+                                                <Calendar size={13} style={{verticalAlign:-2}}/> {BULAN_NAMA[+bulan]} {filterTahun}
                                             </span>
                                             <span style={{marginLeft:10,fontSize:11,color:'var(--muted)',fontWeight:400}}>
                                                 — {grouped[bulan].length} hari libur
@@ -187,7 +194,7 @@ function TabHariLibur({ all_holidays, isDark, isViewer }) {
                                                 </td>
                                                 <td style={{padding:'8px 10px',textAlign:'center',borderBottom:`1px solid ${isDark?'rgba(255,255,255,.05)':'rgba(0,0,0,.06)'}`}}>
                                                     {!isViewer && (
-                                                        <button onClick={()=>hapus(h.id,h.keterangan)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🗑️</button>
+                                                        <button onClick={()=>hapus(h.id,h.keterangan)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><Trash2 size={12}/></button>
                                                     )}
                                                 </td>
                                             </tr>
@@ -403,16 +410,16 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
 
     return (
         <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-            onClick={e=>e.target===e.currentTarget&&onClose()}>
+            onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
             <div onClick={e=>e.stopPropagation()} style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(520px, calc(100vw - 24px))',maxHeight:'88vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
 
                 {/* Header */}
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
                     <div>
-                        <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>➕ Tambah Anggota Timesheet</div>
+                        <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Plus size={15}/> Tambah Anggota Timesheet</div>
                         <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>Bisa pilih banyak sekaligus</div>
                     </div>
-                    <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+                    <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
                 </div>
 
                 <form onSubmit={submit} style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}}>
@@ -420,7 +427,7 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
 
                         {/* Search */}
                         <div style={{position:'relative',flexShrink:0}}>
-                            <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',fontSize:14,color:'var(--muted)'}}>🔍</span>
+                            <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={14}/></span>
                             <input style={{...inp,paddingLeft:32}} value={search}
                                 onChange={e=>setSearch(e.target.value)}
                                 placeholder="Cari nama atau badge..." />
@@ -439,7 +446,7 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
                             {filtered.length > 0 && (
                                 <button type="button" onClick={toggleAll}
                                     style={{fontSize:11,padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                                    {allFilteredSelected ? '☐ Deselect Semua' : '☑ Pilih Semua'}
+                                    {allFilteredSelected ? 'Deselect Semua' : 'Pilih Semua'}
                                 </button>
                             )}
                         </div>
@@ -472,7 +479,7 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
                                             display:'flex', alignItems:'center', justifyContent:'center',
                                             transition:'all .15s',
                                         }}>
-                                            {isChecked && <span style={{color:'#0C0F14',fontSize:11,fontWeight:900,lineHeight:1}}>✓</span>}
+                                            {isChecked && <span style={{color:'#0C0F14',display:'flex'}}><Check size={11}/></span>}
                                         </div>
                                         <div style={{flex:1}}>
                                             <div style={{fontWeight:600,color: isChecked ? 'var(--accent)' : 'var(--text)'}}>{emp.nama_lengkap}</div>
@@ -488,7 +495,7 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
                         {selectedBadges.length > 0 && (
                             <div style={{flexShrink:0,padding:'10px 12px',borderRadius:8,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)'}}>
                                 <div style={{fontSize:11,color:'var(--accent)',fontWeight:600,marginBottom:6}}>
-                                    ✓ {selectedBadges.length} karyawan akan ditambahkan:
+                                    <Check size={12} style={{verticalAlign:-2}}/> {selectedBadges.length} karyawan akan ditambahkan:
                                 </div>
                                 <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
                                     {selectedBadges.map(badge => {
@@ -502,7 +509,7 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
                                             }}>
                                                 {emp?.nama_lengkap || badge}
                                                 <span onClick={e=>{e.stopPropagation();toggleOne(badge);}}
-                                                    style={{cursor:'pointer',opacity:.7,fontSize:10}}>✕</span>
+                                                    style={{cursor:'pointer',opacity:.7,display:'flex'}}><X size={10}/></span>
                                             </span>
                                         );
                                     })}
@@ -514,15 +521,16 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
                     {/* Footer */}
                     <div style={{padding:'12px 20px',borderTop:'1px solid var(--border)',flexShrink:0,background:'var(--bg2)',display:'flex',flexDirection:'column',gap:10}}>
                         <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                            {/* Sub-Group — hanya Khawista */}
-                            {(projectKode||'').toLowerCase() === 'khawista' && (
+                            {/* Sub-Group — sesuai pengelompokan project */}
+                            {SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()] && (
                                 <div>
                                     <label style={{fontSize:11,color:'var(--muted)',marginBottom:4,display:'block'}}>Sub-Group:</label>
                                     <select value={subGroupBulk} onChange={e=>setSubGroupBulk(e.target.value)}
                                         style={{background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:8,padding:'7px 11px',fontSize:12.5,fontFamily:"'Outfit',sans-serif",outline:'none',width:'100%'}}>
                                         <option value="">— Tidak ada —</option>
-                                        <option value="construction">🏗️ Construction</option>
-                                        <option value="piling">🔩 Piling</option>
+                                        {SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()].map(o => (
+                                            <option key={o.value} value={o.value}>{o.emoji} {o.label}</option>
+                                        ))}
                                     </select>
                                 </div>
                             )}
@@ -532,8 +540,8 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
                                     <label style={{fontSize:11,color:'var(--muted)',marginBottom:4,display:'block'}}>Kelompok Lembur:</label>
                                     <select value={kelompokBulk} onChange={e=>setKelompokBulk(e.target.value)}
                                         style={{background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:8,padding:'7px 11px',fontSize:12.5,fontFamily:"'Outfit',sans-serif",outline:'none',width:'100%'}}>
-                                        <option value="per_jam">⏱️ Per Jam</option>
-                                        <option value="flat">📋 Flat</option>
+                                        <option value="per_jam">Per Jam</option>
+                                        <option value="flat">Flat</option>
                                     </select>
                                 </div>
                             )}
@@ -547,7 +555,7 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
                                 style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,
                                     cursor:loading||selectedBadges.length===0?'not-allowed':'pointer',
                                     fontFamily:"'Outfit',sans-serif",opacity:loading||selectedBadges.length===0?.5:1}}>
-                                {loading ? '⏳...' : `➕ Tambah ${selectedBadges.length > 0 ? selectedBadges.length+' ' : ''}Anggota`}
+                                {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Tambah {selectedBadges.length > 0 ? selectedBadges.length+' ' : ''}Anggota</span>}
                             </button>
                         </div>
                     </div>
@@ -594,10 +602,10 @@ function EditAnggotaModal({ member, onClose, projectKode }) {
             <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(460px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
                     <div>
-                        <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>✏️ Edit Anggota</div>
+                        <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Pencil size={15}/> Edit Anggota</div>
                         <div style={{fontSize:11.5,color:'var(--muted)',marginTop:2}}>{member.id_badge}</div>
                     </div>
-                    <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+                    <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
                 </div>
                 <form onSubmit={submit}>
                     <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -625,23 +633,24 @@ function EditAnggotaModal({ member, onClose, projectKode }) {
                             </select>
                             {tipe === '8jam' && (
                                 <div style={{fontSize:11,color:'var(--accent)',marginTop:4}}>
-                                    ⚠️ Tipe 8 jam: OT dihitung dari jam ke-9, Sabtu OT dari jam pertama
+                                    <TriangleAlert size={12} style={{verticalAlign:-2}}/> Tipe 8 jam: OT dihitung dari jam ke-9, Sabtu OT dari jam pertama
                                 </div>
                             )}
                         </div>
 
-                        {/* Sub-Group — hanya Khawista */}
-                        {(projectKode||'').toLowerCase() === 'khawista' && (
+                        {/* Sub-Group — sesuai pengelompokan project */}
+                        {SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()] && (
                           <div>
                             <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Sub-Group</label>
                             <select style={inp} value={subGroup} onChange={e=>setSubGroup(e.target.value)}>
                               <option value="">— Tidak ada (tampil di semua tab) —</option>
-                              <option value="construction">🏗️ Construction</option>
-                              <option value="piling">🔩 Piling</option>
+                              {SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()].map(o => (
+                                <option key={o.value} value={o.value}>{o.emoji} {o.label}</option>
+                              ))}
                             </select>
                             {subGroup && (
                               <div style={{fontSize:10.5,color:'var(--accent)',marginTop:3}}>
-                                Muncul di tab {subGroup==='construction'?'Construction':'Piling'}
+                                Muncul di tab {subGroupMeta(projectKode, subGroup).label}
                               </div>
                             )}
                           </div>
@@ -651,8 +660,8 @@ function EditAnggotaModal({ member, onClose, projectKode }) {
                         <div>
                             <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Kelompok Lembur</label>
                             <select style={inp} value={kelompok} onChange={e=>setKelompok(e.target.value)}>
-                                <option value="per_jam">⏱️ Per Jam (lembur dihitung dari timesheet)</option>
-                                <option value="flat">📋 Flat </option>
+                                <option value="per_jam">Per Jam (lembur dihitung dari timesheet)</option>
+                                <option value="flat">Flat</option>
                             </select>
                             <div style={{fontSize:10.5,color:'var(--muted)',marginTop:3}}>
                                 {kelompok==='flat'
@@ -675,7 +684,7 @@ function EditAnggotaModal({ member, onClose, projectKode }) {
                     <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
                         <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
                         <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                            {loading ? '⏳...' : '💾 Simpan'}
+                            {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan</span>}
                         </button>
                     </div>
                 </form>
@@ -689,7 +698,7 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from 
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-function SortableRow({ member, orderNo, projectKode, isViewer, onEdit, onDelete }) {
+function SortableRow({ member, orderNo, projectKode, isViewer, onEdit, onDelete, hideSubGroupCol=false }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: member.id });
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -697,7 +706,7 @@ function SortableRow({ member, orderNo, projectKode, isViewer, onEdit, onDelete 
         opacity: isDragging ? 0.5 : 1,
         background: isDragging ? 'rgba(232,160,32,.08)' : undefined,
     };
-    const isKhawista = (projectKode||'').toLowerCase() === 'khawista';
+    const hasSubGroupOptions = !hideSubGroupCol && !!SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()];
 
     return (
         <tr ref={setNodeRef} style={style}
@@ -727,17 +736,24 @@ function SortableRow({ member, orderNo, projectKode, isViewer, onEdit, onDelete 
                 {member.nama_override && <div style={{fontSize:10.5,color:'var(--muted)'}}>Override dari: {member.nama_lengkap}</div>}
             </td>
             <td style={{padding:'10px 12px',borderBottom:'1px solid var(--border)',color:'var(--muted2)',fontSize:11.5}}>{member.jabatan}</td>
-            {isKhawista && (
+            {hasSubGroupOptions && (
                 <td style={{padding:'10px 12px',borderBottom:'1px solid var(--border)'}}>
-                    {member.sub_group ? (
-                        <span style={{
-                            padding:'2px 10px', borderRadius:99, fontSize:11, fontWeight:700,
-                            background: member.sub_group==='construction' ? 'rgba(232,160,32,.12)' : 'rgba(58,143,224,.12)',
-                            color: member.sub_group==='construction' ? 'var(--accent)' : 'var(--blue)',
-                        }}>
-                            {member.sub_group==='construction' ? '🏗️ Construction' : '🔩 Piling'}
-                        </span>
-                    ) : <span style={{color:'var(--muted)',fontSize:11}}>—</span>}
+                    {member.sub_group ? (() => {
+                        const opts = SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()] || [];
+                        const idx = opts.findIndex(o => o.value === member.sub_group);
+                        const meta = subGroupMeta(projectKode, member.sub_group);
+                        const isSecond = idx === 1;
+                        return (
+                            <span style={{
+                                padding:'2px 10px', borderRadius:99, fontSize:11, fontWeight:700,
+                                display:'inline-flex', alignItems:'center', gap:4,
+                                background: isSecond ? 'rgba(58,143,224,.12)' : 'rgba(232,160,32,.12)',
+                                color: isSecond ? 'var(--blue)' : 'var(--accent)',
+                            }}>
+                                {meta.icon && <meta.icon size={11}/>} {meta.label}
+                            </span>
+                        );
+                    })() : <span style={{color:'var(--muted)',fontSize:11}}>—</span>}
                 </td>
             )}
             <td style={{padding:'10px 12px',borderBottom:'1px solid var(--border)'}}>
@@ -751,19 +767,19 @@ function SortableRow({ member, orderNo, projectKode, isViewer, onEdit, onDelete 
                 <span style={{padding:'2px 10px',borderRadius:99,fontSize:11,fontWeight:600,
                     background:member.aktif?'rgba(34,201,122,.12)':'rgba(128,128,128,.12)',
                     color:member.aktif?'var(--green)':'var(--muted)'}}>
-                    {member.aktif ? '✓ Aktif' : '✗ Nonaktif'}
+                    {member.aktif ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Check size={11}/>Aktif</span> : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><X size={11}/>Nonaktif</span>}
                 </span>
             </td>
             <td style={{padding:'8px 12px',borderBottom:'1px solid var(--border)',textAlign:'center'}}>
                 <div style={{display:'flex',gap:5,justifyContent:'center'}}>
                     {!isViewer && (
                         <button onClick={()=>onEdit(member)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                            ✏️ Edit
+                            <Pencil size={11} style={{verticalAlign:-2}}/> Edit
                         </button>
                     )}
                     {!isViewer && (
                         <button onClick={()=>onDelete(member.id, member.id_badge)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                            🗑️
+                            <Trash2 size={11}/>
                         </button>
                     )}
                 </div>
@@ -772,9 +788,9 @@ function SortableRow({ member, orderNo, projectKode, isViewer, onEdit, onDelete 
     );
 }
 
-function GroupSection({ title, icon, color, members, startNumber, projectKode, isViewer, onEdit, onDelete, onDragEnd }) {
+function GroupSection({ title, icon, color, members, startNumber, projectKode, isViewer, onEdit, onDelete, onDragEnd, hideSubGroupCol=false }) {
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-    const isKhawista = (projectKode||'').toLowerCase() === 'khawista';
+    const hasSubGroupOptions = !hideSubGroupCol && !!SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()];
 
     return (
         <div style={{marginBottom:20}}>
@@ -795,7 +811,7 @@ function GroupSection({ title, icon, color, members, startNumber, projectKode, i
                             <th style={{...thHoliday(true),textAlign:'left'}}>ID Badge</th>
                             <th style={{...thHoliday(true),textAlign:'left'}}>Nama</th>
                             <th style={{...thHoliday(true),textAlign:'left'}}>Jabatan</th>
-                            {isKhawista && <th style={{...thHoliday(true),textAlign:'left'}}>Sub-Group</th>}
+                            {hasSubGroupOptions && <th style={{...thHoliday(true),textAlign:'left'}}>Sub-Group</th>}
                             <th style={{...thHoliday(true),textAlign:'left'}}>Tipe</th>
                             <th style={{...thHoliday(true),textAlign:'left'}}>Status</th>
                             <th style={{...thHoliday(true),textAlign:'center',width:130}}>Aksi</th>
@@ -805,7 +821,7 @@ function GroupSection({ title, icon, color, members, startNumber, projectKode, i
                         <SortableContext items={members.map(m=>m.id)} strategy={verticalListSortingStrategy}>
                             <tbody>
                                 {members.length === 0 && (
-                                    <tr><td colSpan={isKhawista?8:7} style={{padding:20,textAlign:'center',color:'var(--muted)',fontSize:11.5}}>
+                                    <tr><td colSpan={hasSubGroupOptions?8:7} style={{padding:20,textAlign:'center',color:'var(--muted)',fontSize:11.5}}>
                                         Belum ada anggota di kelompok ini
                                     </td></tr>
                                 )}
@@ -813,7 +829,8 @@ function GroupSection({ title, icon, color, members, startNumber, projectKode, i
                                     <SortableRow key={m.id} member={m}
                                         orderNo={(startNumber || 1) + i}
                                         projectKode={projectKode} isViewer={isViewer}
-                                        onEdit={onEdit} onDelete={onDelete} />
+                                        onEdit={onEdit} onDelete={onDelete}
+                                        hideSubGroupCol={hideSubGroupCol} />
                                 ))}
                             </tbody>
                         </SortableContext>
@@ -825,10 +842,11 @@ function GroupSection({ title, icon, color, members, startNumber, projectKode, i
 }
 
 function TabKelolaAnggota({ members = [], availableEmployees = [], isViewer = false, project_info = null }) {
-    const [showAdd,   setShowAdd]   = useState(false);
-    const [editItem,  setEditItem]  = useState(null);
-    const [search,    setSearch]    = useState('');
-    const [localList, setLocalList] = useState(members);
+    const [showAdd,     setShowAdd]     = useState(false);
+    const [editItem,    setEditItem]    = useState(null);
+    const [search,      setSearch]      = useState('');
+    const [localList,   setLocalList]   = useState(members);
+    const [subGroupTab, setSubGroupTab] = useState('all');
 
     useEffect(() => { setLocalList(members); }, [members]);
 
@@ -837,7 +855,7 @@ function TabKelolaAnggota({ members = [], availableEmployees = [], isViewer = fa
         router.delete(`/timesheet/members/${id}`, { preserveScroll: true });
     }
 
-    const filtered = search.trim()
+    const searched = search.trim()
         ? localList.filter(m =>
             m.id_badge?.toLowerCase().includes(search.toLowerCase()) ||
             (m.nama_override || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -845,6 +863,13 @@ function TabKelolaAnggota({ members = [], availableEmployees = [], isViewer = fa
             (m.jabatan       || '').toLowerCase().includes(search.toLowerCase())
           )
         : localList;
+
+    // Project yang punya sub-group (mis. GIAM: staff/mechanical/construction) — tab pemisah
+    // di atas, lalu di dalam tab yang aktif tetap dipisah lagi per_jam vs flat seperti biasa.
+    const subGroupOpts = SUB_GROUP_OPTIONS[(project_info?.kode||'').toLowerCase()];
+    const filtered = subGroupOpts && subGroupTab !== 'all'
+        ? searched.filter(m => m.sub_group === subGroupTab)
+        : searched;
 
     const perJam = filtered.filter(m => (m.kelompok || 'per_jam') === 'per_jam');
     const flat   = filtered.filter(m => m.kelompok === 'flat');
@@ -859,14 +884,12 @@ function TabKelolaAnggota({ members = [], availableEmployees = [], isViewer = fa
             const newIdx = groupList.findIndex(m => m.id === over.id);
             if (oldIdx === -1 || newIdx === -1) return;
 
-            // Reorder grup yang di-drag
+            // Reorder di dalam grup yang di-drag saja; anggota lain (termasuk sub-group/kelompok
+            // lain yang sedang tidak tampil) tetap di posisi relatifnya di localList.
             const reordered = arrayMove(groupList, oldIdx, newIdx);
-            const otherList = kelompok === 'per_jam' ? flat : perJam;
-
-            // Susun ulang localList: Per Jam dulu, lalu Flat
-            const perJamNew = kelompok === 'per_jam' ? reordered : otherList;
-            const flatNew   = kelompok === 'flat'    ? reordered : otherList;
-            const newLocal  = [...perJamNew, ...flatNew];
+            let ptr = 0;
+            const reorderedIds = new Set(reordered.map(m => m.id));
+            const newLocal = localList.map(m => reorderedIds.has(m.id) ? reordered[ptr++] : m);
 
             setLocalList(newLocal);
 
@@ -901,18 +924,39 @@ function TabKelolaAnggota({ members = [], availableEmployees = [], isViewer = fa
                 </div>
                 {!isViewer && (
                     <button onClick={()=>setShowAdd(true)} style={{padding:'7px 14px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                        ➕ Tambah Anggota
+                        <Plus size={13} style={{verticalAlign:-2}}/> Tambah Anggota
                     </button>
                 )}
             </div>
 
             <div style={{position:'relative',marginBottom:14}}>
-                <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',fontSize:15,color:'var(--muted)'}}>🔍</span>
+                <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={15}/></span>
                 <input className="search-input" type="text" value={search}
                     placeholder="Cari badge, nama, atau jabatan..."
                     onChange={e => setSearch(e.target.value)}
                     style={{paddingLeft:'36px', width:'100%'}} />
             </div>
+
+            {subGroupOpts && (
+                <div style={{display:'flex',gap:4,marginBottom:14,flexWrap:'wrap'}}>
+                    {[
+                        { key:'all', label:`Semua (${searched.length})`, icon:null },
+                        ...subGroupOpts.map(o => ({ key:o.value, label:`${o.label} (${searched.filter(m=>m.sub_group===o.value).length})`, icon:o.icon })),
+                    ].map(t => (
+                        <div key={t.key} onClick={() => setSubGroupTab(t.key)}
+                            style={{
+                                padding:'7px 16px', borderRadius:8, cursor:'pointer',
+                                fontSize:12.5, fontWeight:600, transition:'all .15s',
+                                display:'inline-flex', alignItems:'center', gap:6,
+                                background: subGroupTab===t.key ? 'linear-gradient(135deg,#E8A020,#A06010)' : 'var(--card)',
+                                color:       subGroupTab===t.key ? '#0C0F14' : 'var(--muted)',
+                                border: `1px solid ${subGroupTab===t.key ? 'transparent' : 'var(--border)'}`,
+                            }}>
+                            {t.icon && <t.icon size={12}/>} {t.label}
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {localList.length === 0 ? (
                 <div className="panel" style={{padding:32,textAlign:'center',color:'var(--muted)'}}>
@@ -920,20 +964,22 @@ function TabKelolaAnggota({ members = [], availableEmployees = [], isViewer = fa
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="panel" style={{padding:24,textAlign:'center',color:'var(--muted)',fontSize:12}}>
-                    Tidak ada anggota yang cocok dengan pencarian
+                    Tidak ada anggota yang cocok dengan pencarian/tab ini
                 </div>
             ) : (
                 <>
-                    <GroupSection title="Per Jam" icon="⏱️" color="#22C97A"
+                    <GroupSection title="Per Jam" icon={<Timer size={14}/>} color="#22C97A"
                         members={perJam} startNumber={1}
                         projectKode={project_info?.kode} isViewer={isViewer}
                         onEdit={setEditItem} onDelete={hapus}
-                        onDragEnd={handleDragEnd('per_jam')} />
-                    <GroupSection title="Flat" icon="📋" color="#9B59B6"
+                        onDragEnd={handleDragEnd('per_jam')}
+                        hideSubGroupCol={subGroupTab !== 'all'} />
+                    <GroupSection title="Flat" icon={<ClipboardList size={14}/>} color="#9B59B6"
                         members={flat} startNumber={perJam.length + 1}
                         projectKode={project_info?.kode} isViewer={isViewer}
                         onEdit={setEditItem} onDelete={hapus}
-                        onDragEnd={handleDragEnd('flat')} />
+                        onDragEnd={handleDragEnd('flat')}
+                        hideSubGroupCol={subGroupTab !== 'all'} />
                 </>
             )}
 
@@ -960,9 +1006,9 @@ function AddHolidayFromHeaderModal({ day, bulan, tahun, isSaturday, onClose, onS
     }
     return (
         <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-            onClick={e=>e.target===e.currentTarget&&onClose()}>
+            onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
             <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:14,width:'min(340px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',padding:'22px 24px',textAlign:'center'}}>
-                <div style={{fontSize:28,marginBottom:10}}>📅</div>
+                <div style={{marginBottom:10,display:'flex',justifyContent:'center'}}><Calendar size={28}/></div>
                 <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,marginBottom:6}}>Tandai sebagai Libur?</div>
                 <div style={{fontSize:13,color:'var(--muted2)',marginBottom:20}}>
                     <b style={{color:'var(--accent)'}}>{String(day).padStart(2,'0')} {BULAN_NAMA[bulan]} {tahun}</b>
@@ -973,7 +1019,7 @@ function AddHolidayFromHeaderModal({ day, bulan, tahun, isSaturday, onClose, onS
                 <div style={{display:'flex',gap:10,justifyContent:'center'}}>
                     <button onClick={onClose} style={{padding:'9px 20px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
                     <button onClick={doToggle} disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#C070F0,#7C3AED)',color:'#fff',fontSize:12,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-                        {loading ? '⏳...' : '✓ Jadikan Libur'}
+                        {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Check size={14}/>Jadikan Libur</span>}
                     </button>
                 </div>
             </div>
@@ -990,16 +1036,16 @@ function DeleteHolidayFromHeaderModal({ holiday, onClose, onSaved }) {
     }
     return (
         <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-            onClick={e=>e.target===e.currentTarget&&onClose()}>
+            onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
             <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:14,width:'min(360px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',padding:'20px 22px'}}>
-                <div style={{fontFamily:'Syne,sans-serif',fontSize:14,fontWeight:700,marginBottom:10}}>🗑️ Hapus Hari Libur?</div>
+                <div style={{fontFamily:'Syne,sans-serif',fontSize:14,fontWeight:700,marginBottom:10,display:'flex',alignItems:'center',gap:8}}><Trash2 size={14}/> Hapus Hari Libur?</div>
                 <div style={{fontSize:12.5,color:'var(--muted2)',marginBottom:16}}>
                     <b style={{color:'var(--accent)'}}>{holiday.tanggal_fmt}</b><br/>
                     <span>{holiday.keterangan}</span>
                 </div>
                 <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
                     <button onClick={onClose} style={{padding:'8px 16px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-                    <button onClick={doDelete} style={{padding:'8px 18px',borderRadius:8,border:'none',background:'rgba(224,69,69,.85)',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🗑️ Hapus</button>
+                    <button onClick={doDelete} style={{padding:'8px 18px',borderRadius:8,border:'none',background:'rgba(224,69,69,.85)',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Trash2 size={13}/>Hapus</button>
                 </div>
             </div>
         </div>
@@ -1016,7 +1062,7 @@ function DeleteHolidayFromHeaderModal({ holiday, onClose, onSaved }) {
         return (
             <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',
                 display:'flex',alignItems:'center',justifyContent:'center'}}
-                onClick={e=>e.target===e.currentTarget&&onClose()}>
+                onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
                 <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',
                     borderRadius:16,width:'min(420px,calc(100vw - 24px))',
                     boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
@@ -1024,10 +1070,10 @@ function DeleteHolidayFromHeaderModal({ holiday, onClose, onSaved }) {
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
                         padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
                         <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>
-                            📋 Export Timesheet
+                            <ClipboardList size={14} style={{verticalAlign:-2}}/> Export Timesheet
                         </div>
                         <div onClick={onClose}
-                            style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+                            style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
                     </div>
 
                     <div style={{padding:'20px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -1039,7 +1085,7 @@ function DeleteHolidayFromHeaderModal({ holiday, onClose, onSaved }) {
 
                         <div>
                             <label style={{fontSize:11,color:'var(--muted)',marginBottom:5,display:'block'}}>
-                                👤 HR Project (TTD kiri)
+                                <User size={12} style={{verticalAlign:-2}}/> HR Project (TTD kiri)
                             </label>
                             <input
                                 style={inp}
@@ -1051,7 +1097,7 @@ function DeleteHolidayFromHeaderModal({ holiday, onClose, onSaved }) {
 
                         <div>
                             <label style={{fontSize:11,color:'var(--muted)',marginBottom:5,display:'block'}}>
-                                👤 Project Manager (TTD kanan)
+                                <User size={12} style={{verticalAlign:-2}}/> Project Manager (TTD kanan)
                             </label>
                             <input
                                 style={inp}
@@ -1082,7 +1128,7 @@ function DeleteHolidayFromHeaderModal({ holiday, onClose, onSaved }) {
                                 background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',
                                 color:'#fff',fontSize:12.5,fontWeight:700,
                                 cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                            ⬇️ Download Excel
+                            <Download size={13} style={{verticalAlign:-2}}/> Download Excel
                         </button>
                     </div>
                 </div>
@@ -1115,7 +1161,7 @@ export default function TimesheetPage({
 
     const isDark   = useIsDark();
     const { auth } = usePage().props;
-    const isViewer = auth?.user?.can?.is_viewer || false;
+    const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
 
     const hasSubGroup  = grid.some(e => e.sub_group);
     const activeGrid   = gridTab === 'all' ? grid : grid.filter(e => e.sub_group === gridTab);
@@ -1241,9 +1287,9 @@ export default function TimesheetPage({
             {/* TAB SWITCHER */}
             <div style={{display:'flex',gap:4,marginBottom:16}}>
                 {[
-                    { key:'timesheet',      label:'📅 Timesheet' },
-                    { key:'hari_libur',     label:'🗓️ Hari Libur',     count: all_holidays.length },
-                    { key:'kelola_anggota', label:'👤 Kelola Anggota', count: members.length },
+                    { key:'timesheet',      label:'Timesheet', icon:Calendar },
+                    { key:'hari_libur',     label:'Hari Libur', icon:CalendarX2,     count: all_holidays.length },
+                    { key:'kelola_anggota', label:'Kelola Anggota', icon:User, count: members.length },
                 ].map(t=>(
                     <div key={t.key} onClick={()=>setActiveTab(t.key)}
                         style={{
@@ -1253,7 +1299,7 @@ export default function TimesheetPage({
                             color:       activeTab===t.key ? '#0C0F14' : 'var(--muted)',
                             border: `1px solid ${activeTab===t.key ? 'transparent' : 'var(--border)'}`,
                         }}>
-                        {t.label}
+                        <t.icon size={14}/> {t.label}
                         {t.count !== undefined && (
                             <span style={{
                                 background: activeTab===t.key ? 'rgba(0,0,0,.2)' : 'var(--bg3)',
@@ -1289,7 +1335,7 @@ export default function TimesheetPage({
                         {tahunList.map(y=><option key={y} value={y}>{y}</option>)}
                     </select>
                     <div style={{position:'relative',flex:1,minWidth:180}}>
-                        <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',fontSize:13}}>🔍</span>
+                        <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={13}/></span>
                         <input type="text" style={{...inp,width:'100%',paddingLeft:28}}
                             value={searchVal} placeholder="Cari nama / badge..."
                             onChange={e=>{
@@ -1312,20 +1358,20 @@ export default function TimesheetPage({
                         })}
                         <span style={{fontSize:10.5,padding:'3px 9px',borderRadius:99,background:isDark?'#0D2E1A':'#CCFFCC',color:isDark?'#30D080':'#276221',fontWeight:700}}>Angka = Jam</span>
                         {isMd && <span style={{fontSize:10.5,padding:'3px 9px',borderRadius:99,background:isDark?'rgba(80,60,10,.8)':'#FFF0D0',color:isDark?'#E8A020':'#A06010',fontWeight:700}}>8 Jam Reguler · OT dari Jam ke-9</span>}
-                        <span style={{fontSize:10.5,padding:'3px 9px',borderRadius:99,background:isDark?'rgba(58,26,74,.8)':'#F3E8FF',color:isDark?'#C070F0':'#7E22CE',fontWeight:700}}>🟣 Libur</span>
+                        <span style={{fontSize:10.5,padding:'3px 9px',borderRadius:99,background:isDark?'rgba(58,26,74,.8)':'#F3E8FF',color:isDark?'#C070F0':'#7E22CE',fontWeight:700,display:'inline-flex',alignItems:'center',gap:4}}><Circle size={7} fill="currentColor"/> Libur</span>
                     </div>
                     <button onClick={()=>setShowTtdModal(true)}
                         style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',
                             background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,
                             cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                        📥 Export
+                        <Upload size={13} style={{verticalAlign:-2}}/> Export
                     </button>
                 </div>
 
                 {/* Holiday info bar */}
                 {holidayDays.length > 0 && (
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:10,padding:'8px 14px',borderRadius:8,background:isDark?'rgba(58,26,74,.3)':'#FAF5FF',border:`1px solid ${isDark?'rgba(192,112,240,.2)':'#E9D5FF'}`,fontSize:11.5,color:isDark?'#C070F0':'#7E22CE'}}>
-                        <span>🗓️ Hari libur bulan ini:</span>
+                        <span style={{display:'inline-flex',alignItems:'center',gap:5}}><CalendarX2 size={12}/> Hari libur bulan ini:</span>
                         {holidayDays.map((d,i)=>(
                             <span key={i} style={{background:isDark?'rgba(58,26,74,.5)':'#F3E8FF',padding:'2px 8px',borderRadius:99,fontWeight:600}}>
                                 {d.day} — {d.holiday_label}
@@ -1337,26 +1383,29 @@ export default function TimesheetPage({
                 {hasSubGroup && (
                     <div style={{display:'flex',gap:4,marginBottom:10,flexWrap:'wrap'}}>
                         {[
-                            { key:'all',          label:`👥 Semua (${grid.length})` },
-                            { key:'construction', label:`🏗️ Construction (${grid.filter(e=>e.sub_group==='construction').length})` },
-                            { key:'piling',       label:`🔩 Piling (${grid.filter(e=>e.sub_group==='piling').length})` },
+                            { key:'all', label:`Semua (${grid.length})`, icon:null },
+                            ...Array.from(new Set(grid.map(e=>e.sub_group).filter(Boolean))).map(sg => {
+                                const meta = subGroupMeta(project_info?.kode, sg);
+                                return { key: sg, label: `${meta.label} (${grid.filter(e=>e.sub_group===sg).length})`, icon: meta.icon };
+                            }),
                         ].map(t => (
                             <div key={t.key} onClick={() => setGridTab(t.key)}
                                 style={{
                                     padding:'7px 16px', borderRadius:8, cursor:'pointer',
                                     fontSize:12.5, fontWeight:600, transition:'all .15s',
+                                    display:'inline-flex', alignItems:'center', gap:6,
                                     background: gridTab===t.key ? 'linear-gradient(135deg,#E8A020,#A06010)' : 'var(--card)',
                                     color:       gridTab===t.key ? '#0C0F14' : 'var(--muted)',
                                     border: `1px solid ${gridTab===t.key ? 'transparent' : 'var(--border)'}`,
                                 }}>
-                                {t.label}
+                                {t.icon && <t.icon size={12}/>} {t.label}
                             </div>
                         ))}
                     </div>
                 )}
 
                 <div style={{fontSize:11,color:'var(--muted)',marginBottom:10}}>
-                    💡 Klik sel untuk edit · <b style={{color:'var(--accent)'}}>Enter/Tab</b> simpan · <b style={{color:'var(--accent)'}}>Esc</b> batal · Ketik angka atau <b>I·S·A·C</b>
+                    <Lightbulb size={12} style={{verticalAlign:-2}}/> Klik sel untuk edit · <b style={{color:'var(--accent)'}}>Enter/Tab</b> simpan · <b style={{color:'var(--accent)'}}>Esc</b> batal · Ketik angka atau <b>I·S·A·C</b>
                     {isMd && <span style={{marginLeft:8,color:'var(--accent)'}}>· MD: Sabtu = OT dari jam pertama · Minggu = OT 2x</span>}
                 </div>
 
@@ -1395,7 +1444,7 @@ export default function TimesheetPage({
                                                 onMouseLeave={e => { e.currentTarget.style.filter='none'; }}>
                                                 <div style={{fontSize:9,fontWeight:600,lineHeight:1.2}}>{d.day_name}</div>
                                                 <div style={{fontSize:11,fontWeight:800}}>{d.day}</div>
-                                                {d.is_holiday && !d.is_sunday && <div style={{fontSize:7}}>🟣</div>}
+                                                {d.is_holiday && !d.is_sunday && <div style={{display:'flex',justifyContent:'center'}}><Circle size={7} fill="currentColor"/></div>}
                                             </th>
                                         );
                                     })}

@@ -1,18 +1,22 @@
 // resources/js/Components/DocumentPanel.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import {
+  Camera, CreditCard, Users, Stethoscope, Pill, ClipboardList, ShieldCheck,
+  ScrollText, HardHat, FileText, Folder, X, Download, Upload, Loader2, Eye, Trash2,
+} from 'lucide-react';
 
 const TIPE_CONFIG = {
-  foto:           { label:'Foto Karyawan',        color:'#E8A020', icon:'📷' },
-  ktp:            { label:'KTP',                  color:'#3A8FE0', icon:'💳' },
-  kk:             { label:'Kartu Keluarga',       color:'#22C97A', icon:'👨‍👩‍👧' },
-  bpjs:           { label:'BPJS Ketenagakerjaan', color:'#9B59B6', icon:'🏥' },
-  bpjs_kesehatan: { label:'BPJS Kesehatan',       color:'#3ABCDE', icon:'💊' },
-  cv:             { label:'CV / Curriculum Vitae',color:'#22C97A', icon:'📋' },
-  skck:           { label:'SKCK',                 color:'#E04545', icon:'🚔' },
-  sio:            { label:'Sertifikat SIO',       color:'#E06A20', icon:'📜' },
-  k3u:            { label:'Sertifikat K3U',       color:'#E8A020', icon:'🏗️' },
-  lainnya:        { label:'Dokumen Lainnya',      color:'#6B7494', icon:'📄' },
+  foto:           { label:'Foto Karyawan',        color:'#E8A020', icon:Camera },
+  ktp:            { label:'KTP',                  color:'#3A8FE0', icon:CreditCard },
+  kk:             { label:'Kartu Keluarga',       color:'#22C97A', icon:Users },
+  bpjs:           { label:'BPJS Ketenagakerjaan', color:'#9B59B6', icon:Stethoscope },
+  bpjs_kesehatan: { label:'BPJS Kesehatan',       color:'#3ABCDE', icon:Pill },
+  cv:             { label:'CV / Curriculum Vitae',color:'#22C97A', icon:ClipboardList },
+  skck:           { label:'SKCK',                 color:'#E04545', icon:ShieldCheck },
+  sio:            { label:'Sertifikat SIO',       color:'#E06A20', icon:ScrollText },
+  k3u:            { label:'Sertifikat K3U',       color:'#E8A020', icon:HardHat },
+  lainnya:        { label:'Dokumen Lainnya',      color:'#6B7494', icon:FileText },
 };
 
 export default function DocumentPanel({ employeeId, employeeName }) {
@@ -88,15 +92,15 @@ export default function DocumentPanel({ employeeId, employeeName }) {
         <div style={{position:'fixed',top:0,right:0,bottom:0,left:'var(--sidebar-w, 220px)',zIndex:400,background:'rgba(0,0,0,.8)',display:'flex',flexDirection:'column'}}
           onClick={e=>e.target===e.currentTarget&&setPreview(null)}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 20px',background:'var(--bg2)',borderBottom:'1px solid var(--border)'}}>
-            <div style={{fontSize:13,fontWeight:600}}>📄 {preview.nama}</div>
+            <div style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:6}}><FileText size={15}/> {preview.nama}</div>
             <div style={{display:'flex',gap:8}}>
               <a href={preview.url.replace('/preview','/download')} download
-                style={{padding:'6px 14px',borderRadius:7,background:'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12,fontWeight:600,textDecoration:'none'}}>
-                📥 Download
+                style={{padding:'6px 14px',borderRadius:7,background:'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12,fontWeight:600,textDecoration:'none',display:'flex',alignItems:'center',gap:6}}>
+                <Upload size={14}/> Download
               </a>
               <button type="button" onClick={()=>setPreview(null)}
-                style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted)',cursor:'pointer',fontSize:12}}>
-                ✕ Tutup
+                style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',gap:6}}>
+                <X size={13}/> Tutup
               </button>
             </div>
           </div>
@@ -108,23 +112,23 @@ export default function DocumentPanel({ employeeId, employeeName }) {
       )}
 
       <div style={{marginBottom:24}}>
-        <div style={{fontSize:12,fontWeight:600,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>
-          📁 Dokumen Karyawan
+        <div style={{fontSize:12,fontWeight:600,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:6}}>
+          <Folder size={14}/> Dokumen Karyawan
         </div>
 
         {/* Upload Area */}
         <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:16,padding:'12px 14px',borderRadius:9,background:'var(--bg3)',border:'1px solid var(--border)'}}>
           <select style={{...inp,width:180}} value={tipe} onChange={e=>setTipe(e.target.value)}>
-            <option value="foto">📷 Foto Karyawan</option>
-            <option value="ktp">💳 KTP</option>
-            <option value="kk">👨‍👩‍👧 Kartu Keluarga</option>
-            <option value="bpjs">🏥 BPJS Ketenagakerjaan</option>
-            <option value="bpjs_kesehatan">💊 BPJS Kesehatan</option>
-            <option value="cv">📋 CV / Curriculum Vitae</option>
-            <option value="skck">🚔 SKCK</option>
-            <option value="sio">📜 Sertifikat SIO</option>
-            <option value="k3u">🏗️ Sertifikat K3U</option>
-            <option value="lainnya">📄 Lainnya</option>
+            <option value="foto">Foto Karyawan</option>
+            <option value="ktp">KTP</option>
+            <option value="kk">Kartu Keluarga</option>
+            <option value="bpjs">BPJS Ketenagakerjaan</option>
+            <option value="bpjs_kesehatan">BPJS Kesehatan</option>
+            <option value="cv">CV / Curriculum Vitae</option>
+            <option value="skck">SKCK</option>
+            <option value="sio">Sertifikat SIO</option>
+            <option value="k3u">Sertifikat K3U</option>
+            <option value="lainnya">Lainnya</option>
           </select>
           <label style={{
             padding:'8px 16px', borderRadius:8, cursor:'pointer', fontSize:12.5, fontWeight:600,
@@ -132,7 +136,9 @@ export default function DocumentPanel({ employeeId, employeeName }) {
             display:'flex', alignItems:'center', gap:6,
             opacity: uploading ? .6 : 1,
           }}>
-            {uploading ? '⏳ Mengupload...' : tipe === 'foto' ? '📤 Upload Foto' : '📤 Upload PDF'}
+            {uploading
+              ? <><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> Mengupload...</>
+              : <><Download size={14}/> {tipe === 'foto' ? 'Upload Foto' : 'Upload PDF'}</>}
             <input ref={fileRef} type="file"
               accept={tipe==='foto' ? '.pdf,.jpg,.jpeg,.png' : '.pdf'}
               onChange={handleUpload} disabled={uploading}
@@ -145,7 +151,7 @@ export default function DocumentPanel({ employeeId, employeeName }) {
 
         {/* Docs List */}
         {loading ? (
-          <div style={{padding:20,textAlign:'center',color:'var(--muted)',fontSize:12}}>⏳ Memuat dokumen...</div>
+          <div style={{padding:20,textAlign:'center',color:'var(--muted)',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> Memuat dokumen...</div>
         ) : docs.length === 0 ? (
           <div style={{padding:20,textAlign:'center',color:'var(--muted)',fontSize:12,borderRadius:9,border:'1px dashed var(--border)'}}>
             Belum ada dokumen. Upload KTP atau Sertifikat SIO di atas.
@@ -157,8 +163,8 @@ export default function DocumentPanel({ employeeId, employeeName }) {
               const tc = TIPE_CONFIG[tipeKey] || TIPE_CONFIG.lainnya;
               return (
                 <div key={tipeKey}>
-                  <div style={{fontSize:10.5,fontWeight:700,color:tc.color,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6,marginTop:8}}>
-                    {tc.icon} {tc.label} ({tipeDocs.length})
+                  <div style={{fontSize:10.5,fontWeight:700,color:tc.color,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6,marginTop:8,display:'flex',alignItems:'center',gap:5}}>
+                    <tc.icon size={12}/> {tc.label} ({tipeDocs.length})
                   </div>
                   {tipeDocs.map((doc,i) => (
                     <div key={i} style={{
@@ -167,7 +173,7 @@ export default function DocumentPanel({ employeeId, employeeName }) {
                       background:'var(--bg3)', border:'1px solid var(--border)',
                       marginBottom:4,
                     }}>
-                      <span style={{fontSize:18, flexShrink:0}}>📄</span>
+                      <span style={{flexShrink:0, display:'flex'}}><FileText size={18}/></span>
                       <div style={{flex:1, minWidth:0}}>
                         <div style={{fontSize:12.5, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                           {doc.nama_file}
@@ -180,16 +186,16 @@ export default function DocumentPanel({ employeeId, employeeName }) {
                         <button
                           type="button" onClick={()=>setPreview({url:`/employees/documents/${doc.id}/preview`, nama:doc.nama_file})}
                           style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(58,143,224,.1)',color:'var(--blue)',border:'1px solid rgba(58,143,224,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                          👁️ Lihat
+                          <Eye size={11}/> Lihat
                         </button>
                         <a href={`/employees/documents/${doc.id}/download`}
                           style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(34,201,122,.1)',color:'#22C97A',border:'1px solid rgba(34,201,122,.25)',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>
-                          📥
+                          <Download size={11}/>
                         </a>
                         <button
                           type="button" onClick={()=>handleDelete(doc.id, doc.nama_file)}
                           style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                          🗑️
+                          <Trash2 size={11}/>
                         </button>
                       </div>
                     </div>

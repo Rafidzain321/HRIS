@@ -4,6 +4,12 @@ import AppLayout from '@/Layouts/AppLayout';
 import { router, Link, useForm, usePage } from '@inertiajs/react';
 import { ConfirmModal } from '@/Layouts/AppLayout';
 import axios from 'axios';
+import {
+  Pencil, X, TriangleAlert, Plus, Check, Search, Settings, Upload, Download,
+  Stethoscope, User, CreditCard, CheckCircle2, XCircle, ClipboardList, Trash2,
+  Save, Loader2, RefreshCw, Users, LogOut, Camera, Syringe, ShieldCheck, Shield,
+  ScrollText, Award, Archive, RotateCcw, Bell, Building2,
+} from 'lucide-react';
 
 const avatarColors = ['#3A8FE0','#22C97A','#E8A020','#E04545','#9B59B6','#E06A20','#3ABCDE','#C97A22'];
 function getAv(nama){ return (nama||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase(); }
@@ -19,15 +25,27 @@ function simPill(sim_status,type_sim){
 }
 
 const DOC_TIPES = [
-  { key:'doc_foto',   tipe:'foto',           label:'📷 Foto' },
-  { key:'doc_ktp',    tipe:'ktp',            label:'💳 KTP' },
-  { key:'doc_kk',     tipe:'kk',             label:'👨‍👩‍👧 KK' },
-  { key:'doc_bpjs',   tipe:'bpjs',           label:'🏥 BPJS TK' },
-  { key:'doc_bpjs_k', tipe:'bpjs_kesehatan', label:'💊 BPJS Kes' },
-  { key:'doc_skck',   tipe:'skck',           label:'🚔 SKCK' },
-  { key:'doc_sio',    tipe:'sio',            label:'📜 SIO' },
-  { key:'doc_cv',     tipe:'cv',             label:'📋 CV' },
-  { key:'doc_k3u',    tipe:'k3u',            label:'🏗️ Sertifikat K3U' },
+  { key:'doc_foto',   tipe:'foto',           label:'Foto', icon:Camera },
+  { key:'doc_ktp',    tipe:'ktp',            label:'KTP', icon:CreditCard },
+  { key:'doc_kk',     tipe:'kk',             label:'KK', icon:Users },
+  { key:'doc_bpjs',   tipe:'bpjs',           label:'BPJS TK', icon:Stethoscope },
+  { key:'doc_bpjs_k', tipe:'bpjs_kesehatan', label:'BPJS Kes', icon:Syringe },
+  { key:'doc_skck',   tipe:'skck',           label:'SKCK', icon:ShieldCheck },
+  { key:'doc_sio',    tipe:'sio',            label:'SIO', icon:ScrollText },
+  { key:'doc_cv',     tipe:'cv',             label:'CV', icon:ClipboardList },
+  { key:'doc_k3u',    tipe:'k3u',            label:'Sertifikat K3U', icon:Award },
+];
+const HO_COLS = [
+  { key:'ho_nik',             label:'NIK HO' },
+  { key:'ho_lokasi_kerja',    label:'Lokasi Kerja' },
+  { key:'ho_status_karyawan', label:'Status Karyawan' },
+  { key:'ho_no_kk',           label:'No. KK' },
+  { key:'ho_rt_rw',           label:'RT/RW' },
+  { key:'ho_kelurahan',       label:'Kelurahan' },
+  { key:'ho_kecamatan',       label:'Kecamatan' },
+  { key:'ho_propinsi',        label:'Propinsi' },
+  { key:'ho_npwp',            label:'NPWP' },
+  { key:'ho_email',           label:'Email' },
 ];
 const OPTIONAL_COLS = [
   { key:'sim',       label:'SIM' },
@@ -36,65 +54,87 @@ const OPTIONAL_COLS = [
   { key:'kp',        label:'KP' },
   { key:'badge',     label:'Badge' },
   { key:'tgl_masuk', label:'Tgl Masuk' },
+  { key:'masa_kerja',label:'Masa Pengabdian' },
   { key:'agama',     label:'Agama' },
   { key:'alamat',    label:'Alamat' },
   { key:'umur',      label:'Umur' },
   ...DOC_TIPES.map(d => ({ key: d.key, label: d.label })),
+  ...HO_COLS,
 ];
 const DEFAULT_COLS = ['sim','sio_k3','mcu','kp','badge'];
 
 // ── COLUMN PICKER MODAL ──
-function ColPickerModal({ selected, onClose, onApply }) {
+function ColPickerModal({ selected, onClose, onApply, hideCompliance=false }) {
   const [selectedCols, setSelectedCols] = useState([...selected]);
   function toggle(key) {
     setSelectedCols(prev => prev.includes(key) ? prev.filter(k=>k!==key) : [...prev, key]);
   }
   return (
     <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(480px, calc(100vw - 24px))',maxHeight:'80vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:1}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>⚙️ Pilih Kolom Tampilan</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Settings size={15}/> Pilih Kolom Tampilan</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <div style={{padding:'16px 20px'}}>
           <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:16,padding:'8px 12px',background:'var(--bg3)',borderRadius:8}}>
             NIK, Nama, dan Jabatan selalu tampil. Pilih kolom tambahan di bawah:
           </div>
-          <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10}}>🛡️ Compliance</div>
+          {!hideCompliance && (
+          <>
+          <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><Shield size={12}/> Compliance</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
             {OPTIONAL_COLS.filter(c=>!c.key.startsWith('doc_')&&!['tgl_masuk','agama','alamat'].includes(c.key)).map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
-                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',
+                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',display:'flex',alignItems:'center',gap:5,
                   background:selectedCols.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
                   color:selectedCols.includes(col.key)?'var(--accent)':'var(--muted2)',
                   border:`1px solid ${selectedCols.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
-                {selectedCols.includes(col.key)?'✓ ':''}{col.label}
+                {selectedCols.includes(col.key)&&<Check size={12}/>}{col.label}
               </div>
             ))}
           </div>
-          <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10}}>👤 Data Pribadi</div>
+          </>
+          )}
+          <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><User size={12}/> Data Pribadi</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
-            {OPTIONAL_COLS.filter(c=>['tgl_masuk','agama','alamat'].includes(c.key)).map(col=>(
+            {OPTIONAL_COLS.filter(c=>['tgl_masuk','agama','alamat'].includes(c.key) || (c.key==='masa_kerja' && hideCompliance)).map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
-                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',
+                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',display:'flex',alignItems:'center',gap:5,
                   background:selectedCols.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
                   color:selectedCols.includes(col.key)?'var(--accent)':'var(--muted2)',
                   border:`1px solid ${selectedCols.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
-                {selectedCols.includes(col.key)?'✓ ':''}{col.label}
+                {selectedCols.includes(col.key)&&<Check size={12}/>}{col.label}
               </div>
             ))}
           </div>
-          <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10}}>📁 Dokumen Karyawan</div>
-          <div style={{fontSize:11,color:'var(--muted)',marginBottom:8}}>✅ = sudah upload · ✗ = belum upload</div>
+          {hideCompliance && (
+          <>
+          <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><Building2 size={12}/> Detail HO</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+            {HO_COLS.map(col=>(
+              <div key={col.key} onClick={()=>toggle(col.key)}
+                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',display:'flex',alignItems:'center',gap:5,
+                  background:selectedCols.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
+                  color:selectedCols.includes(col.key)?'var(--accent)':'var(--muted2)',
+                  border:`1px solid ${selectedCols.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
+                {selectedCols.includes(col.key)&&<Check size={12}/>}{col.label}
+              </div>
+            ))}
+          </div>
+          </>
+          )}
+          <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><Archive size={12}/> Dokumen Karyawan</div>
+          <div style={{fontSize:11,color:'var(--muted)',marginBottom:8,display:'flex',alignItems:'center',gap:10}}><span style={{display:'flex',alignItems:'center',gap:3}}><Check size={11} color="#22C97A"/> = sudah upload</span><span style={{display:'flex',alignItems:'center',gap:3}}><X size={11}/> = belum upload</span></div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
             {DOC_TIPES.map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
-                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',
+                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',display:'flex',alignItems:'center',gap:5,
                   background:selectedCols.includes(col.key)?'rgba(34,201,122,.12)':'var(--bg3)',
                   color:selectedCols.includes(col.key)?'#22C97A':'var(--muted2)',
                   border:`1px solid ${selectedCols.includes(col.key)?'#22C97A':'var(--border)'}`}}>
-                {selectedCols.includes(col.key)?'✓ ':''}{col.label}
+                <col.icon size={12}/> {col.label}
               </div>
             ))}
           </div>
@@ -109,8 +149,8 @@ function ColPickerModal({ selected, onClose, onApply }) {
             Batal
           </button>
           <button type="button" onClick={()=>{ onApply(selectedCols); onClose(); }}
-            style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-            ✓ Terapkan
+            style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}>
+            <Check size={14}/> Terapkan
           </button>
         </div>
       </div>
@@ -119,7 +159,7 @@ function ColPickerModal({ selected, onClose, onApply }) {
 }
 
 // ── MODAL IMPORT EXCEL ──
-function ImportModal({ onClose }) {
+function ImportModal({ onClose, isHo=false }) {
   const [file,    setFile]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [result,  setResult]  = useState(null);
@@ -151,16 +191,16 @@ function ImportModal({ onClose }) {
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(560px, calc(100vw - 24px))',maxHeight:'90vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
           <div>
-            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>📥 Import Karyawan dari Excel</div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Upload size={15}/> Import Karyawan dari Excel</div>
             <div style={{fontSize:11.5,color:'var(--muted)',marginTop:2}}>Gunakan template resmi HRIS AKM</div>
           </div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
-        {error && <div style={{margin:'14px 20px 0',padding:'10px 14px',borderRadius:9,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.25)',fontSize:12,color:'#E04545'}}>❌ {error}</div>}
+        {error && <div style={{margin:'14px 20px 0',padding:'10px 14px',borderRadius:9,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.25)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><XCircle size={13}/> {error}</div>}
         {result && (
           <div style={{margin:'16px 20px 0',display:'flex',flexDirection:'column',gap:10}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
@@ -179,7 +219,7 @@ function ImportModal({ onClose }) {
             </div>
             {result.skipped_list?.length > 0 && (
               <div style={{background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',borderRadius:9,padding:'12px 14px'}}>
-                <div style={{fontSize:11.5,fontWeight:600,color:'var(--accent)',marginBottom:8}}>⚠️ Di-skip karena NIK/Badge sudah ada:</div>
+                <div style={{fontSize:11.5,fontWeight:600,color:'var(--accent)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> Di-skip karena NIK/Badge sudah ada:</div>
                 <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:120,overflowY:'auto'}}>
                   {result.skipped_list.map((s,i)=><div key={i} style={{fontSize:11,color:'var(--muted2)'}}>• {s}</div>)}
                 </div>
@@ -187,40 +227,41 @@ function ImportModal({ onClose }) {
             )}
             {result.errors?.length > 0 && (
               <div style={{background:'rgba(224,69,69,.08)',border:'1px solid rgba(224,69,69,.2)',borderRadius:9,padding:'12px 14px'}}>
-                <div style={{fontSize:11.5,fontWeight:600,color:'#E04545',marginBottom:8}}>❌ Error:</div>
+                <div style={{fontSize:11.5,fontWeight:600,color:'#E04545',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><XCircle size={13}/> Error:</div>
                 <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:120,overflowY:'auto'}}>
                   {result.errors.map((err,i)=><div key={i} style={{fontSize:11,color:'#E04545'}}>• {err}</div>)}
                 </div>
               </div>
             )}
-            {result.imported > 0 && <div style={{background:'rgba(34,201,122,.08)',border:'1px solid rgba(34,201,122,.2)',borderRadius:9,padding:'10px 14px',fontSize:12,color:'#22C97A',fontWeight:600}}>✅ {result.imported} karyawan berhasil ditambahkan ke sistem!</div>}
+            {result.imported > 0 && <div style={{background:'rgba(34,201,122,.08)',border:'1px solid rgba(34,201,122,.2)',borderRadius:9,padding:'10px 14px',fontSize:12,color:'#22C97A',fontWeight:600,display:'flex',alignItems:'center',gap:6}}><CheckCircle2 size={14}/> {result.imported} karyawan berhasil ditambahkan ke sistem!</div>}
           </div>
         )}
         <form onSubmit={handleSubmit}>
           <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
             <div style={{background:'rgba(58,143,224,.08)',border:'1px solid rgba(58,143,224,.2)',borderRadius:9,padding:'12px 14px'}}>
-              <div style={{fontSize:12,fontWeight:600,color:'var(--blue)',marginBottom:6}}>📋 Sebelum import, pastikan:</div>
+              <div style={{fontSize:12,fontWeight:600,color:'var(--blue)',marginBottom:6,display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13}/> Sebelum import, pastikan:</div>
               <div style={{fontSize:11.5,color:'var(--muted2)',display:'flex',flexDirection:'column',gap:4}}>
-                <div>✓ Gunakan template resmi (download di bawah)</div>
-                <div>✓ Data diisi mulai baris ke-5</div>
-                <div>✓ Format tanggal: DD-MM-YYYY (ketik sebagai teks)</div>
-                <div>✓ Kolom wajib: ID Badge, Nama Lengkap, Status</div>
-                <div>✓ NIK yang sudah ada akan otomatis di-skip</div>
+                <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Gunakan template resmi (download di bawah)</div>
+                <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Data diisi mulai baris ke-5</div>
+                <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Format tanggal: DD-MM-YYYY (ketik sebagai teks)</div>
+                <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Kolom wajib: {isHo ? 'Nama Lengkap, No. KTP' : 'ID Badge, Nama Lengkap, Status'}</div>
+                <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> NIK yang sudah ada akan otomatis di-skip</div>
+                {isHo && <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Template ini khusus untuk karyawan HO (unit, NIK HO, data KTP, dll)</div>}
               </div>
               <a href="/employees/template-import" style={{display:'inline-flex',alignItems:'center',gap:6,marginTop:10,padding:'6px 14px',borderRadius:7,background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',fontSize:12,fontWeight:600,textDecoration:'none'}}>
-                📥 Download Template Excel
+                <Download size={13}/> Download Template Excel {isHo ? 'HO' : ''}
               </a>
             </div>
             <div>
               <label style={{fontSize:11.5,color:'var(--muted)',marginBottom:6,display:'block'}}>Pilih File Excel (.xlsx)</label>
               <input type="file" accept=".xlsx,.xls" style={{...inp,cursor:'pointer',padding:'7px 12px'}} onChange={e=>{setFile(e.target.files[0]);setResult(null);setError('');}} />
-              {file && <div style={{fontSize:11,color:'var(--green)',marginTop:4}}>✓ {file.name} ({(file.size/1024).toFixed(1)} KB)</div>}
+              {file && <div style={{fontSize:11,color:'var(--green)',marginTop:4,display:'flex',alignItems:'center',gap:5}}><Check size={12}/> {file.name} ({(file.size/1024).toFixed(1)} KB)</div>}
             </div>
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>{result ? 'Tutup' : 'Batal'}</button>
             <button type="submit" disabled={loading||!file} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading||!file?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading||!file?0.6:1}}>
-              {loading ? '⏳ Mengimport...' : '📥 Import Sekarang'}
+              {loading ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>Mengimport...</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Upload size={14}/>Import Sekarang</span>}
             </button>
           </div>
         </form>
@@ -230,7 +271,7 @@ function ImportModal({ onClose }) {
 }
 
 // ── MODAL TAMBAH KARYAWAN ──
-function TambahModal({ jabatan_list, projects, onClose }) {
+function TambahModal({ jabatan_list, projects, onClose, isHo=false, isSuperAdmin=false }) {
   const [badgeOwner, setBadgeOwner] = React.useState(null);
   const { data, setData, post, processing, errors, reset } = useForm({
     nama_lengkap:'', id_badge:'', no_ktp:'', no_telepon:'',
@@ -238,11 +279,19 @@ function TambahModal({ jabatan_list, projects, onClose }) {
     nama_ibu:'', ptkp:'', agama:'', project_id:'',
     status:'AKTIF', status_mcu:'', lokasi_mcu:'', tgl_mcu:'', exp_mcu:'',
     derajat_kesehatan:'',
+    ho_detail: { unit:'', nik_ho:'', lokasi_kerja:'', status_karyawan:'', no_kk:'', rt_rw:'', kelurahan:'', kecamatan:'', propinsi:'', npwp:'', email:'' },
   });
   const inp = { background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)', borderRadius:8, padding:'8px 11px', fontSize:12.5, fontFamily:"'Outfit',sans-serif", outline:'none', width:'100%', boxSizing:'border-box' };
 
-  // Cek apakah user adalah super admin (ada prop projects)
-  const isSuperAdmin = projects && projects.length > 0;
+  // Super admin memilih project lewat dropdown di modal ini sendiri, jadi status HO
+  // ditentukan dari project yang sedang dipilih; non-super-admin ikut project_info halaman.
+  const resolvedIsHo = isSuperAdmin
+    ? projects.find(p => String(p.id) === String(data.project_id))?.tipe_gaji === 'ho'
+    : isHo;
+
+  function setHoDetail(field, value) {
+    setData('ho_detail', { ...data.ho_detail, [field]: value });
+  }
 
   function submit(e) {
     e.preventDefault();
@@ -250,22 +299,22 @@ function TambahModal({ jabatan_list, projects, onClose }) {
   }
   return (
     <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(680px, calc(100vw - 24px))',maxHeight:'90vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:10}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>➕ Tambah Karyawan Baru</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Plus size={15}/> Tambah Karyawan Baru</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px 16px'}}>
-            <div style={{gridColumn:'1/-1',fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',paddingBottom:6,borderBottom:'1px solid var(--border)'}}>👤 Identitas</div>
+            <div style={{gridColumn:'1/-1',fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',paddingBottom:6,borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:6}}><User size={12}/> Identitas</div>
             <div style={{gridColumn:'1/-1'}}>
               <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Nama Lengkap *</label>
               <input type="text" style={{...inp,borderColor:errors.nama_lengkap?'#E04545':'var(--border)'}} value={data.nama_lengkap} onChange={e=>setData('nama_lengkap',e.target.value)} placeholder="NAMA LENGKAP SESUAI KTP" />
-              {errors.nama_lengkap && <div style={{fontSize:10.5,color:'#E04545',marginTop:3}}>⚠️ {errors.nama_lengkap}</div>}
+              {errors.nama_lengkap && <div style={{fontSize:10.5,color:'#E04545',marginTop:3,display:'flex',alignItems:'center',gap:4}}><TriangleAlert size={11}/>{errors.nama_lengkap}</div>}
             </div>
             <div>
-              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>ID Badge *</label>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>ID Badge{resolvedIsHo?'':' *'}</label>
               <input type="text" style={{...inp,borderColor:errors.id_badge||badgeOwner?'#E04545':'var(--border)'}}
                 defaultValue={data.id_badge}
                 onBlur={async e => {
@@ -281,17 +330,17 @@ function TambahModal({ jabatan_list, projects, onClose }) {
                 }} />
               {badgeOwner && !errors.id_badge && (
                 <div style={{fontSize:10.5,color:'#E04545',marginTop:3}}>
-                  ⚠️ Badge ini sudah digunakan oleh <b>{badgeOwner}</b>
+                  <TriangleAlert size={11} style={{verticalAlign:-2}}/> Badge ini sudah digunakan oleh <b>{badgeOwner}</b>
                 </div>
               )}
               {errors.id_badge && (
-                <div style={{fontSize:10.5,color:'#E04545',marginTop:3}}>⚠️ {errors.id_badge}</div>
+                <div style={{fontSize:10.5,color:'#E04545',marginTop:3,display:'flex',alignItems:'center',gap:4}}><TriangleAlert size={11}/>{errors.id_badge}</div>
               )}
             </div>
             <div>
               <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>No. KTP</label>
               <input type="text" style={{...inp,borderColor:errors.no_ktp?'#E04545':'var(--border)'}} defaultValue={data.no_ktp} onBlur={e=>setData('no_ktp',e.target.value)} />
-              {errors.no_ktp && <div style={{fontSize:10.5,color:'#E04545',marginTop:3}}>⚠️ {errors.no_ktp}</div>}
+              {errors.no_ktp && <div style={{fontSize:10.5,color:'#E04545',marginTop:3,display:'flex',alignItems:'center',gap:4}}><TriangleAlert size={11}/>{errors.no_ktp}</div>}
             </div>
             <div>
               <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>No. Telepon</label>
@@ -350,7 +399,7 @@ function TambahModal({ jabatan_list, projects, onClose }) {
                   <option value="">— Pilih Project —</option>
                   {projects.map(p=><option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>)}
                 </select>
-                {errors.project_id && <div style={{fontSize:10.5,color:'#E04545',marginTop:3}}>⚠️ {errors.project_id}</div>}
+                {errors.project_id && <div style={{fontSize:10.5,color:'#E04545',marginTop:3,display:'flex',alignItems:'center',gap:4}}><TriangleAlert size={11}/>{errors.project_id}</div>}
               </div>
             )}
             <div>
@@ -360,7 +409,8 @@ function TambahModal({ jabatan_list, projects, onClose }) {
                 {['TK/0','TK/1','TK/2','TK/3','K/0','K/1','K/2','K/3'].map(v=><option key={v} value={v}>{v}</option>)}
               </select>
             </div>
-            <div style={{gridColumn:'1/-1',fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',paddingBottom:6,borderBottom:'1px solid var(--border)',marginTop:6}}>🏥 MCU</div>
+            {!resolvedIsHo && (<>
+            <div style={{gridColumn:'1/-1',fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',paddingBottom:6,borderBottom:'1px solid var(--border)',marginTop:6,display:'flex',alignItems:'center',gap:6}}><Stethoscope size={12}/> MCU</div>
             <div>
               <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Status MCU</label>
               <select style={inp} value={data.status_mcu} onChange={e=>setData('status_mcu',e.target.value)}>
@@ -385,11 +435,63 @@ function TambahModal({ jabatan_list, projects, onClose }) {
               <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Expired MCU</label>
               <input type="date" style={inp} value={data.exp_mcu} onChange={e=>setData('exp_mcu',e.target.value)} />
             </div>
+            </>)}
+            {resolvedIsHo && (<>
+            <div style={{gridColumn:'1/-1',fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',paddingBottom:6,borderBottom:'1px solid var(--border)',marginTop:6,display:'flex',alignItems:'center',gap:6}}><Building2 size={12}/> Detail HO</div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Unit</label>
+              <select style={inp} value={data.ho_detail.unit} onChange={e=>setHoDetail('unit',e.target.value)}>
+                <option value="">— Pilih —</option>
+                <option value="HO-1">HO-1</option>
+                <option value="HO-2">HO-2</option>
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>NIK HO</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.nik_ho} onBlur={e=>setHoDetail('nik_ho',e.target.value)} />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Status Karyawan</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.status_karyawan} onBlur={e=>setHoDetail('status_karyawan',e.target.value)} placeholder="cth: Karyawan Tetap" />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Lokasi Kerja</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.lokasi_kerja} onBlur={e=>setHoDetail('lokasi_kerja',e.target.value)} />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>No. KK</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.no_kk} onBlur={e=>setHoDetail('no_kk',e.target.value)} />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>RT/RW</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.rt_rw} onBlur={e=>setHoDetail('rt_rw',e.target.value)} />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Kelurahan</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.kelurahan} onBlur={e=>setHoDetail('kelurahan',e.target.value)} />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Kecamatan</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.kecamatan} onBlur={e=>setHoDetail('kecamatan',e.target.value)} />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Propinsi</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.propinsi} onBlur={e=>setHoDetail('propinsi',e.target.value)} />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>NPWP</label>
+              <input type="text" style={inp} defaultValue={data.ho_detail.npwp} onBlur={e=>setHoDetail('npwp',e.target.value)} />
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Email</label>
+              <input type="email" style={inp} defaultValue={data.ho_detail.email} onBlur={e=>setHoDetail('email',e.target.value)} />
+            </div>
+            </>)}
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)',position:'sticky',bottom:0,background:'var(--bg2)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
             <button type="submit" disabled={processing} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:processing?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:processing?0.7:1}}>
-              {processing ? '⏳ Menyimpan...' : '💾 Simpan'}
+              {processing ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>Menyimpan...</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan</span>}
             </button>
           </div>
         </form>
@@ -411,17 +513,17 @@ function TerminationModal({ employee, onClose }) {
     router.post(`/employees/${employee.id}/terminate`, form, { onSuccess: ()=>{setLoading(false);onClose();}, onError: ()=>setLoading(false) });
   }
   return (
-    <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid rgba(224,69,69,.3)',borderRadius:16,width:'min(480px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.6)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
           <div>
-            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,color:'#E04545'}}>🚪 Termination Karyawan</div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,color:'#E04545',display:'flex',alignItems:'center',gap:8}}><LogOut size={15}/> Termination Karyawan</div>
             <div style={{fontSize:11.5,color:'var(--muted)',marginTop:2}}>{employee.nama_lengkap} · {employee.id_badge}</div>
           </div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <div style={{margin:'16px 20px 0',padding:'10px 14px',borderRadius:8,background:'rgba(224,69,69,.08)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#F09090',lineHeight:1.5}}>
-          ⚠️ Karyawan ini akan dipindahkan ke <b>tab Terminated</b>. Data tidak dihapus — tetap bisa dilihat sebagai arsip.
+          <TriangleAlert size={12} style={{verticalAlign:-2}}/> Karyawan ini akan dipindahkan ke <b>tab Terminated</b>. Data tidak dihapus — tetap bisa dilihat sebagai arsip.
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -444,7 +546,7 @@ function TerminationModal({ employee, onClose }) {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
             <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E04545,#A03030)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?0.7:1}}>
-              {loading ? '⏳ Memproses...' : '🚪 Konfirmasi Termination'}
+              {loading ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>Memproses...</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><LogOut size={14}/>Konfirmasi Termination</span>}
             </button>
           </div>
         </form>
@@ -466,14 +568,14 @@ function EditTerminatedModal({ employee, onClose }) {
     router.put(`/employees/${employee.id}/terminate-update`, form, { onSuccess:()=>{setLoading(false);onClose();}, onError:()=>setLoading(false) });
   }
   return (
-    <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(480px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.6)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
           <div>
-            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>✏️ Edit Data Terminated</div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Pencil size={15}/> Edit Data Terminated</div>
             <div style={{fontSize:11.5,color:'var(--muted)',marginTop:2}}>{employee.nama_lengkap} · {employee.id_badge}</div>
           </div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -496,7 +598,7 @@ function EditTerminatedModal({ employee, onClose }) {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
             <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?0.7:1}}>
-              {loading?'⏳...':'💾 Simpan'}
+              {loading?<Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>:<span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan</span>}
             </button>
           </div>
         </form>
@@ -540,15 +642,15 @@ function PindahProjectModal({ employee, projects, isSuperAdmin, onClose, onSucce
     setLoading(false);
   }
   return (
-    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(460px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',overflow:'hidden'}}>
         <div style={{height:4,background:'linear-gradient(90deg,#3A8FE0,#22C97A)'}}/>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
           <div>
-            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>🔄 {isSuperAdmin ? 'Pindah Project' : 'Ajukan Mutasi'}</div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><RefreshCw size={15}/> {isSuperAdmin ? 'Pindah Project' : 'Ajukan Mutasi'}</div>
             <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{employee.nama_lengkap} · {employee.jabatan}</div>
           </div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -569,15 +671,147 @@ function PindahProjectModal({ employee, projects, isSuperAdmin, onClose, onSucce
             </div>
             {!isSuperAdmin && (
               <div style={{padding:'10px 14px',borderRadius:8,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',fontSize:11.5,color:'var(--muted2)'}}>
-                ⏳ Pengajuan akan dikirim ke Super Admin untuk disetujui. Karyawan belum pindah sampai disetujui.
+                <Loader2 size={12} style={{verticalAlign:-2}}/> Pengajuan akan dikirim ke Super Admin untuk disetujui. Karyawan belum pindah sampai disetujui.
               </div>
             )}
-            {error && <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#E04545'}}>⚠️ {error}</div>}
+            {error && <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> {error}</div>}
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
             <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:isSuperAdmin?'linear-gradient(135deg,#3A8FE0,#1A5FA0)':'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-              {loading ? '⏳...' : isSuperAdmin ? '🔄 Pindahkan Sekarang' : '📤 Kirim Pengajuan'}
+              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : isSuperAdmin ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><RefreshCw size={14}/>Pindahkan Sekarang</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Download size={14}/>Kirim Pengajuan</span>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL PINDAH PROJECT MASSAL ──
+function BulkPindahProjectModal({ employeeIds, count, projects, isSuperAdmin, onClose, onSuccess }) {
+  const [toProjectId, setToProjectId] = useState('');
+  const [catatan,     setCatatan]     = useState('');
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState('');
+
+  const inp = { background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)', borderRadius:8, padding:'8px 11px', fontSize:12.5, fontFamily:"'Outfit',sans-serif", outline:'none', width:'100%', boxSizing:'border-box' };
+  async function submit(e) {
+    e.preventDefault();
+    if (!toProjectId) { setError('Pilih project tujuan.'); return; }
+    setLoading(true); setError('');
+    try {
+      const res = await axios.post('/employees/transfer-bulk', { employee_ids: employeeIds, to_project_id: toProjectId, catatan }, { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content } });
+      if (res.data.ok) {
+        onSuccess(res.data.message);
+        onClose();
+      } else {
+        setError(res.data.message);
+      }
+    } catch (err) { setError(err.response?.data?.message || 'Terjadi kesalahan.'); }
+    setLoading(false);
+  }
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(460px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',overflow:'hidden'}}>
+        <div style={{height:4,background:'linear-gradient(90deg,#3A8FE0,#22C97A)'}}/>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><RefreshCw size={15}/> {isSuperAdmin ? 'Pindah Project Massal' : 'Ajukan Mutasi Massal'}</div>
+            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{count} karyawan terpilih</div>
+          </div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
+        </div>
+        <form onSubmit={submit}>
+          <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Project Tujuan *</label>
+              <select style={inp} value={toProjectId} onChange={e=>setToProjectId(e.target.value)}>
+                <option value="">— Pilih Project —</option>
+                {projects.map(p=><option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Catatan {isSuperAdmin ? '(opsional)' : '(alasan mutasi)'}</label>
+              <textarea style={{...inp,minHeight:80,resize:'vertical'}} value={catatan} onChange={e=>setCatatan(e.target.value)} placeholder={isSuperAdmin ? 'Alasan pemindahan...' : 'Jelaskan alasan pengajuan mutasi...'} />
+            </div>
+            {!isSuperAdmin && (
+              <div style={{padding:'10px 14px',borderRadius:8,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',fontSize:11.5,color:'var(--muted2)'}}>
+                <Loader2 size={12} style={{verticalAlign:-2}}/> Pengajuan akan dikirim ke Super Admin untuk disetujui. Karyawan belum pindah sampai disetujui.
+              </div>
+            )}
+            {error && <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> {error}</div>}
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
+            <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
+            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:isSuperAdmin?'linear-gradient(135deg,#3A8FE0,#1A5FA0)':'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
+              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : isSuperAdmin ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><RefreshCw size={14}/>Pindahkan Sekarang</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Download size={14}/>Kirim Pengajuan</span>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL PINDAH UNIT HO ──
+function PindahUnitHoModal({ employee, onClose, onSuccess }) {
+  const [toUnit,  setToUnit]  = useState('');
+  const [catatan, setCatatan] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+
+  const availableUnits = ['HO-1', 'HO-2'].filter(u => u !== employee.ho_unit);
+  const inp = { background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)', borderRadius:8, padding:'8px 11px', fontSize:12.5, fontFamily:"'Outfit',sans-serif", outline:'none', width:'100%', boxSizing:'border-box' };
+  async function submit(e) {
+    e.preventDefault();
+    if (!toUnit) { setError('Pilih unit tujuan.'); return; }
+    setLoading(true); setError('');
+    try {
+      const res = await axios.post(`/employees/${employee.id}/pindah-unit-ho`, { unit: toUnit, catatan }, { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content } });
+      if (res.data.ok) {
+        onSuccess(res.data.message);
+        onClose();
+      } else {
+        setError(res.data.message);
+      }
+    } catch (err) { setError(err.response?.data?.message || 'Terjadi kesalahan.'); }
+    setLoading(false);
+  }
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(460px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',overflow:'hidden'}}>
+        <div style={{height:4,background:'linear-gradient(90deg,#3A8FE0,#22C97A)'}}/>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Building2 size={15}/> Pindah Unit HO</div>
+            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{employee.nama_lengkap} · {employee.jabatan}</div>
+          </div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
+        </div>
+        <form onSubmit={submit}>
+          <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{padding:'10px 14px',borderRadius:9,background:'rgba(58,143,224,.08)',border:'1px solid rgba(58,143,224,.2)',fontSize:12}}>
+              <div style={{color:'var(--muted)',marginBottom:4}}>Unit saat ini:</div>
+              <div style={{fontWeight:700,color:'var(--blue)'}}>{employee.ho_unit || 'Belum ditentukan'}</div>
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Unit Tujuan *</label>
+              <select style={inp} value={toUnit} onChange={e=>setToUnit(e.target.value)}>
+                <option value="">— Pilih Unit —</option>
+                {availableUnits.map(u=><option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Catatan (opsional)</label>
+              <textarea style={{...inp,minHeight:70,resize:'vertical'}} value={catatan} onChange={e=>setCatatan(e.target.value)} placeholder="Alasan pemindahan unit..." />
+            </div>
+            {error && <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> {error}</div>}
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
+            <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
+            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
+              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><RefreshCw size={14}/>Pindahkan Sekarang</span>}
             </button>
           </div>
         </form>
@@ -602,12 +836,12 @@ function ApprovalModal({ transfer, action, onClose, onSuccess }) {
     setLoading(false);
   }
   return (
-    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(440px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',overflow:'hidden'}}>
         <div style={{height:4,background:isApprove?'linear-gradient(90deg,#22C97A,#148050)':'linear-gradient(90deg,#E04545,#A01010)'}}/>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>{isApprove ? '✅ Setujui Mutasi' : '❌ Tolak Mutasi'}</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}>{isApprove ? <><CheckCircle2 size={15}/> Setujui Mutasi</> : <><XCircle size={15}/> Tolak Mutasi</>}</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -624,7 +858,7 @@ function ApprovalModal({ transfer, action, onClose, onSuccess }) {
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
             <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:isApprove?'linear-gradient(135deg,#22C97A,#148050)':'linear-gradient(135deg,#E04545,#A01010)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-              {loading?'⏳...':isApprove?'✅ Setujui':'❌ Tolak'}
+              {loading?<Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>:isApprove?<span style={{display:'inline-flex',alignItems:'center',gap:6}}><CheckCircle2 size={14}/>Setujui</span>:<span style={{display:'inline-flex',alignItems:'center',gap:6}}><XCircle size={14}/>Tolak</span>}
             </button>
           </div>
         </form>
@@ -658,11 +892,11 @@ function TabPindahProject({ isSuperAdmin, userProjectId, isViewer }) {
   };
   const filtered = (data?.transfers||[]).filter(t => filterStatus === 'all' ? true : t.status === filterStatus);
 
-  if (loading) return <div style={{padding:40,textAlign:'center',color:'var(--muted)'}}>⏳ Memuat...</div>;
+  if (loading) return <div style={{padding:40,textAlign:'center',color:'var(--muted)',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>Memuat...</div>;
 
   return (
     <div>
-      {flashMsg && <div style={{marginBottom:14,padding:'10px 16px',borderRadius:8,background:'rgba(34,201,122,.1)',border:'1px solid rgba(34,201,122,.25)',fontSize:12.5,color:'#22C97A'}}>✅ {flashMsg}</div>}
+      {flashMsg && <div style={{marginBottom:14,padding:'10px 16px',borderRadius:8,background:'rgba(34,201,122,.1)',border:'1px solid rgba(34,201,122,.25)',fontSize:12.5,color:'#22C97A',display:'flex',alignItems:'center',gap:6}}><CheckCircle2 size={14}/> {flashMsg}</div>}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
         <div>
           <div style={{fontSize:13,fontWeight:600}}>Pengajuan Pindah Project</div>
@@ -686,7 +920,7 @@ function TabPindahProject({ isSuperAdmin, userProjectId, isViewer }) {
       </div>
       {isSuperAdmin && data?.pending_count > 0 && (
         <div style={{marginBottom:14,padding:'10px 16px',borderRadius:8,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.25)',fontSize:12.5,color:'var(--accent)',display:'flex',alignItems:'center',gap:8}}>
-          🔔 Ada <b>{data.pending_count}</b> pengajuan mutasi yang menunggu persetujuan kamu.
+          <Bell size={13} style={{verticalAlign:-2}}/> Ada <b>{data.pending_count}</b> pengajuan mutasi yang menunggu persetujuan kamu.
         </div>
       )}
       <div className="panel" style={{overflow:'hidden'}}>
@@ -733,8 +967,8 @@ function TabPindahProject({ isSuperAdmin, userProjectId, isViewer }) {
                       <td style={{textAlign:'center'}}>
                         {t.status === 'pending' ? (
                           <div style={{display:'flex',gap:5,justifyContent:'center'}}>
-                            <button onClick={()=>setApprovalModal({transfer:t,action:'approve'})} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(34,201,122,.12)',color:'#22C97A',border:'1px solid rgba(34,201,122,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>✅ Setujui</button>
-                            <button onClick={()=>setApprovalModal({transfer:t,action:'reject'})}  style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>❌ Tolak</button>
+                            <button onClick={()=>setApprovalModal({transfer:t,action:'approve'})} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(34,201,122,.12)',color:'#22C97A',border:'1px solid rgba(34,201,122,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><CheckCircle2 size={12}/>Setujui</button>
+                            <button onClick={()=>setApprovalModal({transfer:t,action:'reject'})}  style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><XCircle size={12}/>Tolak</button>
                           </div>
                         ) : <span style={{fontSize:11,color:'var(--muted)'}}>—</span>}
                       </td>
@@ -752,25 +986,67 @@ function TabPindahProject({ isSuperAdmin, userProjectId, isViewer }) {
 }
 
 // ── TABEL AKTIF ──
-function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jabatan_list, projects, search, jabatan, stats, onTerminate, onPindah, isSuperAdmin, activeProjectId}) {
+function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jabatan_list, projects, search, jabatan, stats, onTerminate, onPindah, isSuperAdmin, activeProjectId, project_info}) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
+  const isHo = project_info?.tipe_gaji === 'ho';
   const [showAdd,    setShowAdd]    = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [searchVal,  setSearchVal]  = useState(search);
   const [jabatanVal, setJabatanVal] = useState(jabatan);
+  const [hoUnitTab,  setHoUnitTab]  = useState('all');
+  const [selectedIds,   setSelectedIds]   = useState([]);
+  const [showBulkPindah, setShowBulkPindah] = useState(false);
+  const [bulkFlash,     setBulkFlash]     = useState('');
+  const projectColsKey = `emp-table-cols-${project_info?.kode || 'all'}`;
   const [activeCols, setActiveCols] = useState(() => {
-    try { const saved = localStorage.getItem('emp-table-cols'); return saved ? JSON.parse(saved) : DEFAULT_COLS; }
+    try { const saved = localStorage.getItem(projectColsKey); return saved ? JSON.parse(saved) : DEFAULT_COLS; }
     catch { return DEFAULT_COLS; }
   });
+  // Pengaturan kolom disimpan terpisah per project (kunci localStorage beda per kode
+  // project) supaya tidak tercampur — misalnya kolom yang dipilih untuk HO tidak ikut
+  // muncul saat pindah ke Giam/Khawista/Purnama/MD, begitu juga sebaliknya.
+  useEffect(() => {
+    try { const saved = localStorage.getItem(projectColsKey); setActiveCols(saved ? JSON.parse(saved) : DEFAULT_COLS); }
+    catch { setActiveCols(DEFAULT_COLS); }
+  }, [projectColsKey]);
 
-  function applyCols(cols) { setActiveCols(cols); localStorage.setItem('emp-table-cols', JSON.stringify(cols)); }
+  // Reset seleksi checkbox tiap kali data berubah (ganti halaman/filter/reload)
+  useEffect(() => { setSelectedIds([]); }, [data]);
+
+  // HO tidak punya compliance (SIM/SIO/MCU/KP/Badge) — sembunyikan kolom itu meski tersimpan di preferensi user.
+  const visibleCols = isHo
+    ? activeCols.filter(k => !['sim','sio_k3','mcu','kp','badge'].includes(k))
+    : activeCols.filter(k => k !== 'masa_kerja');
+  const displayData = isHo && hoUnitTab !== 'all' ? data.filter(e => e.ho_unit === hoUnitTab) : data;
+
+  function applyCols(cols) { setActiveCols(cols); localStorage.setItem(projectColsKey, JSON.stringify(cols)); }
   function doFilter(s, j) { router.get('/employees', {search:s, jabatan:j}, {preserveState:true, replace:true}); }
+  function toggleOne(id) { setSelectedIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]); }
+  function toggleAll() {
+    const pageIds = displayData.map(e=>e.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id));
+    setSelectedIds(allSelected ? selectedIds.filter(id => !pageIds.includes(id)) : [...new Set([...selectedIds, ...pageIds])]);
+  }
 
   const FIXED_FILTERS = ['', 'Driver Dump Truck', 'Spotter', 'HES Man'];
   const isCustomFilter = jabatanVal && !FIXED_FILTERS.includes(jabatanVal) && jabatanVal !== 'PMCOW';
-  const quickStats = [
+
+  // HO tidak punya jabatan lapangan tetap seperti project lain — card jabatan menyesuaikan
+  // jabatan yang paling banyak muncul di unit (Semua/HO-1/HO-2) yang sedang dipilih.
+  const hoStats = isHo ? (stats.ho?.[hoUnitTab] || { total: 0, top_jabatan: [] }) : null;
+  const HO_CARD_COLORS = ['#E8A020', '#22C97A', '#9B59B6', '#E06A20'];
+  const quickStats = isHo ? (() => {
+    const cards = [
+      { label:'Total Aktif', val: hoStats.total || 0, color:'#3A8FE0', filter: '' },
+      ...hoStats.top_jabatan.map((j,i) => ({ label:j.label, val:j.val, color:HO_CARD_COLORS[i % HO_CARD_COLORS.length], filter:j.label })),
+    ];
+    if (jabatanVal && !hoStats.top_jabatan.some(j => j.label === jabatanVal)) {
+      cards.push({ label: jabatanVal, val: total, color:'#9B59B6', filter: jabatanVal });
+    }
+    return cards;
+  })() : [
     { label:'Total Aktif',       val: stats.total      || 0, color:'#3A8FE0', filter: '' },
     { label:'Driver Dump Truck', val: stats.dump_truck || 0, color:'#E8A020', filter: 'Driver Dump Truck' },
     { label:'Spotter',           val: stats.spotter    || 0, color:'#22C97A', filter: 'Spotter' },
@@ -788,14 +1064,18 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
       case 'kp':        return <td key={colKey}><Pill type={e.status_kp?'green':'gray'}>{e.status_kp?'Ada':'—'}</Pill></td>;
       case 'badge':     return <td key={colKey}><Pill type={e.badge_status==='expired'?'red':e.badge_status==='warning'?'warn':e.badge_status==='valid'?'green':'gray'}>{e.badge_status==='expired'?'Expired':e.badge_status==='warning'?'<30hr':e.badge_status==='valid'?'Valid':'—'}</Pill></td>;
       case 'tgl_masuk': return <td key={colKey} style={{fontSize:11.5,color:'var(--muted2)',whiteSpace:'nowrap'}}>{e.tanggal_masuk||'—'}</td>;
+      case 'masa_kerja': return <td key={colKey} style={{fontSize:11.5,color:'var(--muted2)',whiteSpace:'nowrap'}}>{e.masa_kerja||'—'}</td>;
       case 'agama':     return <td key={colKey} style={{fontSize:11.5,color:'var(--muted2)'}}>{e.agama||'—'}</td>;
       case 'alamat':    return <td key={colKey} style={{fontSize:11,color:'var(--muted)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.alamat||'—'}</td>;
-      case 'umur':      return (<td key={colKey} style={{textAlign:'center'}}>{e.umur!=null?(<span style={{fontSize:12,fontWeight:600,color:e.umur>=56?'#E04545':e.umur>=53?'var(--accent)':'var(--text)'}}>{e.umur} thn{e.umur>=56&&<span style={{marginLeft:4,fontSize:10}}>⚠️</span>}</span>):<span style={{color:'var(--muted)'}}>—</span>}</td>);
+      case 'umur':      return (<td key={colKey} style={{textAlign:'center',whiteSpace:'nowrap'}}>{e.umur!=null?(<span style={{fontSize:12,fontWeight:600,color:e.umur>=56?'#E04545':e.umur>=53?'var(--accent)':'var(--text)'}}>{e.umur} thn{e.umur>=56&&<span style={{marginLeft:4,display:'inline-flex'}}><TriangleAlert size={10}/></span>}</span>):<span style={{color:'var(--muted)'}}>—</span>}</td>);
       default: {
+        if (colKey.startsWith('ho_')) {
+          return <td key={colKey} style={{fontSize:11.5,color:'var(--muted2)'}}>{e[colKey]||'—'}</td>;
+        }
         const docDef = DOC_TIPES.find(d => d.key === colKey);
         if (docDef) {
           const hasDoc = (e.docs||[]).includes(docDef.tipe);
-          return <td key={colKey} style={{textAlign:'center'}}>{hasDoc ? <span style={{color:'#22C97A',fontSize:14}}>✅</span> : <span style={{color:'var(--muted)',fontSize:13}}>✗</span>}</td>;
+          return <td key={colKey} style={{textAlign:'center'}}>{hasDoc ? <span style={{color:'#22C97A',display:'flex',justifyContent:'center'}}><Check size={14}/></span> : <span style={{color:'var(--muted)',display:'flex',justifyContent:'center'}}><X size={13}/></span>}</td>;
         }
         return <td key={colKey}>—</td>;
       }
@@ -803,14 +1083,32 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
   }
   function renderHeader(colKey) {
     const col = OPTIONAL_COLS.find(c => c.key === colKey);
-    return <th key={colKey} style={{textAlign:colKey.startsWith('doc_')?'center':undefined}}>{col?.label||colKey}</th>;
+    const compact = colKey !== 'alamat';
+    return <th key={colKey} style={{textAlign:colKey.startsWith('doc_')?'center':undefined, whiteSpace:compact?'nowrap':undefined, width:compact?'1%':undefined}}>{col?.label||colKey}</th>;
   }
 
   return (
     <>
-      {showAdd    && <TambahModal jabatan_list={jabatan_list} projects={projects} onClose={()=>setShowAdd(false)} />}
-      {showImport && <ImportModal onClose={()=>setShowImport(false)} />}
-      {showPicker && <ColPickerModal selected={activeCols} onClose={()=>setShowPicker(false)} onApply={applyCols} />}
+      {showAdd    && <TambahModal jabatan_list={jabatan_list} projects={projects} onClose={()=>setShowAdd(false)} isHo={isHo} isSuperAdmin={isSuperAdmin} />}
+      {showImport && <ImportModal onClose={()=>setShowImport(false)} isHo={isHo} />}
+      {showPicker && <ColPickerModal selected={activeCols} onClose={()=>setShowPicker(false)} onApply={applyCols} hideCompliance={isHo} />}
+      {showBulkPindah && (
+        <BulkPindahProjectModal
+          employeeIds={selectedIds}
+          count={selectedIds.length}
+          projects={projects}
+          isSuperAdmin={isSuperAdmin}
+          onClose={()=>setShowBulkPindah(false)}
+          onSuccess={(msg)=>{
+            setBulkFlash(msg);
+            setSelectedIds([]);
+            router.visit(window.location.pathname + window.location.search, {
+              preserveScroll: true,
+              onSuccess: () => setTimeout(() => setBulkFlash(''), 5000),
+            });
+          }}
+        />
+      )}
       <div style={{display:'flex',gap:12,marginBottom:14}}>
         {quickStats.map((q,i)=>{
           const isActive = jabatanVal === q.filter;
@@ -829,67 +1127,107 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
       </div>
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">👤 Data Karyawan Aktif — PT. Andalas Karya Mulia</div>
+          <div className="panel-title" style={{display:"flex",alignItems:"center",gap:6}}><User size={14}/> Data Karyawan Aktif — PT. Andalas Karya Mulia</div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <select value={jabatanVal} onChange={e=>{setJabatanVal(e.target.value);doFilter(searchVal,e.target.value);}}>
               <option value="">Semua Jabatan</option>
               {jabatan_list.map((j,i)=><option key={i} value={typeof j==='string'?j:j.nama_jabatan}>{typeof j==='string'?j:j.nama_jabatan}</option>)}
             </select>
-            <button type="button" onClick={()=>setShowPicker(true)} style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}>⚙️ Kolom</button>
-            {!isViewer && <button type="button" onClick={()=>setShowAdd(true)} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>➕ Tambah</button>}
+            <button type="button" onClick={()=>setShowPicker(true)} style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Settings size={13}/> Kolom</button>
+            {!isViewer && <button type="button" onClick={()=>setShowAdd(true)} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Plus size={13}/> Tambah</button>}
             {!isViewer && (!isSuperAdmin || activeProjectId) && (
               <button type="button" onClick={()=>setShowImport(true)}
                 style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                📥 Import Excel
+                <Upload size={13}/> Import Excel
               </button>
             )}
-            <a href="/export/karyawan" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif"}}>📤 Export</a>
+            <a href="/export/karyawan" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Download size={13}/> Export</a>
           </div>
         </div>
         <div style={{padding:'14px 16px'}}>
           <div style={{position:'relative',marginBottom:14}}>
-            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',fontSize:15,color:'var(--muted)'}}>🔍</span>
+            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={15}/></span>
             <input className="search-input" type="text" value={searchVal} placeholder="Cari nama, NIK, jabatan, ID Badge..."
               onChange={e=>{setSearchVal(e.target.value);doFilter(e.target.value,jabatanVal);}} style={{paddingLeft:'36px'}} />
           </div>
+          {isHo && (
+            <div style={{display:'flex',gap:6,marginBottom:14}}>
+              {[{key:'all',label:'Semua',icon:Users},{key:'HO-1',label:'HO-1',icon:Building2},{key:'HO-2',label:'HO-2',icon:Building2}].map(t=>(
+                <div key={t.key} onClick={()=>setHoUnitTab(t.key)}
+                  style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,
+                    display:'flex',alignItems:'center',gap:6,
+                    background:hoUnitTab===t.key?'rgba(232,160,32,.15)':'var(--bg3)',
+                    color:hoUnitTab===t.key?'var(--accent)':'var(--muted2)',
+                    border:`1px solid ${hoUnitTab===t.key?'var(--accent)':'var(--border)'}`}}>
+                  <t.icon size={13}/> {t.label}
+                </div>
+              ))}
+            </div>
+          )}
+          {bulkFlash && (
+            <div style={{marginBottom:12,padding:'10px 14px',borderRadius:8,background:'rgba(34,201,122,.08)',border:'1px solid rgba(34,201,122,.25)',fontSize:12.5,color:'var(--green)',display:'flex',alignItems:'center',gap:8}}>
+              <CheckCircle2 size={13}/> {bulkFlash}
+            </div>
+          )}
+          {!isViewer && selectedIds.length > 0 && (
+            <div style={{marginBottom:12,padding:'10px 14px',borderRadius:8,background:'rgba(58,143,224,.08)',border:'1px solid rgba(58,143,224,.25)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+              <div style={{fontSize:12.5,color:'var(--blue)',fontWeight:600}}>{selectedIds.length} karyawan terpilih</div>
+              <div style={{display:'flex',gap:8}}>
+                <button type="button" onClick={()=>setSelectedIds([])} style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal Pilih</button>
+                <button type="button" onClick={()=>setShowBulkPindah(true)} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><RefreshCw size={13}/> {isSuperAdmin ? 'Pindahkan Project' : 'Ajukan Mutasi'}</button>
+              </div>
+            </div>
+          )}
           <div style={{overflowX:'auto'}}>
-            <table className="kar-table">
+            <table className="kar-table" style={{width:'auto'}}>
               <thead>
                 <tr>
-                  <th style={{minWidth:120,whiteSpace:'nowrap'}}>NIK</th>
-                  <th style={{minWidth:110,whiteSpace:'nowrap'}}>Badge</th>
+                  {!isViewer && (
+                    <th style={{width:'1%',whiteSpace:'nowrap',textAlign:'center'}}>
+                      <input type="checkbox" checked={displayData.length>0 && displayData.every(e=>selectedIds.includes(e.id))} onChange={toggleAll} style={{cursor:'pointer'}}/>
+                    </th>
+                  )}
+                  <th style={{width:'1%',whiteSpace:'nowrap'}}>NIK</th>
+                  {!isHo && <th style={{width:'1%',whiteSpace:'nowrap'}}>Badge</th>}
                   <th>Nama</th><th>Jabatan</th>
-                  {activeCols.map(k => renderHeader(k))}
-                  {!isViewer && <th style={{textAlign:'center'}}>Aksi</th>}
+                  {visibleCols.map(k => renderHeader(k))}
+                  {!isViewer && <th style={{width:'1%',whiteSpace:'nowrap',textAlign:'center'}}>Aksi</th>}
                 </tr>
               </thead>
               <tbody>
-                {data.map((e,i)=>(
+                {displayData.map((e,i)=>(
                   <tr key={i} data-emp-id={e.id}>
+                  {!isViewer && (
+                    <td style={{textAlign:'center'}}>
+                      <input type="checkbox" checked={selectedIds.includes(e.id)} onChange={()=>toggleOne(e.id)} style={{cursor:'pointer'}}/>
+                    </td>
+                  )}
                   <td>
                     <span style={{fontSize:11.5,whiteSpace:'nowrap'}}>{e.no_ktp||'—'}</span>
                   </td>
-                  <td>
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <div style={{width:24,height:24,borderRadius:6,background:getAvColor(e.id_badge),display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#fff',flexShrink:0}}>{getAv(e.nama_lengkap)}</div>
-                      <span style={{fontSize:11.5,whiteSpace:'nowrap'}}>{e.id_badge||'—'}</span>
-                    </div>
-                  </td>
+                  {!isHo && (
+                    <td>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <div style={{width:24,height:24,borderRadius:6,background:getAvColor(e.id_badge),display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#fff',flexShrink:0}}>{getAv(e.nama_lengkap)}</div>
+                        <span style={{fontSize:11.5,whiteSpace:'nowrap'}}>{e.id_badge||'—'}</span>
+                      </div>
+                    </td>
+                  )}
                   <td style={{fontWeight:500}}>{e.nama_lengkap}</td>
-                  <td>{e.jabatan}</td>
-                    {activeCols.map(k => renderCell(e, k))}
+                  <td style={{maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.jabatan}</td>
+                    {visibleCols.map(k => renderCell(e, k))}
                     {!isViewer && (
                       <td>
                         <div style={{display:'flex',gap:6,justifyContent:'center'}}>
-                          <Link href={`/employees/${e.id}/edit`} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',textDecoration:'none',border:'1px solid rgba(232,160,32,.25)',whiteSpace:'nowrap'}}>✏️ Edit</Link>
-                          <button type="button" onClick={()=>onPindah(e)} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(58,143,224,.1)',color:'var(--blue)',border:'1px solid rgba(58,143,224,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>🔄 Pindah</button>
-                          <button type="button" onClick={()=>onTerminate(e)} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>🚪 Terminate</button>
+                          <Link href={`/employees/${e.id}/edit`} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',textDecoration:'none',border:'1px solid rgba(232,160,32,.25)',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:5}}><Pencil size={11}/> Edit</Link>
+                          <button type="button" onClick={()=>onPindah(e)} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(58,143,224,.1)',color:'var(--blue)',border:'1px solid rgba(58,143,224,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><RefreshCw size={11}/> Pindah</button>
+                          <button type="button" onClick={()=>onTerminate(e)} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><LogOut size={11}/> Terminate</button>
                         </div>
                       </td>
                     )}
                   </tr>
                 ))}
-                {data.length===0 && <tr><td colSpan={4+activeCols.length+(isViewer?0:1)} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Tidak ada data karyawan</td></tr>}
+                {displayData.length===0 && <tr><td colSpan={(isHo?3:4)+visibleCols.length+(isViewer?0:2)} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Tidak ada data karyawan</td></tr>}
               </tbody>
             </table>
           </div>
@@ -910,7 +1248,7 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
 // ── TABEL TERMINATED ──
 function TabTerminated({ terminated }) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [editEmp, setEditEmp] = useState(null);
   const [confirmHapus, setConfirmHapus] = useState(null);
   const [confirmReaktif, setConfirmReaktif] = useState(null);
@@ -958,7 +1296,7 @@ function TabTerminated({ terminated }) {
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">🗂️ Arsip Karyawan Terminated</div>
+          <div className="panel-title" style={{display:"flex",alignItems:"center",gap:6}}><Archive size={14}/> Arsip Karyawan Terminated</div>
           <div style={{fontSize:11.5,color:'var(--muted)'}}>{terminated.length} karyawan</div>
         </div>
         <div style={{padding:'14px 16px'}}>
@@ -982,9 +1320,9 @@ function TabTerminated({ terminated }) {
                         {!isViewer && (
                           <td style={{textAlign:'center'}}>
                             <div style={{display:'flex',gap:5,justifyContent:'center'}}>
-                              <button type="button" onClick={()=>setEditEmp(e)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>✏️ Edit</button>
-                              <button type="button" onClick={()=>setConfirmReaktif({id:e.id, nama:e.nama_lengkap})} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(34,201,122,.1)',color:'var(--green)',border:'1px solid rgba(34,201,122,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>♻️ Aktifkan</button>
-                              <button type="button" onClick={()=>setConfirmHapus({id:e.id,nama:e.nama_lengkap})} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>🗑️ Hapus</button>
+                              <button type="button" onClick={()=>setEditEmp(e)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><Pencil size={11}/> Edit</button>
+                              <button type="button" onClick={()=>setConfirmReaktif({id:e.id, nama:e.nama_lengkap})} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(34,201,122,.1)',color:'var(--green)',border:'1px solid rgba(34,201,122,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><RotateCcw size={11}/> Aktifkan</button>
+                              <button type="button" onClick={()=>setConfirmHapus({id:e.id,nama:e.nama_lengkap})} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><Trash2 size={11}/> Hapus</button>
                             </div>
                           </td>
                         )}
@@ -1009,10 +1347,12 @@ export default function EmployeeIndex({
   stats = {},
   projects = [],
   auth = {},
+  project_info = null,
 }) {
   const [activeTab,    setActiveTab]    = useState('aktif');
   const [terminateEmp, setTerminateEmp] = useState(null);
   const [pindahEmp,    setPindahEmp]    = useState(null);
+  const [pindahHoEmp,  setPindahHoEmp]  = useState(null);
   const [flashTransfer,setFlashTransfer]= useState('');
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -1084,9 +1424,9 @@ export default function EmployeeIndex({
   const lastPage = employees.last_page    || 1;
 
   const tabs = [
-    { key:'aktif',      label:'👤 Karyawan Aktif',     count: total },
-    { key:'terminated', label:'🗂️ Terminated',          count: terminated.length },
-    { key:'transfer',   label:'🔄 Pindah Project',      count: pendingCount > 0 ? pendingCount : null, isAlert: pendingCount > 0 },
+    { key:'aktif',      label:'Karyawan Aktif',     count: total, icon: User },
+    { key:'terminated', label:'Terminated',          count: terminated.length, icon: Archive },
+    { key:'transfer',   label:'Pindah Project',      count: pendingCount > 0 ? pendingCount : null, isAlert: pendingCount > 0, icon: RefreshCw },
   ];
 
   return (
@@ -1113,12 +1453,28 @@ export default function EmployeeIndex({
         />
       )}
 
+      {/* Modal pindah unit HO */}
+      {pindahHoEmp && (
+        <PindahUnitHoModal
+          employee={pindahHoEmp}
+          onClose={() => setPindahHoEmp(null)}
+          onSuccess={(msg) => {
+            setFlashTransfer(msg);
+            setPindahHoEmp(null);
+            router.visit(window.location.pathname + window.location.search, {
+              preserveScroll: true,
+              onSuccess: () => setTimeout(() => setFlashTransfer(''), 4000),
+            });
+          }}
+        />
+      )}
+
       {/* Flash transfer success */}
       {flashTransfer && (
         <div style={{position:'fixed',bottom:80,right:16,zIndex:9999,padding:'12px 16px',borderRadius:10,
           background:'rgba(58,143,224,.15)',border:'1px solid rgba(58,143,224,.3)',
           fontSize:12.5,color:'var(--blue)',maxWidth:360,boxShadow:'0 8px 24px rgba(0,0,0,.2)'}}>
-          ✅ {flashTransfer}
+          <CheckCircle2 size={13} style={{verticalAlign:-2}}/> {flashTransfer}
         </div>
       )}
 
@@ -1131,7 +1487,7 @@ export default function EmployeeIndex({
               color:activeTab===t.key?'#0C0F14':'var(--muted)',
               border:`1px solid ${activeTab===t.key?'transparent':'var(--border)'}`,
               display:'flex',alignItems:'center',gap:8,position:'relative'}}>
-            {t.label}
+            <t.icon size={14}/> {t.label}
             {t.count !== null && t.count !== undefined && t.count > 0 && (
               <span style={{
                 background: t.isAlert
@@ -1157,18 +1513,26 @@ export default function EmployeeIndex({
           search={''} jabatan={''} stats={stats}
           isSuperAdmin={isSuperAdmin}
           activeProjectId={usePage().props.active_project_id}
+          project_info={project_info}
           onTerminate={emp => setTerminateEmp(emp)}
-          onPindah={emp => setPindahEmp({
-            id: emp.id,
-            nama_lengkap: emp.nama_lengkap,
-            jabatan: emp.jabatan,
-            project_id: emp.project_id,
-            project_nama: emp.project_nama,
-          })}
+          onPindah={emp => (project_info?.tipe_gaji === 'ho' || emp.ho_unit)
+            ? setPindahHoEmp({
+                id: emp.id,
+                nama_lengkap: emp.nama_lengkap,
+                jabatan: emp.jabatan,
+                ho_unit: emp.ho_unit,
+              })
+            : setPindahEmp({
+                id: emp.id,
+                nama_lengkap: emp.nama_lengkap,
+                jabatan: emp.jabatan,
+                project_id: emp.project_id,
+                project_nama: emp.project_nama,
+              })}
         />
       )}
       {activeTab === 'terminated' && <TabTerminated terminated={terminated} />}
-      {activeTab === 'transfer'   && <TabPindahProject isSuperAdmin={isSuperAdmin} userProjectId={auth?.user?.project_id} isViewer={auth?.user?.can?.is_viewer || false} />}
+      {activeTab === 'transfer'   && <TabPindahProject isSuperAdmin={isSuperAdmin} userProjectId={auth?.user?.project_id} isViewer={auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false} />}
     </AppLayout>
   );
 }

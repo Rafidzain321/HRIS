@@ -2,16 +2,21 @@
 import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router } from '@inertiajs/react';
+import { CheckCircle2, TriangleAlert, Circle, Bell } from 'lucide-react';
 
 const TAB_CONFIG = [
-  { key:'mcu',        label:'🏥 MCU',              color:'#E06A20' },
-  { key:'badge',      label:'💳 Badge',             color:'#3A8FE0' },
-  { key:'kp',         label:'📋 KP',               color:'#22C97A' },
-  { key:'sim',        label:'🚗 SIM',              color:'#9B59B6' },
-  { key:'equip_unit', label:'🚛 Equipment Unit',   color:'#E04545' },
-  { key:'equip_op',   label:'👷 Equipment Operator',color:'#C97A22' },
-  { key:'pensiun',    label:'👴 Pensiun',           color:'#E04545' },
+  { key:'mcu',        label:'MCU',              color:'#E06A20' },
+  { key:'badge',      label:'Badge',             color:'#3A8FE0' },
+  { key:'kp',         label:'KP',               color:'#22C97A' },
+  { key:'sim',        label:'SIM',              color:'#9B59B6' },
+  { key:'equip_unit', label:'Equipment Unit',   color:'#E04545' },
+  { key:'equip_op',   label:'Equipment Operator',color:'#C97A22' },
+  { key:'pensiun',    label:'Pensiun',           color:'#E04545' },
 ];
+
+// Tab yang tidak relevan untuk Kantor Pusat (HO) — karyawan HO tidak punya
+// MCU/Badge/KP/SIM/Equipment karena bukan pekerja lapangan.
+const HO_HIDDEN_TABS = ['mcu', 'badge', 'kp', 'sim', 'equip_unit', 'equip_op'];
 
 function DaysCell({ days, level }) {
   if (days === null || days === undefined) return <span style={{color:'var(--muted)'}}>—</span>;
@@ -44,8 +49,8 @@ function LevelPill({ level }) {
 function NotifTable({ items, emptyMsg, isPensiun }) {
   if (!items || items.length === 0) {
     return (
-      <div style={{padding:'48px 16px',textAlign:'center',color:'var(--muted)',fontSize:13}}>
-        ✅ {emptyMsg || 'Tidak ada notifikasi'}
+      <div style={{padding:'48px 16px',textAlign:'center',color:'var(--muted)',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+        <CheckCircle2 size={14}/> {emptyMsg || 'Tidak ada notifikasi'}
       </div>
     );
   }
@@ -142,7 +147,7 @@ function NotifTable({ items, emptyMsg, isPensiun }) {
                 fontSize:11, fontWeight:700, color:'var(--accent)',
                 textTransform:'uppercase', letterSpacing:'.07em',
               }}>
-                ⚠️ {isPensiun ? `Akan Pensiun dalam 3 Bulan (${warnings.length})` : `Akan Expired (${warnings.length})`}
+                <TriangleAlert size={11} style={{verticalAlign:-2}}/> {isPensiun ? `Akan Pensiun dalam 3 Bulan (${warnings.length})` : `Akan Expired (${warnings.length})`}
               </td>
             </tr>
           )}
@@ -158,7 +163,7 @@ function NotifTable({ items, emptyMsg, isPensiun }) {
                 fontSize:11, fontWeight:700, color:'#E04545',
                 textTransform:'uppercase', letterSpacing:'.07em',
               }}>
-                🔴 {isPensiun ? `Sudah Melewati Usia 56 (${expireds.length})` : `Sudah Expired (${expireds.length})`}
+                <Circle size={9} fill="currentColor" style={{verticalAlign:1}}/> {isPensiun ? `Sudah Melewati Usia 56 (${expireds.length})` : `Sudah Expired (${expireds.length})`}
               </td>
             </tr>
           )}
@@ -169,8 +174,10 @@ function NotifTable({ items, emptyMsg, isPensiun }) {
   );
 }
 
-export default function NotificationsPage({ tabs = {}, summary = {} }) {
-  const [activeTab, setActiveTab] = useState('mcu');
+export default function NotificationsPage({ tabs = {}, summary = {}, project_info = null }) {
+  const isHo = project_info?.tipe_gaji === 'ho';
+  const visibleTabs = isHo ? TAB_CONFIG.filter(t => !HO_HIDDEN_TABS.includes(t.key)) : TAB_CONFIG;
+  const [activeTab, setActiveTab] = useState(isHo ? 'pensiun' : 'mcu');
 
   const totalAll = summary.total || 0;
 
@@ -180,7 +187,7 @@ export default function NotificationsPage({ tabs = {}, summary = {} }) {
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:12}}>
         <div>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:16,fontWeight:700}}>🔔 Pusat Pemberitahuan</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:16,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/> Pusat Pemberitahuan</div>
           <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>
             Semua dokumen yang expired atau akan expired dalam 30 hari
           </div>
@@ -198,7 +205,7 @@ export default function NotificationsPage({ tabs = {}, summary = {} }) {
 
       {/* Tab buttons */}
       <div style={{display:'flex',gap:6,marginBottom:20,flexWrap:'wrap'}}>
-        {TAB_CONFIG.map(t => {
+        {visibleTabs.map(t => {
           const count = summary[t.key] || 0;
           const isActive = activeTab === t.key;
           return (
@@ -231,8 +238,8 @@ export default function NotificationsPage({ tabs = {}, summary = {} }) {
               — {summary[activeTab] || 0} item
             </span>
           </div>
-          <div style={{fontSize:11,color:'var(--muted)'}}>
-            ⚠️ Warning dulu · 🔴 Expired di bawah
+          <div style={{fontSize:11,color:'var(--muted)',display:'flex',alignItems:'center',gap:5}}>
+            <TriangleAlert size={11}/> Warning dulu · <Circle size={8} fill="currentColor"/> Expired di bawah
           </div>
         </div>
         <NotifTable

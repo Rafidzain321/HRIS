@@ -281,6 +281,9 @@ class NotificationController extends Controller
             });
 
         return Inertia::render('Notifications/Index', [
+            'project_info' => $pid
+                ? \App\Models\Project::find($pid, ['id', 'kode', 'nama', 'tipe_gaji'])
+                : null,
             'tabs' => [
                 'mcu'        => $this->sortItems($mcu)->values(),
                 'badge'      => $this->sortItems($badge)->values(),

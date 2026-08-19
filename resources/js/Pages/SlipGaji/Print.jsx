@@ -1,6 +1,7 @@
 // resources/js/Pages/SlipGaji/Print.jsx
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
+import { Download, Printer } from 'lucide-react';
 
 function fmt(n) {
   if (!n && n !== 0) return '—';
@@ -227,10 +228,10 @@ export default function SlipGajiPrint({ payroll, employee, periode }) {
           Tampilkan Rincian Jam
         </label>
         <button className="btn-ctrl btn-excel" onClick={handleExcelDownload}>
-          ⬇ Excel
+          <Download size={13}/> Excel
         </button>
         <button className="btn-ctrl btn-pdf" onClick={handlePrintPDF}>
-          🖨 Print / PDF
+          <Printer size={13}/> Print / PDF
         </button>
       </div>
 

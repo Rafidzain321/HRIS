@@ -40,6 +40,9 @@ class DashboardController extends Controller
             ? $q->where('project_id', $activeProjectId)
             : $q->where('project_id', '!=', $nkId);
 
+        $projectInfo = $activeProjectId ? \App\Models\Project::find($activeProjectId, ['id', 'kode', 'nama', 'tipe_gaji']) : null;
+        $isHo = $projectInfo && $projectInfo->tipe_gaji === 'ho';
+
         $stats = [
             'total_karyawan' => $pf(Employee::aktif())->count(),
             'sim_expired'    => $pf(Employee::simExpired())->count(),
@@ -52,6 +55,22 @@ class DashboardController extends Controller
             'ccpm_aktif'     => $pf(Employee::aktif())->where('ccpm','AKTIF')->count(),
             'mcu_ok'         => $pf(Employee::aktif())->where('status_mcu','OK')->count(),
         ];
+
+        // HO tidak punya compliance (SIM/MCU/Badge) — tampilkan breakdown unit & jabatan terbanyak sebagai gantinya.
+        if ($isHo) {
+            $hoEmployees = $pf(Employee::aktif())->with(['hoDetail', 'position'])->get();
+            $stats['ho_unit'] = [
+                'HO-1' => $hoEmployees->filter(fn($e) => $e->hoDetail?->unit === 'HO-1')->count(),
+                'HO-2' => $hoEmployees->filter(fn($e) => $e->hoDetail?->unit === 'HO-2')->count(),
+            ];
+            $stats['ho_top_jabatan'] = $hoEmployees
+                ->filter(fn($e) => $e->position?->nama_jabatan)
+                ->groupBy(fn($e) => $e->position->nama_jabatan)
+                ->map(fn($g, $label) => ['label' => $label, 'val' => $g->count()])
+                ->sortByDesc('val')
+                ->values()
+                ->first();
+        }
 
         $jabatan_stats = $pf(Employee::aktif())
             ->selectRaw('(SELECT nama_jabatan FROM positions WHERE positions.id = employees.position_id) as jabatan, COUNT(*) as total')
@@ -246,6 +265,7 @@ class DashboardController extends Controller
             'alert_employees'    => $alert_employees,
             'pensiun_employees'  => $pensiun_employees,
             'active_project_id'  => $activeProjectId,
+            'project_info'       => $projectInfo,
             'karyawanPerProject' => $karyawanPerProject,
             'pengeluaranGaji'    => $pengeluaranGaji,
             'projectKeys'        => $projectKeys,

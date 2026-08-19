@@ -17,22 +17,41 @@ class UserManagementController extends Controller
         $isSuperAdmin = auth()->user()->hasRole('super-admin');
         $pid          = $this->activeProjectId();
 
-        $users = User::with(['roles', 'project'])->orderBy('name')->get()->map(fn($u) => [
-            'id'             => $u->id,
-            'name'           => $u->name,
-            'email'          => $u->email,
-            'role'           => $u->roles->first()?->name ?? '—',
-            'project_id'     => $u->project_id,
-            'project_ids'    => $u->project_ids ? json_decode($u->project_ids, true) : null,
-            'project_nama'   => $u->project?->nama ?? 'Semua',
-            'is_active'      => $u->is_active ?? true,
-            'created_at'     => $u->created_at->format('d M Y'),
-            'last_login'     => $u->last_login_at?->format('d M Y H:i') ?? '—',
-            'plain_password' => $isSuperAdmin ? ($u->plain_password ?? '—') : null,
-        ]);
+        // ── User list cuma untuk super-admin — user lain (project-user, viewer, dst) tidak boleh
+        // ikut menerima daftar akun/izin orang lain lewat props Inertia, meskipun tab-nya sudah
+        // disembunyikan di frontend (props tetap terkirim di response).
+        $users = $isSuperAdmin
+            ? User::with(['roles', 'project', 'permissions'])->orderBy('name')->get()->map(fn($u) => [
+                'id'             => $u->id,
+                'name'           => $u->name,
+                'email'          => $u->email,
+                'role'           => $u->roles->first()?->name ?? '—',
+                'project_id'     => $u->project_id,
+                'project_ids'    => $u->project_ids ? json_decode($u->project_ids, true) : null,
+                'project_nama'   => $u->project?->nama ?? 'Semua',
+                'is_active'      => $u->is_active ?? true,
+                'created_at'     => $u->created_at->format('d M Y'),
+                'last_login'     => $u->last_login_at?->format('d M Y H:i') ?? '—',
+                'plain_password' => $u->plain_password ?? '—',
+                'permissions'    => $u->hasRole('super-admin') ? null : $u->permissions->pluck('name'),
+            ])
+            : collect();
 
         $roles    = Role::orderBy('name')->pluck('name');
-        $projects = Project::orderBy('nama')->get(['id', 'kode', 'nama']);
+        $projects = $isSuperAdmin
+            ? Project::withCount('employees')->orderBy('nama')->get()->map(fn ($p) => [
+                'id'             => $p->id,
+                'kode'           => $p->kode,
+                'nama'           => $p->nama,
+                'lokasi'         => $p->lokasi,
+                'tipe_timesheet' => $p->tipe_timesheet,
+                'tipe_gaji'      => $p->tipe_gaji,
+                'warna'          => $p->warna,
+                'is_active'      => $p->is_active,
+                'employees_count'=> $p->employees_count,
+            ])
+            : Project::where('is_active', true)->orderBy('nama')->get(['id', 'kode', 'nama']);
+        $menus    = collect(config('menus'))->map(fn ($m, $key) => ['key' => $key, ...$m])->values();
 
         $positions = \App\Models\Position::orderBy('nama_jabatan')
             ->withCount('employees')->get()
@@ -42,12 +61,17 @@ class UserManagementController extends Controller
                 'employees_count' => $p->employees_count,
             ]);
 
-        // ── Activity Log — super admin lihat semua, project user lihat project sendiri ──
+        // ── Activity Log — super admin lihat semua, project user lihat project ASAL sendiri saja.
+        // Sengaja pakai project_id (home project, tetap), BUKAN activeProjectId() (project yang lagi
+        // di-switch) — supaya user multi-project (Budi/Efendi/Ali) yang lagi lihat data project lain
+        // tetap cuma lihat log aktivitas HO, bukan ikut lihat log aktivitas project yang sedang dilihat.
         $logQuery = \App\Models\ActivityLog::with('user')->orderByDesc('created_at')->limit(1000);
-        if (!$isSuperAdmin && $pid) {
-            // Filter log berdasarkan user yang ada di project yang sama
-            $userIds = User::where('project_id', $pid)->pluck('id');
-            $logQuery->whereIn('user_id', $userIds);
+        if (!$isSuperAdmin) {
+            $ownProjectId = auth()->user()->project_id;
+            if ($ownProjectId) {
+                $userIds = User::where('project_id', $ownProjectId)->pluck('id');
+                $logQuery->whereIn('user_id', $userIds);
+            }
         }
         $logs = $logQuery->get()->map(fn($l) => [
             'id'          => $l->id,
@@ -75,8 +99,23 @@ class UserManagementController extends Controller
             ]);
 
         return Inertia::render('Pengaturan/Index', compact(
-            'users', 'roles', 'projects', 'positions', 'training_types', 'logs'
+            'users', 'roles', 'projects', 'positions', 'training_types', 'logs', 'menus'
         ));
+    }
+
+    // menu+action ('view'|'edit') -> nama permission Spatie ("view-karyawan" dst), tervalidasi terhadap config/menus.php.
+    private function permissionNames(array $selected): array
+    {
+        $menus = config('menus');
+        $names = [];
+        foreach ($selected as $item) {
+            $menu   = $item['menu']   ?? null;
+            $action = $item['action'] ?? null;
+            if (!$menu || !isset($menus[$menu])) continue;
+            if ($action === 'view') $names[] = "view-{$menu}";
+            if ($action === 'edit' && $menus[$menu]['edit']) $names[] = "edit-{$menu}";
+        }
+        return array_unique($names);
     }
 
     public function store(Request $request)
@@ -84,11 +123,16 @@ class UserManagementController extends Controller
         if (!auth()->user()->hasRole('super-admin')) abort(403);
 
         $data = $request->validate([
-            'name'       => 'required|string|max:100',
-            'email'      => 'required|email|unique:users,email',
-            'password'   => 'required|string|min:6',
-            'role'       => 'required|exists:roles,name',
-            'project_id' => 'nullable|exists:projects,id',
+            'name'                  => 'required|string|max:100',
+            'email'                 => 'required|email|unique:users,email',
+            'password'              => 'required|string|min:6',
+            'role'                  => 'required|exists:roles,name',
+            'project_id'            => 'nullable|exists:projects,id',
+            'project_ids'           => 'nullable|array',
+            'project_ids.*'         => 'exists:projects,id',
+            'permissions'           => 'array',
+            'permissions.*.menu'    => 'required|string',
+            'permissions.*.action'  => 'required|in:view,edit',
         ]);
 
         $user = User::create([
@@ -97,9 +141,13 @@ class UserManagementController extends Controller
             'password'       => Hash::make($data['password']),
             'plain_password' => $data['password'],
             'project_id'     => $data['project_id'] ?? null,
+            'project_ids'    => !empty($data['project_ids']) ? json_encode(array_map('intval', $data['project_ids'])) : null,
             'is_active'      => true,
         ]);
         $user->assignRole($data['role']);
+        if ($data['role'] !== 'super-admin') {
+            $user->syncPermissions($this->permissionNames($data['permissions'] ?? []));
+        }
 
         ActivityLog::record('create', 'User', $user->name, "User baru ditambahkan dengan role {$data['role']}");
         return back()->with('success', "User {$user->name} berhasil ditambahkan.");
@@ -110,22 +158,29 @@ class UserManagementController extends Controller
         if (!auth()->user()->hasRole('super-admin')) abort(403);
 
         $data = $request->validate([
-            'name'       => 'required|string|max:100',
-            'email'      => "required|email|unique:users,email,{$user->id}",
-            'password'   => 'nullable|string|min:6',
-            'role'       => 'required|exists:roles,name',
-            'project_id' => 'nullable|exists:projects,id',
+            'name'                  => 'required|string|max:100',
+            'email'                 => "required|email|unique:users,email,{$user->id}",
+            'password'              => 'nullable|string|min:6',
+            'role'                  => 'required|exists:roles,name',
+            'project_id'            => 'nullable|exists:projects,id',
+            'project_ids'           => 'nullable|array',
+            'project_ids.*'         => 'exists:projects,id',
+            'permissions'           => 'array',
+            'permissions.*.menu'    => 'required|string',
+            'permissions.*.action'  => 'required|in:view,edit',
         ]);
 
         $user->update([
-            'name'       => $data['name'],
-            'email'      => $data['email'],
-            'project_id' => $data['project_id'] ?? null,
+            'name'        => $data['name'],
+            'email'       => $data['email'],
+            'project_id'  => $data['project_id'] ?? null,
+            'project_ids' => !empty($data['project_ids']) ? json_encode(array_map('intval', $data['project_ids'])) : null,
             ...(isset($data['password']) && $data['password']
                 ? ['password' => Hash::make($data['password']), 'plain_password' => $data['password']]
                 : []),
         ]);
         $user->syncRoles([$data['role']]);
+        $user->syncPermissions($data['role'] === 'super-admin' ? [] : $this->permissionNames($data['permissions'] ?? []));
 
         ActivityLog::record('update', 'User', $user->name, "Data user diperbarui");
         return back()->with('success', "User {$user->name} berhasil diperbarui.");

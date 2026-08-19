@@ -1,9 +1,17 @@
 // resources/js/Pages/Timesheet/DataGaji.jsx
-import { ConfirmModal } from '@/Layouts/AppLayout';
 import React, { useState, useEffect, useRef } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
+import { SUB_GROUP_OPTIONS } from './subGroupOptions';
+import {
+  Pencil, Search, X, Settings, TriangleAlert, Plus, Check, CheckCircle2,
+  ClipboardList, Trash2, Save, Loader2, HardHat, Calendar, Receipt, Wallet,
+  BookOpen, PenLine, BarChart3, Eye, Upload, Download, Stethoscope, User,
+  CreditCard, XCircle, Building2, RefreshCw, Shield, Truck, Bell, Users,
+  Siren, LogOut, Factory, Construction, Wrench, Cog, Calculator, Folder,
+  Timer, AlarmClock, Pause, Lightbulb, Info,
+} from 'lucide-react';
 
 function rp(val) {
   if (val === null || val === undefined || val === '' || isNaN(val)) return '-';
@@ -69,13 +77,13 @@ function TttConfigModal({ items, onSave, onClose }) {
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(540px,calc(100vw - 24px))',maxHeight:'90vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
 
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:1}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>⚙️ Konfigurasi Tunjangan Tidak Tetap</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Settings size={15}/> Konfigurasi Tunjangan Tidak Tetap</div>
+          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
 
         <div style={{padding:'12px 20px',fontSize:11.5,color:'var(--muted)',background:'rgba(232,160,32,.06)',borderBottom:'1px solid var(--border)'}}>
@@ -127,8 +135,8 @@ function TttConfigModal({ items, onSave, onClose }) {
                 <button onClick={()=>deleteItem(i)}
                   style={{padding:'3px 8px',borderRadius:6,border:'1px solid rgba(224,69,69,.2)',
                     background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:11,cursor:'pointer',
-                    fontFamily:"'Outfit',sans-serif",flexShrink:0}}>
-                  🗑️
+                    fontFamily:"'Outfit',sans-serif",flexShrink:0,display:'flex'}}>
+                  <Trash2 size={13}/>
                 </button>
               )}
             </div>
@@ -136,7 +144,7 @@ function TttConfigModal({ items, onSave, onClose }) {
 
           {/* Tambah item baru */}
           <div style={{marginTop:8,padding:'12px 14px',borderRadius:9,border:'2px dashed var(--border)',background:'var(--bg3)'}}>
-            <div style={{fontSize:11.5,fontWeight:600,color:'var(--accent)',marginBottom:8}}>➕ Tambah Tunjangan Baru</div>
+            <div style={{fontSize:11.5,fontWeight:600,color:'var(--accent)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah Tunjangan Baru</div>
             <div style={{display:'flex',gap:8}}>
               <input style={{...inp,flex:1}} value={newLabel}
                 onChange={e=>setNewLabel(e.target.value)}
@@ -148,8 +156,9 @@ function TttConfigModal({ items, onSave, onClose }) {
                   color:newLabel.trim()?'#0C0F14':'var(--muted)',
                   fontSize:12,fontWeight:700,cursor:newLabel.trim()?'pointer':'not-allowed',
                   fontFamily:"'Outfit',sans-serif",flexShrink:0,
+                  display:'flex',alignItems:'center',gap:5,
                   opacity:adding?0.7:1}}>
-                {adding?'⏳...':'Tambah'}
+                {adding?<Loader2 size={13} style={{animation:'spin .8s linear infinite'}}/>:null}Tambah
               </button>
             </div>
           </div>
@@ -160,8 +169,163 @@ function TttConfigModal({ items, onSave, onClose }) {
           <button type="button" onClick={()=>{onSave(draft);onClose();}}
             style={{padding:'9px 22px',borderRadius:8,border:'none',
               background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',
-              fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-            ✓ Selesai
+              fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
+              display:'flex',alignItems:'center',gap:6}}>
+            <Check size={14}/> Selesai
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Konfigurasi BPJS % & TTD — per project, berlaku per tanggal ──
+function BpjsTtdConfigModal({ onClose, onSaved }) {
+  const [loading, setLoading] = useState(true);
+  const [bpjsHistory, setBpjsHistory] = useState([]);
+  const [bpjsForm, setBpjsForm] = useState({ berlaku_mulai:'', pct_jht:2, pct_pensiun:1, pct_kes:1 });
+  const [ttdForm, setTtdForm] = useState({
+    list:[{label:'Disetujui Oleh,',name:'',jabatan:''},{label:'Dibayar Oleh,',name:'',jabatan:''}],
+  });
+  const [savingBpjs, setSavingBpjs] = useState(false);
+  const [savingTtd,  setSavingTtd]  = useState(false);
+  const token = document.querySelector('meta[name=csrf-token]')?.content;
+
+  function loadAll() {
+    setLoading(true);
+    Promise.all([axios.get('/bpjs-config'), axios.get('/ttd-config')])
+      .then(([b,t]) => {
+        setBpjsHistory(b.data||[]);
+        if (t.data?.ttd_list?.length) setTtdForm({ list: t.data.ttd_list });
+      })
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => { loadAll(); }, []);
+
+  function submitBpjs(e) {
+    e.preventDefault();
+    if (!bpjsForm.berlaku_mulai) { alert('Pilih tanggal berlaku dulu.'); return; }
+    setSavingBpjs(true);
+    axios.post('/bpjs-config', bpjsForm, { headers:{'X-CSRF-TOKEN':token} })
+      .then(() => { loadAll(); onSaved?.(); setBpjsForm(f=>({...f, berlaku_mulai:''})); })
+      .catch(err => alert(err.response?.data?.message || 'Gagal menyimpan.'))
+      .finally(() => setSavingBpjs(false));
+  }
+  function deleteBpjs(id) {
+    if (!window.confirm('Hapus versi konfigurasi BPJS ini?')) return;
+    axios.delete(`/bpjs-config/${id}`, { headers:{'X-CSRF-TOKEN':token} })
+      .then(() => { loadAll(); onSaved?.(); })
+      .catch(err => alert(err.response?.data?.message || 'Gagal menghapus.'));
+  }
+
+  function updateTtdSlot(i, field, val) {
+    setTtdForm(f => ({ ...f, list: f.list.map((s,idx)=>idx===i?{...s,[field]:val}:s) }));
+  }
+  function submitTtd(e) {
+    e.preventDefault();
+    setSavingTtd(true);
+    axios.post('/ttd-config', { ttd_list: ttdForm.list }, { headers:{'X-CSRF-TOKEN':token} })
+      .then(() => { loadAll(); onSaved?.(); })
+      .catch(err => alert(err.response?.data?.message || 'Gagal menyimpan.'))
+      .finally(() => setSavingTtd(false));
+  }
+
+  const inp = {
+    background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)',
+    borderRadius:7, padding:'6px 10px', fontSize:12.5,
+    fontFamily:"'Outfit',sans-serif", outline:'none', width:'100%', boxSizing:'border-box',
+  };
+  const th = {padding:'5px 8px',fontSize:10.5,fontWeight:700,textAlign:'left',color:'var(--muted)',borderBottom:'1px solid var(--border)'};
+  const td = {padding:'5px 8px',fontSize:11.5,borderBottom:'1px solid var(--border)'};
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(680px,calc(100vw - 24px))',maxHeight:'90vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:1}}>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Settings size={15}/> Konfigurasi BPJS & TTD</div>
+          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)',display:'flex'}}><X size={18}/></div>
+        </div>
+
+        <div style={{padding:'12px 20px',fontSize:11.5,color:'var(--muted)',background:'rgba(232,160,32,.06)',borderBottom:'1px solid var(--border)'}}>
+          BPJS: perubahan berlaku mulai bulan yang dipilih ke depan — periode gaji sebelumnya tetap pakai versi lama. Hanya versi terbaru yang bisa dihapus. TTD: cukup 1 konfigurasi aktif, langsung berubah di semua slip begitu disimpan.
+        </div>
+
+        {loading ? (
+          <div style={{padding:40,textAlign:'center',color:'var(--muted)',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> Memuat...</div>
+        ) : (
+        <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:22}}>
+
+          {/* ── BPJS ── */}
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><Wallet size={13}/> Persentase BPJS</div>
+            {bpjsHistory.length > 0 && (
+              <div style={{overflowX:'auto',marginBottom:10}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr><th style={th}>Berlaku Mulai</th><th style={th}>JHT</th><th style={th}>Pensiun</th><th style={th}>Kes</th><th style={th}></th></tr></thead>
+                  <tbody>
+                    {bpjsHistory.map((h,i) => (
+                      <tr key={h.id}>
+                        <td style={td}>{h.berlaku_mulai}</td>
+                        <td style={td}>{h.pct_jht}%</td>
+                        <td style={td}>{h.pct_pensiun}%</td>
+                        <td style={td}>{h.pct_kes}%</td>
+                        <td style={{...td,textAlign:'right'}}>
+                          {i===0 && (
+                            <button onClick={()=>deleteBpjs(h.id)} style={{padding:'2px 8px',borderRadius:5,border:'1px solid rgba(224,69,69,.2)',background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:10.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex'}}><Trash2 size={12}/></button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <form onSubmit={submitBpjs} style={{padding:'12px 14px',borderRadius:9,border:'2px dashed var(--border)',background:'var(--bg3)',display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end'}}>
+              <div style={{minWidth:130}}>
+                <label style={{fontSize:10,color:'var(--muted)',marginBottom:3,display:'block'}}>Berlaku Mulai</label>
+                <input type="date" style={inp} value={bpjsForm.berlaku_mulai} onChange={e=>setBpjsForm(f=>({...f,berlaku_mulai:e.target.value}))} />
+              </div>
+              {[{k:'pct_jht',l:'JHT %'},{k:'pct_pensiun',l:'Pensiun %'},{k:'pct_kes',l:'Kes %'}].map(f=>(
+                <div key={f.k} style={{width:80}}>
+                  <label style={{fontSize:10,color:'var(--muted)',marginBottom:3,display:'block'}}>{f.l}</label>
+                  <input type="number" min="0" max="100" step="0.5" style={inp} value={bpjsForm[f.k]} onChange={e=>setBpjsForm(p=>({...p,[f.k]:parseFloat(e.target.value)||0}))} />
+                </div>
+              ))}
+              <button type="submit" disabled={savingBpjs} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",opacity:savingBpjs?0.7:1,display:'flex',alignItems:'center',gap:5}}>
+                {savingBpjs?<Loader2 size={13} style={{animation:'spin .8s linear infinite'}}/>:null}{savingBpjs?'...':'+ Tambah'}
+              </button>
+            </form>
+          </div>
+
+          {/* ── TTD ── */}
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><PenLine size={13}/> Tanda Tangan Slip Gaji</div>
+            <form onSubmit={submitTtd} style={{padding:'12px 14px',borderRadius:9,border:'2px dashed var(--border)',background:'var(--bg3)',display:'flex',flexDirection:'column',gap:10}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                {ttdForm.list.map((slot,i) => (
+                  <div key={i} style={{padding:'10px 12px',borderRadius:8,background:'var(--bg2)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:6}}>
+                    <div style={{fontSize:10.5,fontWeight:700,color:'var(--muted2)'}}>Kolom {i+1}</div>
+                    <input style={inp} placeholder="Label (cth: Disetujui Oleh,)" value={slot.label} onChange={e=>updateTtdSlot(i,'label',e.target.value)} />
+                    <input style={inp} placeholder="Nama" value={slot.name} onChange={e=>updateTtdSlot(i,'name',e.target.value)} />
+                    <input style={inp} placeholder="Jabatan" value={slot.jabatan} onChange={e=>updateTtdSlot(i,'jabatan',e.target.value)} />
+                  </div>
+                ))}
+              </div>
+              <div style={{fontSize:10.5,color:'var(--muted)'}}>Kolom "Diterima Oleh," untuk nama karyawan otomatis ditambahkan — tidak perlu diisi di sini.</div>
+              <button type="submit" disabled={savingTtd} style={{alignSelf:'flex-start',padding:'7px 16px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",opacity:savingTtd?0.7:1,display:'flex',alignItems:'center',gap:5}}>
+                {savingTtd?<Loader2 size={13} style={{animation:'spin .8s linear infinite'}}/>:<Save size={13}/>} Simpan
+              </button>
+            </form>
+          </div>
+
+        </div>
+        )}
+
+        <div style={{display:'flex',justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)',position:'sticky',bottom:0,background:'var(--bg2)'}}>
+          <button type="button" onClick={onClose}
+            style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}>
+            <Check size={14}/> Selesai
           </button>
         </div>
       </div>
@@ -210,18 +374,26 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
   const showNk       = isSuperAdmin || projectIds.includes(5);
   const showFlat     = isSuperAdmin || projectIds.includes(1) || projectIds.includes(3) || projectIds.includes(4) || projectIds.includes(5);
   const showPurnama = isSuperAdmin || projectIds.includes(4);
+  const showHo       = isSuperAdmin || projectIds.includes(6);
+  const isGiamStrict = isSuperAdmin || projectIds.includes(1); // GIAM doang, di luar Purnama
+
+  // Gabungin nama project jadi label dinamis — cuma nyebut project yang BENERAN kepunyaan
+  // viewer ini (atau semua kalau admin/viewer), supaya user 1 project nggak ikut lihat nama
+  // project lain di judul section yang sebetulnya nggak berlaku buat dia.
+  const projLabel = (...items) => items.filter(Boolean).join(' / ');
 
   const tabs = [
-    {key:'umum',     label:'📋 Umum'},
-    ...(showGiam && !showPurnama ? [{key:'time7', label:'⏱️ Sistem 7 Jam'}] : []),
-    ...(showPurnama && !showGiam ? [{key:'purnama', label:'🏭 Purnama'}]    : []),
-    ...(showGiam && showPurnama  ? [{key:'time7',   label:'⏱️ Sistem 7 Jam'}] : []),
-    ...(showMd       ? [{key:'time8',    label:'⏰ Sistem 8 Jam'}]   : []),
-    ...(showFlat     ? [{key:'flat',     label:'📋 Sistem Flat'}]    : []),
-    ...(showKhawista ? [{key:'khawista', label:'🏗️ Khawista'}]      : []),
-    ...(showNk       ? [{key:'nk',       label:'🔧 NK'}]             : []),
-    {key:'bpjs',     label:'🏥 BPJS & Potongan'},
-    {key:'rumus',    label:'🧮 Ringkasan Rumus'},
+    {key:'umum',     label:'Umum', icon:ClipboardList},
+    ...(showGiam && !showPurnama ? [{key:'time7', label:'Sistem 7 Jam', icon:Timer}] : []),
+    ...(showPurnama && !showGiam ? [{key:'purnama', label:'Purnama', icon:Factory}]    : []),
+    ...(showGiam && showPurnama  ? [{key:'time7',   label:'Sistem 7 Jam', icon:Timer}] : []),
+    ...(showMd       ? [{key:'time8',    label:'Sistem 8 Jam', icon:AlarmClock}]   : []),
+    ...(showFlat     ? [{key:'flat',     label:'Sistem Flat', icon:ClipboardList}]    : []),
+    ...(showKhawista ? [{key:'khawista', label:'Khawista', icon:Construction}]      : []),
+    ...(showNk       ? [{key:'nk',       label:'NK', icon:Wrench}]             : []),
+    ...(showHo       ? [{key:'ho',       label:'Kantor Pusat (HO)', icon:Building2}] : []),
+    {key:'bpjs',     label:'BPJS & Potongan', icon:Stethoscope},
+    {key:'rumus',    label:'Ringkasan Rumus', icon:Calculator},
   ];
 
   return (
@@ -232,8 +404,9 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
           <button key={t.key} onClick={()=>setSection(t.key)}
             style={{padding:'8px 12px',borderRadius:7,border:'none',textAlign:'left',cursor:'pointer',fontSize:12,fontWeight:section===t.key?700:400,
               background:section===t.key?'linear-gradient(135deg,#E8A020,#A06010)':'transparent',
-              color:section===t.key?'#0C0F14':'var(--muted2)',fontFamily:"'Outfit',sans-serif",transition:'all .15s'}}>
-            {t.label}
+              color:section===t.key?'#0C0F14':'var(--muted2)',fontFamily:"'Outfit',sans-serif",transition:'all .15s',
+              display:'flex',alignItems:'center',gap:8}}>
+            <t.icon size={13}/> {t.label}
           </button>
         ))}
       </div>
@@ -243,42 +416,49 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
 
         {/* ── UMUM ── */}
         {section==='umum' && (<div>
-        <H>📋 Konsep Dasar Penggajian AKM</H>
+        <H><ClipboardList size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Konsep Dasar Penggajian AKM</H>
         <P>Panduan ini menjelaskan sistem penggajian yang berlaku untuk project Anda.</P>
 
         <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,margin:'12px 0'}}>
           {showGiam && (
-            <Box title="⏱️ Sistem 7 Jam — GIAM / Khawista / NK / Purnama (6:1)" color="#22C97A">
+            <Box title={<><Timer size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Sistem 7 Jam — {projLabel(isGiamStrict&&'GIAM', showPurnama&&'Purnama')} (6:1)</>} color="#22C97A">
               <P>Hari kerja <b>Senin–Sabtu</b> (6 hari kerja, 1 hari libur = Minggu).</P>
               <P>Jam reguler per hari = <b>7 jam</b>.</P>
               <P>Lembur dihitung <b>per jam</b> berdasarkan jam aktual di timesheet.</P>
             </Box>
           )}
           {showMd && (
-            <Box title="⏰ Sistem 8 Jam — MD (5:2)" color="#3A8FE0">
+            <Box title={<><AlarmClock size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Sistem 8 Jam — MD (5:2)</>} color="#3A8FE0">
               <P>Hari kerja <b>Senin–Jumat</b> (5 hari kerja, 2 hari libur = Sabtu & Minggu).</P>
               <P>Jam reguler per hari = <b>8 jam</b>.</P>
               <P>Gaji dihitung berdasarkan <b>H.Basic, U.Basic, U.Kerja</b>.</P>
               <P>Sabtu bisa menjadi <b>Come Day</b> atau <b>lembur per jam</b>.</P>
             </Box>
           )}
+          {showHo && (
+            <Box title={<><Building2 size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Kantor Pusat (HO)</>} color="#6B7280">
+              <P>Tidak memakai timesheet — <b>tidak ada lembur</b> dan <b>tidak ada potongan alpa</b>.</P>
+              <P>Gaji Pokok & Tunjangan Tetap diisi manual per karyawan, bukan dari master jabatan.</P>
+              <P>Gaji dihitung dari <b>Gaji Pokok + Tunjangan Tetap + Kompensasi PWT + TTT Custom</b> saja.</P>
+            </Box>
+          )}
         </div>
 
         {showFlat && (
-          <Box title="📋 Sistem Flat — Kelompok Khusus" color="#9B59B6">
+          <Box title={<><ClipboardList size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Sistem Flat — Kelompok Khusus</>} color="#9B59B6">
             <P>Berlaku untuk jabatan: <Pill color="#9B59B6" bg="rgba(155,89,182,.1)">SPOTTER</Pill> <Pill color="#9B59B6" bg="rgba(155,89,182,.1)">HELPER</Pill> <Pill color="#9B59B6" bg="rgba(155,89,182,.1)">FLAGMAN</Pill> <Pill color="#9B59B6" bg="rgba(155,89,182,.1)">SWAMPER</Pill> dan variannya.</P>
             <P>Lembur <b>tidak dihitung per jam</b>, melainkan menggunakan tarif flat per hari.</P>
-            {showKhawista && <P>Untuk Piling Khawista: tarif per orang berbeda, diinput via tab ⏰ Overtime.</P>}
+            {showKhawista && <P>Untuk Piling Khawista: tarif per orang berbeda, diinput via tab <AlarmClock size={12} style={{verticalAlign:'-2px'}}/> Overtime.</P>}
           </Box>
         )}
 
-        <H>📂 Komponen Gaji</H>
+        <H><Folder size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Komponen Gaji</H>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,margin:'8px 0'}}>
           {[
             {label:'Gaji Pokok',      desc:'Upah dasar sesuai jabatan, dapat diedit di tabel'},
             {label:'Tunjangan Tetap', desc:'Tunjangan transport (default Rp 200.000), dapat diedit'},
             {label:'Kompensasi PWT',  desc:'Dihitung otomatis = (Gapok + Tunj) ÷ 12'},
-            {label:'TTT',             desc:'Tunjangan Tidak Tetap — bisa aktif/nonaktif via ⚙️ TTT'},
+            {label:'TTT',             desc:'8 field standar (Uang Makan, Produksi, Lapangan, Kehadiran, Pulsa, Komp. Kontrak, Insentif, Com Day) + TTT custom per-project — bisa aktif/nonaktif via tombol TTT'},
             {label:'Upah Lembur',     desc:'Dihitung otomatis dari jam timesheet atau input flat'},
             {label:'BPJS & Potongan', desc:'JHT 2%, Pensiun 1%, Kesehatan 1% dari Upah Penuh'},
             {label:'Gaji Bersih',     desc:'Gaji Kotor dikurangi semua potongan'},
@@ -294,7 +474,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
 
         {/* ── SISTEM 7 JAM ── */}
         {section==='time7' && (<div>
-          <H>⏱️ Sistem 7 Jam — GIAM (6 hari kerja : 1 hari libur)</H>
+          <H><Timer size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Sistem 7 Jam — GIAM (6 hari kerja : 1 hari libur)</H>
 
           <P>Sistem ini berlaku untuk karyawan yang bekerja 6 hari seminggu (Senin–Sabtu), libur hari Minggu. Jam standar per hari adalah <b>7 jam</b>.</P>
 
@@ -320,7 +500,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
         </div>)}
 
         {section==='purnama' && (<div>
-          <H>🏭 Purnama — Sistem 7 Jam</H>
+          <H><Factory size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Purnama — Sistem 7 Jam</H>
           <P>Berlaku untuk project <b>Purnama</b>. Hari kerja Senin–Sabtu, libur Minggu. Jam reguler = <b>7 jam/hari</b>.</P>
 
           <H2>Lembur Per Jam</H2>
@@ -343,7 +523,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
 
         {/* ── SISTEM 8 JAM ── */}
         {section==='time8' && (<div>
-        <H>⏰ Sistem 8 Jam — MD / Multi Disiplin (5 hari kerja : 2 hari libur)</H>
+        <H><AlarmClock size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Sistem 8 Jam — MD / Multi Disiplin (5 hari kerja : 2 hari libur)</H>
         <P>Berlaku untuk project <b>MD</b>. Hari kerja Senin–Jumat, libur Sabtu & Minggu.</P>
 
         <H2>Komponen Gaji Kotor MD</H2>
@@ -373,7 +553,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
 
       Nilai OT/jam = Upah Penuh / 173`}</S>
 
-        <Box title="👷 Lembur MD — Khusus Helper (semua jenis Helper)" color="#9B59B6">
+        <Box title={<><HardHat size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Lembur MD — Khusus Helper (semua jenis Helper)</>} color="#9B59B6">
           <P>Jabatan apapun yang mengandung kata <b>"Helper"</b> (Helper Piping, Helper Lokal, Helper Welder, Helper Coating, Helper Electric, Helper Civil, Helper Piling, dll) memiliki aturan lembur sendiri.</P>
           <H2 style={{marginTop:8}}>Hari Reguler (Senin–Jumat)</H2>
           <S>{`Sama persis dengan karyawan non-Helper:
@@ -431,7 +611,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
 
         {/* ── SISTEM FLAT ── */}
         {section==='flat' && (<div>
-          <H>📋 Sistem Lembur Flat — Kelompok Khusus</H>
+          <H><ClipboardList size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Sistem Lembur Flat — Kelompok Khusus</H>
           <P>Kelompok jabatan tertentu tidak dihitung lemburnya per jam:</P>
           <div style={{display:'flex',flexWrap:'wrap',gap:6,margin:'8px 0 16px'}}>
             {['SPOTTER','HELPER','HELPER SURVEY','FLAGMAN','SWAMPER','SWAMPER FUEL TANK','SWAMPER LOW BOY','SWAMPER WATER TRUCK','SWAMPER FT'].map(j=>(
@@ -441,29 +621,29 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
 
           {/* GIAM / Purnama / NK — tarif standar */}
           {(showGiam || showNk) && !showKhawista && (
-            <Box title="💰 Tarif Lembur Flat — GIAM / Purnama / NK" color="#22C97A">
+            <Box title={<><Wallet size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Tarif Lembur Flat — {projLabel(isGiamStrict&&'GIAM', showPurnama&&'Purnama', showNk&&'NK')}</>} color="#22C97A">
               <S>Lembur Sabtu      = Rp  75.000 / hari{'\n'}Lembur Libur      = Rp 200.000 / hari{'\n'}Lembur Biasa      = Rp  20.000 / hari</S>
-              <P>Input jumlah hari di tab <b>⏰ Overtime</b>. Nilai total dihitung otomatis.</P>
+              <P>Input jumlah hari di tab <b><AlarmClock size={12} style={{verticalAlign:'-2px'}}/> Overtime</b>. Nilai total dihitung otomatis.</P>
             </Box>
           )}
 
           {/* Khawista — ada 2 sub-group */}
           {showKhawista && (
             <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,margin:'8px 0'}}>
-              <Box title="🏗️ Construction — Flat Standar" color="#E8A020">
+              <Box title={<><Construction size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Construction — Flat Standar</>} color="#E8A020">
                 <S>Lembur Sabtu  = Rp  75.000 / hari{'\n'}Lembur Libur  = Rp 200.000 / hari{'\n'}Lembur Biasa  = Rp  20.000 / hari</S>
-                <P>Input di tab <b>⏰ Overtime</b> sama seperti GIAM.</P>
+                <P>Input di tab <b><AlarmClock size={12} style={{verticalAlign:'-2px'}}/> Overtime</b> sama seperti GIAM.</P>
               </Box>
-              <Box title="🔩 Piling — Flat Custom per Orang" color="#3A8FE0">
+              <Box title={<><Wrench size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Piling — Flat Custom per Orang</>} color="#3A8FE0">
                 <S>Upah Lembur = (Tarif Sabtu × H.Sabtu){'\n'}             + (Tarif Minggu × H.Minggu)</S>
-                <P>Tarif <b>berbeda per karyawan</b>. Input via tab <b>⏰ Overtime</b> — kolom Tarif/Hari bisa diisi manual.</P>
+                <P>Tarif <b>berbeda per karyawan</b>. Input via tab <b><AlarmClock size={12} style={{verticalAlign:'-2px'}}/> Overtime</b> — kolom Tarif/Hari bisa diisi manual.</P>
               </Box>
             </div>
           )}
 
           {/* Jika ada keduanya (super admin) */}
           {showGiam && showKhawista && (
-            <Box title="💰 Tarif Flat Standar (GIAM / Purnama / NK Construction)" color="#22C97A">
+            <Box title={<><Wallet size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Tarif Flat Standar ({projLabel(isGiamStrict&&'GIAM', showPurnama&&'Purnama', showNk&&'NK Construction')})</>} color="#22C97A">
               <S>Lembur Sabtu = Rp  75.000 / hari{'\n'}Lembur Libur = Rp 200.000 / hari{'\n'}Lembur Biasa = Rp  20.000 / hari</S>
             </Box>
           )}
@@ -474,10 +654,10 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
           <H2>Komponen Gaji Kotor — Sistem Flat</H2>
           <S>Gaji Kotor = Gapok + Tunj Tetap + Komp PWT + TTT + Total Lembur Flat + Uang Hadir</S>
 
-          <H>⏰ Alur Tab Overtime per Project</H>
+          <H><AlarmClock size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Alur Tab Overtime per Project</H>
           <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,margin:'8px 0'}}>
             {(showGiam || showNk) && !showKhawista && (
-              <Box title="📋 GIAM / Purnama / NK — Overtime Standar" color="#22C97A">
+              <Box title={<><ClipboardList size={13} style={{verticalAlign:'-2px',marginRight:4}}/>{projLabel(isGiamStrict&&'GIAM', showPurnama&&'Purnama', showNk&&'NK')} — Overtime Standar</>} color="#22C97A">
                 <P>Input: jumlah hari <b>L Sabtu</b>, <b>L Libur</b>, <b>Lembur Biasa</b>.</P>
                 <S>{`Total = (L.Sabtu × 75.000)
               + (L.Libur × 200.000)
@@ -488,7 +668,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
               </Box>
             )}
             {showKhawista && (
-              <Box title="🏗️ Khawista Construction — Overtime Standar" color="#E8A020">
+              <Box title={<><Construction size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Khawista Construction — Overtime Standar</>} color="#E8A020">
                 <P>Input: jumlah hari <b>L Sabtu</b>, <b>L Libur</b>, <b>Lembur Biasa</b>.</P>
                 <S>{`Total = (L.Sabtu × 75.000)
               + (L.Libur × 200.000)
@@ -499,7 +679,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
               </Box>
             )}
             {showKhawista && (
-              <Box title="🔩 Khawista Piling — Overtime Custom per Orang" color="#3A8FE0">
+              <Box title={<><Wrench size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Khawista Piling — Overtime Custom per Orang</>} color="#3A8FE0">
                 <P>Input: <b>Tarif/Hari Sabtu</b> + <b>Jml Hari Sabtu</b>, <b>Tarif/Hari Minggu</b> + <b>Jml Hari Minggu</b>.</P>
                 <P>Tarif <b>berbeda tiap karyawan</b> — tidak ada tarif standar.</P>
                 <S>{`Subtotal Sabtu  = Tarif Sabtu  × H.Sabtu
@@ -513,7 +693,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
               </Box>
             )}
             {showNk && showKhawista && (
-              <Box title="🔧 NK — Overtime Custom (sama seperti Khawista)" color="#9B59B6">
+              <Box title={<><Wrench size={13} style={{verticalAlign:'-2px',marginRight:4}}/>NK — Overtime Custom (sama seperti Khawista)</>} color="#9B59B6">
                 <P>NK menggunakan tampilan overtime custom yang sama dengan Khawista.</P>
                 <S>{`Total = (Tarif Sabtu × H.Sabtu)
               + (Tarif Minggu × H.Minggu)
@@ -525,18 +705,20 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
             )}
           </div>
 
+          {showKhawista && (
           <div style={{marginTop:12,padding:'10px 14px',borderRadius:9,background:'rgba(232,160,32,.06)',border:'1px solid rgba(232,160,32,.2)',fontSize:11.5,color:'var(--muted2)'}}>
-            💡 <b>Ringkasan perbedaan:</b> GIAM/Purnama/Construction input <i>jumlah hari</i> dengan tarif tetap. Piling/NK input <i>tarif per orang</i> yang bisa berbeda-beda.
+            <Lightbulb size={12} style={{verticalAlign:'-2px'}}/> <b>Ringkasan perbedaan:</b> {projLabel(isGiamStrict&&'GIAM', showPurnama&&'Purnama', 'Construction')} input <i>jumlah hari</i> dengan tarif tetap. {projLabel('Piling', showNk&&'NK')} input <i>tarif per orang</i> yang bisa berbeda-beda.
           </div>
+          )}
         </div>)}
 
         {/* ── BPJS & POTONGAN ── */}
         {section==='bpjs' && (<div>
-          <H>🏥 BPJS & Potongan Wajib</H>
+          <H><Stethoscope size={13} style={{verticalAlign:'-2px',marginRight:4}}/>BPJS & Potongan Wajib</H>
 
           <P>Semua potongan dihitung dari <b>Upah Penuh</b> (Gaji Pokok + Tunjangan Tetap), bukan dari Gaji Kotor.</P>
 
-          <Box title="📊 Tabel Potongan BPJS" color="#E04545">
+          <Box title={<><BarChart3 size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Tabel Potongan BPJS</>} color="#E04545">
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
               <thead>
                 <tr style={{background:'rgba(224,69,69,.1)'}}>
@@ -565,41 +747,54 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
           <S>Contoh (Upah Penuh = Rp 4.025.000):{'\n'}  BPJS JHT     = 2% × 4.025.000 = Rp  80.500{'\n'}  BPJS Pensiun = 1% × 4.025.000 = Rp  40.250{'\n'}  BPJS Kes     = 1% × 4.025.000 = Rp  40.250{'\n'}  Total BPJS   =                   Rp 161.000</S>
 
           <H2>Persentase Bisa Diubah</H2>
-          <P>Di halaman Slip Gaji, klik tombol <b>⚙️ BPJS</b> untuk mengubah persentase JHT, Pensiun, dan Kesehatan sesuai kebutuhan. Perubahan tersimpan di browser dan langsung mempengaruhi perhitungan slip.</P>
+          <P>Di halaman Slip Gaji, klik tombol <b><Settings size={12} style={{verticalAlign:'-2px'}}/> BPJS</b> untuk mengubah persentase JHT, Pensiun, dan Kesehatan sesuai kebutuhan. Perubahan tersimpan di browser dan langsung mempengaruhi perhitungan slip.</P>
 
           <H2>Potongan Alpa / Prorata</H2>
-          <P>Karyawan yang tidak masuk tanpa keterangan (Alpa) atau izin tidak dibayar dikenakan potongan prorata:</P>
-          <S>Potongan Alpa = Upah Penuh ÷ 25 × (Jumlah Izin + Jumlah Alpa){'\n\n'}Contoh: Alpa 2 hari, Upah Penuh Rp 4.025.000{'\n'}  = 4.025.000 ÷ 25 × 2{'\n'}  = Rp 161.000 × 2{'\n'}  = Rp 322.000</S>
-          {(showGiam && !showKhawista && !showPurnama) && (
-            <P style={{fontSize:11,color:'var(--muted)'}}>Potongan Alpa = Upah Penuh / 25 × (Izin + Alpa). Sakit dan Cuti tidak dipotong.</P>
+          <P>Karyawan yang tidak masuk tanpa keterangan (Alpa) atau izin tidak dibayar dikenakan potongan prorata. Rumusnya beda per tipe project:</P>
+          {(isGiamStrict || showNk) && (
+            <P style={{fontSize:11,color:'var(--muted)'}}>Untuk project <b>{projLabel(isGiamStrict&&'GIAM', showNk&&'NK')}</b>: Potongan Alpa = Upah Penuh / 25 × (Izin + Alpa). Sakit dan Cuti tidak dipotong.</P>
           )}
           {(showKhawista || showPurnama) && (
-            <P style={{fontSize:11,color:'var(--muted)'}}>Untuk project <b>Khawista</b> dan <b>Purnama</b>: Potongan Alpa = Upah Penuh / 25 × Alpa saja — Izin tidak dipotong.</P>
+            <P style={{fontSize:11,color:'var(--muted)'}}>Untuk project <b>{projLabel(showKhawista&&'Khawista', showPurnama&&'Purnama')}</b>: Potongan Alpa = Upah Penuh / 25 × Alpa saja — Izin tidak dipotong.</P>
           )}
-          {(!showKhawista && !showPurnama && showGiam) && (
-            <P style={{fontSize:11,color:'var(--muted)'}}>Untuk project <b>GIAM, NK, MD</b>: Potongan Alpa = Upah Penuh / 25 × (Izin + Alpa).</P>
+          {showMd && (
+            <P style={{fontSize:11,color:'var(--muted)'}}>Untuk project <b>MD</b>: Potongan Alpa = Upah Penuh / 25 × Alpa saja — Izin tidak dipotong.</P>
+          )}
+          {showHo && (
+            <P style={{fontSize:11,color:'var(--muted)'}}>Untuk <b>Kantor Pusat (HO)</b>: tidak ada potongan alpa — tidak memakai timesheet, jadi tidak ada konsep hari alpa.</P>
+          )}
+          {(isGiamStrict || showNk) && (
+            <S>Contoh ({projLabel(isGiamStrict&&'GIAM', showNk&&'NK')}): Alpa 2 hari, Upah Penuh Rp 4.025.000{'\n'}  = 4.025.000 ÷ 25 × 2{'\n'}  = Rp 161.000 × 2{'\n'}  = Rp 322.000</S>
+          )}
+          {(showKhawista || showPurnama || showMd) && (
+            <S>Contoh: Alpa 2 hari, Upah Penuh Rp 4.025.000{'\n'}  = 4.025.000 ÷ 25 × 2{'\n'}  = Rp 322.000{'\n'}  (Izin tidak ikut dipotong)</S>
           )}
 
           <H2>Menonaktifkan Potongan Per Karyawan</H2>
-          <P>Di tabel Data Gaji, setiap kolom BPJS memiliki tombol <b>✕</b> untuk menonaktifkan potongan tersebut khusus untuk karyawan bersangkutan. Klik <b>↩</b> untuk mengaktifkan kembali.</P>
+          <P>Di tabel Data Gaji, setiap kolom BPJS memiliki tombol <b><X size={12} style={{verticalAlign:'-2px'}}/></b> untuk menonaktifkan potongan tersebut khusus untuk karyawan bersangkutan. Klik <b>↩</b> untuk mengaktifkan kembali.</P>
         </div>)}
 
         {/* ── RINGKASAN RUMUS ── */}
-        {section==='rumus' && (<div>
-          <H>🧮 Ringkasan Lengkap Semua Rumus</H>
+        {section==='rumus' && (()=>{
+          const showPerJam7 = showGiam || showKhawista || showNk;
+          return (<div>
+          <H><Calculator size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Ringkasan Rumus — {isSuperAdmin ? 'Semua Project' : 'Project Kamu'}</H>
 
           <H2>1. Komponen Dasar</H2>
           <S>{`Upah Penuh     = Gaji Pokok + Tunjangan Tetap
-        Kompensasi PWT = Upah Penuh / 12
-        Nilai OT/jam   = Upah Penuh / 173`}</S>
+        Kompensasi PWT = Upah Penuh / 12${showPerJam7 || showMd ? '\n        Nilai OT/jam   = Upah Penuh / 173' : ''}`}</S>
+          {(showPerJam7 || showMd) && <P style={{fontSize:11,color:'var(--muted)'}}>Nilai OT/jam cuma dipakai untuk kelompok <b>Per Jam</b>. Kelompok <b>Flat</b> pakai tarif harian tetap (lihat tab Sistem Flat), jadi nilai ini tidak relevan untuk mereka.</P>}
 
-          <H2>2. Lembur 7 Jam (GIAM / Khawista / Purnama / NK)</H2>
-          <S>{`Hari Biasa : Jam > 7  → OT 1.5×, Jam > 8  → OT 2×
+          {showPerJam7 && (<>
+            <H2>2. Lembur 7 Jam ({projLabel(isGiamStrict&&'GIAM', showKhawista&&'Khawista', showPurnama&&'Purnama', showNk&&'NK')})</H2>
+            <S>{`Hari Biasa : Jam > 7  → OT 1.5×, Jam > 8  → OT 2×
         Hari Sabtu : Jam > 5  → OT 1.5×, Jam > 6  → OT 2×
         Hari Libur : Jam 1–7  = OT 2×,   Jam ke-8  = OT 3×,  Jam ke-9+ = OT 4×`}</S>
+          </>)}
 
-          <H2>3. Lembur 8 Jam (MD)</H2>
-        <S>{`Non-Helper:
+          {showMd && (<>
+            <H2>3. Lembur 8 Jam (MD)</H2>
+            <S>{`Non-Helper:
           Hari Biasa : Jam > 8  → OT 1.5×, Jam > 9 → OT 2×
           Sabtu/Minggu/Libur (sama perlakuan) : Jam 1–8 → OT 2×, Jam ke-9 → OT 3×, Jam ke-10+ → OT 4×
 
@@ -607,19 +802,23 @@ Helper:
           Hari Biasa : sama seperti non-Helper (Jam>8 → OT1.5×, Jam>9 → OT2×)
           Sabtu/Minggu/Libur, JIKA Com Day diisi (>0) : OT mati, hanya dapat Com Day flat
           Sabtu/Minggu/Libur, JIKA Com Day = 0        : OT hidup, sama seperti non-Helper`}</S>
+          </>)}
 
-          <H2>4. Lembur Flat Standar (GIAM / Purnama / NK Construction)</H2>
-          <S>{`Total Flat = (L.Sabtu  × Rp 75.000)
+          {showPerJam7 && (<>
+            <H2>4. Lembur Flat Standar ({projLabel(isGiamStrict&&'GIAM', showPurnama&&'Purnama', showKhawista&&'Khawista Construction', showNk&&'NK Construction')})</H2>
+            <S>{`Total Flat = (L.Sabtu  × Rp 75.000)
                   + (L.Libur  × Rp 200.000)
                   + (L.Biasa  × Rp 20.000)
 
         Disimpan ke → total_lembur_flat
         Masuk Gaji Kotor sebagai Total Lembur Flat`}</S>
+          </>)}
 
-          <H2>4b. Lembur Flat Custom (Khawista Piling / NK Flat)</H2>
-          <S>{`Upah Lembur = (Tarif Sabtu  × H.Sabtu) + (Tarif Minggu × H.Minggu)
+          {(showKhawista || showNk) && (<>
+            <H2>4b. Lembur Flat Custom ({projLabel(showKhawista&&'Khawista Piling', showNk&&'NK Flat')})</H2>
+            <S>{`Upah Lembur = (Tarif Sabtu  × H.Sabtu) + (Tarif Minggu × H.Minggu)
 
-        Tarif berbeda per karyawan — diinput manual di tab ⏰ Overtime
+        Tarif berbeda per karyawan — diinput manual di tab Overtime
         Jumlah hari otomatis dari timesheet (bisa dioverride manual)
 
         Alur penyimpanan:
@@ -628,69 +827,80 @@ Helper:
           → upah_lembur  = lump_sum
           → total_lembur_flat = lump_sum
           → masuk Gaji Kotor sebagai Upah Lembur`}</S>
+          </>)}
 
           <H2>5. Gaji Kotor</H2>
-          <S>{`Per Jam (GIAM/Khawista/Purnama/NK) :
-          Gaji Kotor = Gapok + Tunj + KompPWT + TTT + Upah Lembur
-
-        Flat Standar (GIAM/Purnama/NK Construction) :
-          Gaji Kotor = Gapok + Tunj + KompPWT + TTT + Total Flat + U.Hadir
-
-        Flat Custom (Khawista Piling / NK) :
-          Gaji Kotor = Gapok + Tunj + KompPWT + TTT + Upah Lembur Custom
-
-        MD (Multi Disiplin) :
-          Gaji Kotor = U.Basic + KompPWT + U.Kerja + ComDay + Upah Lembur + Tunj.Pulsa + Kekurangan`}</S>
+          {showPerJam7 && <S>{`Per Jam (${projLabel(isGiamStrict&&'GIAM', showKhawista&&'Khawista', showPurnama&&'Purnama', showNk&&'NK')}) :
+          Gaji Kotor = Gapok + Tunj + KompPWT + TTT + Upah Lembur`}</S>}
+          {showPerJam7 && <S>{`Flat Standar (${projLabel(isGiamStrict&&'GIAM', showPurnama&&'Purnama', showKhawista&&'Khawista Construction', showNk&&'NK Construction')}) :
+          Gaji Kotor = Gapok + Tunj + KompPWT + TTT + Total Flat + U.Hadir`}</S>}
+          {(showKhawista || showNk) && <S>{`Flat Custom (${projLabel(showKhawista&&'Khawista Piling', showNk&&'NK')}) :
+          Gaji Kotor = Gapok + Tunj + KompPWT + TTT + Upah Lembur Custom`}</S>}
+          {showMd && <S>{`MD (Multi Disiplin) :
+          Gaji Kotor = U.Basic + KompPWT + U.Kerja + ComDay + Upah Lembur + Tunj.Pulsa + Kekurangan`}</S>}
+          {showHo && <S>{`Kantor Pusat (HO) — tidak ada timesheet/lembur :
+          Gaji Kotor = Gapok + Tunj + KompPWT + TTT Custom`}</S>}
+          {(showPerJam7 || showMd) && <P style={{fontSize:11,color:'var(--muted)'}}>TTT = jumlah 8 field standar (Uang Makan, Produksi, Lapangan, Kehadiran, Pulsa, Komp.Kontrak, Insentif, Com Day) + TTT custom per-project.</P>}
 
           <H2>6. Potongan</H2>
           <S>{`BPJS JHT     = Upah Penuh × 2%
         BPJS Pensiun = Upah Penuh × 1%
-        BPJS Kes     = Upah Penuh × 1%
-
-        Pot. Alpa (GIAM/MD/NK) = Upah Penuh / 25 × (Izin + Alpa)
-        Pot. Alpa (Khawista/Purnama) = Upah Penuh / 25 × Alpa  ← Izin tidak dipotong
-
-        Pot. Insentif (Khawista Construction) = Insentif / 25 × (Izin + Sakit + Cuti)
-        Pot. Insentif (Khawista Piling)       = Tunj.Lapangan / 25 × Izin
-        Pot. Insentif (NK)                    = Insentif / 25 × (Izin + Sakit + Cuti + STB)`}</S>
+        BPJS Kes     = Upah Penuh × 1%`}</S>
+          {(isGiamStrict || showNk) && <S>{`Pot. Alpa (${projLabel(isGiamStrict&&'GIAM', showNk&&'NK')}) = Upah Penuh / 25 × (Izin + Alpa)`}</S>}
+          {showMd && <S>{`Pot. Alpa (MD) = Upah Penuh / 25 × Alpa   ← Izin tidak dipotong`}</S>}
+          {(showKhawista || showPurnama) && <S>{`Pot. Alpa (${projLabel(showKhawista&&'Khawista', showPurnama&&'Purnama')}) = Upah Penuh / 25 × Alpa   ← Izin tidak dipotong`}</S>}
+          {showHo && <S>{`Pot. Alpa (HO) = tidak ada — HO tidak pakai timesheet`}</S>}
+          {showKhawista && <S>{`Pot. Insentif (Khawista Construction) = Insentif / 25 × (Izin + Sakit + Cuti)
+        Pot. Insentif (Khawista Piling)       = Tunj.Lapangan / 25 × Izin`}</S>}
+          {showNk && <S>{`Pot. Insentif (NK) = Insentif / 25 × (Izin + Sakit + Cuti + STB)`}</S>}
+          {showPerJam7 && <P style={{fontSize:11,color:'var(--muted)'}}>Pot. Tabung Oksigen — nominal manual per karyawan, diinput langsung di tabel.</P>}
 
           <H2>7. Gaji Bersih</H2>
-          <S>{`Non-MD = Gaji Kotor - BPJS JHT - BPJS Pensiun - BPJS Kes - Pot.Alpa - Pot.Insentif + Kekurangan Bln Lalu
-        MD     = Gaji Kotor - BPJS JHT - BPJS Pensiun - BPJS Kes - Pot.Alpa
-                (Kekurangan sudah masuk ke Gaji Kotor MD, tidak ditambah lagi)`}</S>
+          {showPerJam7 && <S>{`Non-MD, Non-HO = Gaji Kotor - BPJS JHT - BPJS Pensiun - BPJS Kes
+                       - Pot.Alpa - Pot.Insentif - Pot.Tabung Oksigen + Kekurangan Bln Lalu`}</S>}
+          {showMd && <S>{`MD = Gaji Kotor - BPJS JHT - BPJS Pensiun - BPJS Kes - Pot.Alpa
+        (Kekurangan sudah masuk ke Gaji Kotor MD, tidak ditambah lagi)`}</S>}
+          {showHo && <S>{`HO = Gaji Kotor - BPJS JHT - BPJS Pensiun - BPJS Kes + Kekurangan Bln Lalu
+        (Potongan cuti/alpa/custom HO cuma ditampilkan sebagai info,
+         TIDAK ikut mengurangi Gaji Bersih)`}</S>}
 
-          <H2>8. Upah Lembur Per Jam (Total Terbobot)</H2>
-          <S>{`Total Jam Terbobot = (jam1.5× × 1.5) + (jam2× × 2) + (jam3× × 3) + (jam4× × 4)
+          {(showPerJam7 || showMd) && (<>
+            <H2>8. Upah Lembur Per Jam (Total Terbobot)</H2>
+            <S>{`Total Jam Terbobot = (jam1.5× × 1.5) + (jam2× × 2) + (jam3× × 3) + (jam4× × 4)
         Upah Lembur        = (Upah Penuh / 173) × Total Jam Terbobot`}</S>
+          </>)}
 
-          <H2>9. Komponen Khusus MD</H2>
-          <S>{`H.Basic      = H.Hadir + Sakit + Cuti  (maks 17)
+          {showMd && (<>
+            <H2>9. Komponen Khusus MD</H2>
+            <S>{`H.Basic      = H.Hadir + Sakit + Cuti  (maks 17)
         H.Hadir      = H.Basic - Sakit - Cuti
         H.Kerja Aktif = H.Hadir + H.Sabtu
 
         U.Basic = (Gapok + Tunj) / 17 × min(H.Basic, 17)
         U.Kerja = (Tunj.Makan + Tunj.Kehadiran) × H.Kerja Aktif
         Com Day = Com Day/hari × H.Sabtu`}</S>
+          </>)}
 
           <div style={{marginTop:16,padding:'12px 16px',borderRadius:10,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',fontSize:11.5,color:'var(--muted2)',lineHeight:1.7}}>
-            💡 Semua perhitungan dilakukan otomatis dari data timesheet. Klik sel <span style={{background:'rgba(255,252,200,.6)',padding:'0 4px',borderRadius:3,border:'1px solid #E8C030',fontSize:11}}>kuning</span> di tabel untuk edit manual. Perubahan tersimpan otomatis ke database.
+            <Lightbulb size={12} style={{verticalAlign:'-2px'}}/> Semua perhitungan dilakukan otomatis dari data timesheet. Klik sel <span style={{background:'rgba(255,252,200,.6)',padding:'0 4px',borderRadius:3,border:'1px solid #E8C030',fontSize:11}}>kuning</span> di tabel untuk edit manual. Perubahan tersimpan otomatis ke database.
           </div>
-        </div>)}
+        </div>);
+        })()}
         
             {section==='khawista' && (<div>
-              <H>🏗️ Khawista — Construction vs Piling</H>
+              <H><Construction size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Khawista — Construction vs Piling</H>
               <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,margin:'12px 0'}}>
-                <Box title="🏗️ Sub-Group: Construction" color="#E8A020">
+                <Box title={<><Construction size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Sub-Group: Construction</>} color="#E8A020">
                   <P>Sistem <b>7 jam</b> standar. Lembur dihitung per jam.</P>
                   <P>Kelompok Flat: lembur menggunakan tarif standar.</P>
                   <P>Potongan insentif:</P>
                   <S>Pot. Insentif = Insentif / 25 × (Izin + Sakit + Cuti)</S>
                 </Box>
-                <Box title="🔩 Sub-Group: Piling" color="#3A8FE0">
+                <Box title={<><Wrench size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Sub-Group: Piling</>} color="#3A8FE0">
                   <P>Sistem <b>7 jam</b>. Lembur menggunakan <b>tarif flat custom</b> per orang.</P>
                   <P>Potongan insentif:</P>
                   <S>Pot. Insentif = Tunj. Lapangan / 25 × Izin</S>
-                  <P>Lembur diinput via tab <b>⏰ Overtime</b> dengan tarif Sabtu dan Minggu berbeda per karyawan.</P>
+                  <P>Lembur diinput via tab <b><AlarmClock size={12} style={{verticalAlign:'-2px'}}/> Overtime</b> dengan tarif Sabtu dan Minggu berbeda per karyawan.</P>
                 </Box>
               </div>
 
@@ -699,24 +909,24 @@ Helper:
 
               <H2>Komponen Gaji Kotor — Khawista</H2>
               <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,margin:'8px 0'}}>
-                <Box title="🏗️ Construction — Per Jam" color="#E8A020">
+                <Box title={<><Construction size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Construction — Per Jam</>} color="#E8A020">
                   <S>{`Gaji Kotor = Gapok + Tunj + KompPWT
                       + TTT + Upah Lembur`}</S>
                   <P>Upah Lembur dihitung dari jam timesheet × nilai OT/jam.</P>
                 </Box>
-                <Box title="🔩 Piling — Flat Custom" color="#3A8FE0">
+                <Box title={<><Wrench size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Piling — Flat Custom</>} color="#3A8FE0">
                   <S>{`Gaji Kotor = Gapok + Tunj + KompPWT
                       + TTT + Upah Lembur Custom
 
             Upah Lembur = (Tarif Sabtu × H.Sabtu)
                       + (Tarif Minggu × H.Minggu)`}</S>
-                  <P>Tarif per orang berbeda, diinput via tab <b>⏰ Overtime</b>.</P>
+                  <P>Tarif per orang berbeda, diinput via tab <b><AlarmClock size={12} style={{verticalAlign:'-2px'}}/> Overtime</b>.</P>
                 </Box>
               </div>
 
-              <H>⏰ Tab Overtime — Detail per Sub-Group</H>
+              <H><AlarmClock size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Tab Overtime — Detail per Sub-Group</H>
               <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,margin:'8px 0'}}>
-                <Box title="🏗️ Construction — Tab Overtime Standar" color="#E8A020">
+                <Box title={<><Construction size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Construction — Tab Overtime Standar</>} color="#E8A020">
                   <P>Tampilan: input <b>L Sabtu</b>, <b>L Libur</b>, <b>Lembur Biasa</b> (jumlah hari).</P>
                   <S>{`Total Flat = (L.Sabtu  × 75.000)
                       + (L.Libur  × 200.000)
@@ -725,11 +935,11 @@ Helper:
             Disimpan ke → total_lembur_flat
             Masuk Gaji Kotor sebagai Total Lembur Flat`}</S>
                 </Box>
-                <Box title="🔩 Piling — Tab Overtime Custom" color="#3A8FE0">
+                <Box title={<><Wrench size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Piling — Tab Overtime Custom</>} color="#3A8FE0">
                   <P>Tampilan berbeda — setiap baris punya kolom <b>Tarif/Hari</b> yang bisa berbeda per orang.</P>
                   <S>{`Kolom input:
-              Tarif Sabtu/Hari ✏️  | Jml Hari Sabtu ✏️
-              Tarif Minggu/Hari ✏️ | Jml Hari Minggu ✏️
+              Tarif Sabtu/Hari (edit) | Jml Hari Sabtu (edit)
+              Tarif Minggu/Hari (edit) | Jml Hari Minggu (edit)
 
             Subtotal Sabtu  = Tarif Sabtu  × H.Sabtu
             Subtotal Minggu = Tarif Minggu × H.Minggu
@@ -743,16 +953,16 @@ Helper:
               </div>
 
               <div style={{marginTop:12,padding:'10px 14px',borderRadius:9,background:'rgba(58,143,224,.06)',border:'1px solid rgba(58,143,224,.2)',fontSize:11.5,color:'var(--muted2)'}}>
-                ⚠️ <b>Penting:</b> Di tab Semua/Flat, kolom Lembur untuk Piling tampil <b>—</b> (tidak tampil) karena lembur disimpan ke <code>upah_lembur</code> bukan ke <code>total_lembur_flat</code> yang ditampilkan di kolom tabel. Nilai sudah masuk ke Gaji Kotor via Upah Lembur.
+                <TriangleAlert size={12} style={{verticalAlign:'-2px'}}/> <b>Penting:</b> Di tab Semua/Flat, kolom Lembur untuk Piling tampil <b>—</b> (tidak tampil) karena lembur disimpan ke <code>upah_lembur</code> bukan ke <code>total_lembur_flat</code> yang ditampilkan di kolom tabel. Nilai sudah masuk ke Gaji Kotor via Upah Lembur.
               </div>
             </div>)}
 
         {section==='nk' && (<div>
-          <H>🔧 NK — Nindya Karya</H>
+          <H><Wrench size={13} style={{verticalAlign:'-2px',marginRight:4}}/>NK — Nindya Karya</H>
           <P>Sistem <b>7 jam</b> standar. Lembur dihitung per jam (Per Jam) atau flat custom (Flat).</P>
 
           <H2>Komponen Khusus NK</H2>
-          <Box title="⏸ STB (Standby)" color="#9B59B6">
+          <Box title={<><Pause size={13} style={{verticalAlign:'-2px',marginRight:4}}/>STB (Standby)</>} color="#9B59B6">
             <P>STB = karyawan standby, tidak hadir kerja aktif tapi tetap dihitung untuk potongan insentif.</P>
             <S>Pot. Insentif = Insentif / 25 × (Izin + Sakit + Cuti + STB)</S>
           </Box>
@@ -762,27 +972,27 @@ Helper:
 
           <H2>Komponen Gaji Kotor — NK</H2>
           <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,margin:'8px 0'}}>
-            <Box title="⏱️ Per Jam" color="#22C97A">
+            <Box title={<><Timer size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Per Jam</>} color="#22C97A">
               <S>{`Gaji Kotor = Gapok + Tunj + KompPWT
                   + TTT + Upah Lembur`}</S>
               <P>Upah Lembur dihitung dari jam timesheet × nilai OT/jam.</P>
             </Box>
-            <Box title="📋 Flat (Spotter, Helper, dll)" color="#9B59B6">
+            <Box title={<><ClipboardList size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Flat (Spotter, Helper, dll)</>} color="#9B59B6">
               <S>{`Gaji Kotor = Gapok + Tunj + KompPWT
                   + TTT + Total Lembur Custom
 
         Total Custom = (Tarif Sabtu × H.Sabtu)
                     + (Tarif Minggu × H.Minggu)`}</S>
-              <P>NK Flat menggunakan overtime custom — sama seperti Khawista Piling.</P>
+              <P>{showKhawista ? 'NK Flat menggunakan overtime custom — sama seperti Khawista Piling.' : 'NK Flat menggunakan overtime custom (tarif per orang, bukan tarif standar).'}</P>
             </Box>
           </div>
 
-          <H>⏰ Tab Overtime — NK</H>
-          <Box title="🔧 NK Flat — Overtime Custom (sama seperti Khawista Piling)" color="#9B59B6">
-            <P>NK menggunakan <b>TabelOvertimeCustom</b> — tampilan dan alur sama dengan Khawista.</P>
+          <H><AlarmClock size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Tab Overtime — NK</H>
+          <Box title={<><Wrench size={13} style={{verticalAlign:'-2px',marginRight:4}}/>NK Flat — Overtime Custom</>} color="#9B59B6">
+            <P>NK menggunakan <b>TabelOvertimeCustom</b> untuk input tarif per karyawan.</P>
             <S>{`Kolom input per karyawan:
-          Tarif Sabtu/Hari ✏️  | Jml Hari Sabtu ✏️
-          Tarif Minggu/Hari ✏️ | Jml Hari Minggu ✏️
+          Tarif Sabtu/Hari (edit) | Jml Hari Sabtu (edit)
+          Tarif Minggu/Hari (edit) | Jml Hari Minggu (edit)
 
         Total = (Tarif Sabtu × H.Sabtu)
               + (Tarif Minggu × H.Minggu)
@@ -790,12 +1000,36 @@ Helper:
         Disimpan ke → overtime_custom.lump_sum
                   → upah_lembur + total_lembur_flat
         Masuk Gaji Kotor sebagai Upah Lembur`}</S>
-            <P>Perbedaan dengan Khawista: NK tidak punya sub-group Construction/Piling — semua karyawan flat NK masuk satu daftar overtime yang sama.</P>
+            <P>Semua karyawan flat NK masuk satu daftar overtime yang sama (tidak ada pembagian sub-group).</P>
             <P>Jumlah hari otomatis dari timesheet. Bisa dioverride manual — klik <b>↩</b> untuk reset ke otomatis.</P>
           </Box>
 
+          {showKhawista && (
           <div style={{marginTop:12,padding:'10px 14px',borderRadius:9,background:'rgba(155,89,182,.06)',border:'1px solid rgba(155,89,182,.2)',fontSize:11.5,color:'var(--muted2)'}}>
-            💡 <b>Ringkasan NK vs Khawista Piling:</b> Alur overtime dan penyimpanan sama persis. Bedanya NK tidak ada sub-group, dan potongan insentif NK memperhitungkan STB sedangkan Khawista tidak.
+            <Lightbulb size={12} style={{verticalAlign:'-2px'}}/> <b>Ringkasan NK vs Khawista Piling:</b> Alur overtime dan penyimpanan sama persis. Bedanya NK tidak ada sub-group, dan potongan insentif NK memperhitungkan STB sedangkan Khawista tidak.
+          </div>
+          )}
+        </div>)}
+
+        {section==='ho' && (<div>
+          <H><Building2 size={13} style={{verticalAlign:'-2px',marginRight:4}}/>Kantor Pusat (HO)</H>
+          <P>Karyawan Kantor Pusat <b>tidak punya timesheet</b> — jadi tidak ada lembur, tidak ada jam kerja, dan tidak ada potongan alpa. Perhitungannya jauh lebih sederhana dibanding project lapangan.</P>
+
+          <H2>Gaji Pokok & Tunjangan Tetap</H2>
+          <P>Berbeda dengan project lain (yang defaultnya ambil dari master jabatan), untuk HO kedua nilai ini <b>wajib diisi manual</b> per karyawan di tabel Data Gaji — kalau belum pernah diisi, nilainya 0.</P>
+
+          <H2>Komponen Gaji Kotor — HO</H2>
+          <S>{`Gaji Kotor = Gaji Pokok + Tunjangan Tetap + Kompensasi PWT + TTT Custom
+
+        Kompensasi PWT = (Gaji Pokok + Tunjangan Tetap) / 12
+        TTT Custom     = jumlah item TTT custom yang dikonfigurasi khusus untuk project HO
+                         (bukan 8 field TTT standar seperti project lapangan)`}</S>
+
+          <H2>Gaji Bersih — HO</H2>
+          <S>{`Gaji Bersih = Gaji Kotor - BPJS JHT - BPJS Pensiun - BPJS Kes + Kekurangan Bulan Lalu`}</S>
+
+          <div style={{marginTop:12,padding:'10px 14px',borderRadius:9,background:'rgba(107,114,128,.08)',border:'1px solid rgba(107,114,128,.25)',fontSize:11.5,color:'var(--muted2)'}}>
+            <TriangleAlert size={12} style={{verticalAlign:'-2px'}}/> <b>Penting:</b> Kolom Izin/Sakit/Alpa/Cuti dan Potongan Custom untuk HO tetap bisa diisi dan ditampilkan di tabel, tapi sifatnya <b>hanya informasi</b> ("potensi potongan") — nilainya <b>tidak dikurangkan</b> dari Gaji Bersih HO seperti di project lapangan.
           </div>
         </div>)}
       </div>
@@ -804,13 +1038,14 @@ Helper:
 }
 
 // ── Hitung ulang ──────────────────────────────────────────────
-function recalc(row, activeTttKeys=[]) {
+function recalc(row, activeTttKeys=[], bpjsPct={jht:2,pensiun:1,kes:1}) {
   const isFlat     = row.kelompok === 'flat';
   const isMd       = row.tipe_project === 'md';
+  const isHo       = row.tipe_project === 'ho';
   const gajiPokok  = parseFloat(row.gaji_pokok)    || 0;
   const tunjTetap  = parseFloat(row.tunj_tetap)    || 0;
-  const tunjJabatan = parseFloat(row.tunj_jabatan) || 0;
-  const upahPenuh  = gajiPokok + tunjTetap + tunjJabatan;
+  // tunj_jabatan: info tambahan saja, sudah termasuk dalam tunj_tetap — jangan dijumlah lagi ke upah_penuh/gaji_kotor
+  const upahPenuh  = gajiPokok + tunjTetap;
   const kompPwt = Math.round(upahPenuh / 12);
   const insentif          = parseFloat(row.insentif)           || 0;
   const tunjLap           = parseFloat(row.tunj_lapangan)      || 0;
@@ -875,43 +1110,46 @@ function recalc(row, activeTttKeys=[]) {
     const kekMd       = parseFloat(row.kekurangan_bulan_lalu) || 0;
     gajiKotor = uBasicMd + Math.round(kompPwt) + uKerjaMd + comDayTotal + Math.round(upahLembur) + tPulsa + kekMd;
   } else {
-    const sumKomponen = gajiPokok + tunjTetap + tunjJabatan + Math.round(kompPwt) + activeTttSum + activeCustomSum;
+    const sumKomponen = gajiPokok + tunjTetap + Math.round(kompPwt) + activeTttSum + activeCustomSum;
     gajiKotor = isFlat
       ? Math.round(sumKomponen) + upahLembur + uangHadir
       : Math.round(sumKomponen) + upahLembur;
   }
-  const jht=upahPenuh*0.02, pensiun=upahPenuh*0.01, kes=upahPenuh*0.01;
+  const jht=upahPenuh*(bpjsPct.jht/100), pensiun=upahPenuh*(bpjsPct.pensiun/100), kes=upahPenuh*(bpjsPct.kes/100);
   const izinCount=parseInt(row.izin)||0, alpaCount=parseInt(row.alpa)||0;
   const projectKode = (row.project_kode || '').toLowerCase();
   const izinDipotong = !['khawista', 'purnama'].includes(projectKode);
   const potonganAlpa = upahPenuh/25*(alpaCount+(izinDipotong?izinCount:0));
   const kekurangan   = parseFloat(row.kekurangan_bulan_lalu)||0;
   const finalJht=row._no_jht?0:Math.round(jht), finalPensiun=row._no_pensiun?0:Math.round(pensiun);
-  const finalKes=row._no_kes?0:Math.round(kes), finalAlpa=row._no_alpa?0:Math.round(potonganAlpa);
+  const finalKes=row._no_kes?0:Math.round(kes);
+  // HO: alpa/izin cuma disimulasikan untuk info (lihat potongan_simulasi), tidak dipotong beneran.
+  const finalAlpa=isHo?0:(row._no_alpa?0:Math.round(potonganAlpa));
   const sakit = parseInt(row.sakit)||0;
   const cuti  = parseInt(row.cuti)||0;
   const subGroup = (row.sub_group||'').toLowerCase();
   let potonganInsentif = 0;
-  if (projectKode === 'khawista') {
+  if (!isHo && projectKode === 'khawista') {
     if (subGroup === 'construction') {
       potonganInsentif = Math.round(insentif / 25 * (izinCount + sakit + cuti));
     } else if (subGroup === 'piling') {
       potonganInsentif = Math.round(tunjLap / 25 * izinCount);
     }
-  } else if (projectKode === 'nk') {
+  } else if (!isHo && projectKode === 'nk') {
     const stb = parseInt(row.stb) || 0;
     potonganInsentif = Math.round(insentif / 25 * (izinCount + sakit + cuti + stb));
   }
-  const potTabungOksigen = parseFloat(row.pot_tabung_oksigen)||0;
+  const potTabungOksigen = isHo ? 0 : (parseFloat(row.pot_tabung_oksigen)||0);
+  const potonganSimulasi = isHo ? Math.round(upahPenuh/25*(alpaCount+cuti)) : (parseFloat(row.potongan_simulasi)||0);
   const finalBersih = isMd
     ? Math.round(gajiKotor - finalJht - finalPensiun - finalKes - finalAlpa - potonganInsentif - potTabungOksigen)
     : Math.round(gajiKotor - finalJht - finalPensiun - finalKes - finalAlpa - potonganInsentif - potTabungOksigen + kekurangan);
-  return { ...row, kompensasi_pwt:Math.round(kompPwt), upah_penuh:upahPenuh, u_basic:uBasicMd, u_kerja:uKerjaMd, total_lembur_flat:isFlat?Math.round(totalFlat):(parseFloat(row.total_lembur_flat)||0), upah_lembur:upahLembur, gaji_kotor:Math.round(gajiKotor), potongan_jht:finalJht, potongan_pensiun:finalPensiun, potongan_kes:finalKes, potongan_alpa:finalAlpa, potongan_insentif:potonganInsentif, pot_tabung_oksigen:potTabungOksigen, gaji_bersih:finalBersih };
+  return { ...row, kompensasi_pwt:Math.round(kompPwt), upah_penuh:upahPenuh, u_basic:uBasicMd, u_kerja:uKerjaMd, total_lembur_flat:isFlat?Math.round(totalFlat):(parseFloat(row.total_lembur_flat)||0), upah_lembur:upahLembur, gaji_kotor:Math.round(gajiKotor), potongan_jht:finalJht, potongan_pensiun:finalPensiun, potongan_kes:finalKes, potongan_alpa:finalAlpa, potongan_insentif:potonganInsentif, pot_tabung_oksigen:potTabungOksigen, potongan_simulasi:potonganSimulasi, gaji_bersih:finalBersih };
 }
 
 function EditCell({ val, onSave, width=80 }) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [editing,setEditing]=useState(false), [draft,setDraft]=useState(val||0), ref=useRef(null);
   useEffect(()=>{ if(!editing) setDraft(val||0); },[val,editing]);
   function start(){
@@ -925,10 +1163,10 @@ function EditCell({ val, onSave, width=80 }) {
 
 function BpjsCell({ val, overridden, onToggle }) {
   if(overridden) return <div style={{display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end'}}><span style={{fontSize:9,color:'var(--muted)',textDecoration:'line-through'}}>{rp(val)}</span><button onClick={onToggle} style={{fontSize:9,padding:'1px 5px',borderRadius:4,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.1)',color:'#22C97A',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>↩</button></div>;
-  return <div style={{display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end'}}><span style={{color:'#E04545',fontSize:10}}>{rp(val)}</span><button onClick={onToggle} style={{fontSize:8,padding:'1px 4px',borderRadius:4,border:'1px solid rgba(224,69,69,.2)',background:'rgba(224,69,69,.06)',color:'#E04545',cursor:'pointer',opacity:.7,fontFamily:"'Outfit',sans-serif"}}>✕</button></div>;
+  return <div style={{display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end'}}><span style={{color:'#E04545',fontSize:10}}>{rp(val)}</span><button onClick={onToggle} style={{fontSize:8,padding:'1px 4px',borderRadius:4,border:'1px solid rgba(224,69,69,.2)',background:'rgba(224,69,69,.06)',color:'#E04545',cursor:'pointer',opacity:.7,fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><X size={9}/></button></div>;
 }
 
-function TabelPerJam({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKode='', isMd=false }) {
+function TabelPerJam({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKode='', isMd=false, bpjsPct={jht:2,pensiun:1,kes:1} }) {
   const solidBg0=isDark?'#121620':'#FFFFFF', solidBg1=isDark?'#181E2A':'#F8F9FC';
   const thB={padding:'5px 5px',fontSize:8.5,fontWeight:700,textAlign:'center',border:'1px solid #BDBDBD',whiteSpace:'nowrap'};
   const th1={...thB,background:'#F4A010',color:'#1A0A00'}, th2={...thB,background:'#FFF2CC',color:'#7B5E00'};
@@ -937,8 +1175,15 @@ function TabelPerJam({ data, activeTTT, onEdit, onScheduleSave, isDark, projectK
   function td(c,b,bg){return{padding:'3px 5px',fontSize:10,textAlign:'right',border:'1px solid var(--border)',color:c||'var(--text)',fontWeight:b?700:400,background:bg||'transparent',whiteSpace:'nowrap'};}
   function handleEdit(id,f,v){onEdit(id,f,v);onScheduleSave(id);}
   const isKhawistaPiling = projectKode === 'khawista';
+  const [selectedRow,setSelectedRow] = useState(null);
+  const containerRef = useRef(null);
+  useEffect(()=>{
+    function handleClickOutside(e){ if(containerRef.current && !containerRef.current.contains(e.target)) setSelectedRow(null); }
+    document.addEventListener('mousedown', handleClickOutside);
+    return ()=>document.removeEventListener('mousedown', handleClickOutside);
+  },[]);
   return (
-    <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 320px)'}}>
+    <div ref={containerRef} style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 210px)'}}>
       <table style={{borderCollapse:'collapse',fontSize:10.5,whiteSpace:'nowrap',width:'100%'}}>
         <thead style={{position:'sticky',top:0,zIndex:20}}>
           <tr>
@@ -946,33 +1191,35 @@ function TabelPerJam({ data, activeTTT, onEdit, onScheduleSave, isDark, projectK
             <th style={{...th1,minWidth:160,textAlign:'left',position:'sticky',left:25,zIndex:30,background:'#F4A010'}} rowSpan={2}>NAMA KARYAWAN</th>
             <th style={{...th1,minWidth:90,textAlign:'left'}} rowSpan={2}>JABATAN</th>
             <th style={th1} rowSpan={2}>PTKP</th>
-            <th style={thE} rowSpan={2}>GAJI POKOK ✏️</th>
+            <th style={thE} rowSpan={2}>GAJI POKOK <Pencil size={9} style={{verticalAlign:2}}/></th>
             <th style={th2} colSpan={isMd ? 2 : 3}>TUNJANGAN TETAP</th>
-            {activeTTT.length>0&&<th style={th2} colSpan={activeTTT.length}>TUNJANGAN TIDAK TETAP ✏️</th>}
+            {activeTTT.length>0&&<th style={th2} colSpan={activeTTT.length}>TUNJANGAN TIDAK TETAP <Pencil size={9} style={{verticalAlign:2}}/></th>}
             {isMd && <th style={th5} colSpan={4}>KOMPONEN MD</th>}
             <th style={th3} colSpan={2}>LEMBUR (Per Jam)</th>
             <th style={th1} rowSpan={2}>H.KERJA</th>
-            {isMd && <th style={thE} rowSpan={2}>Kekurangan Bln Lalu ✏️</th>}
+            {isMd && <th style={thE} rowSpan={2}>Kekurangan Bln Lalu <Pencil size={9} style={{verticalAlign:2}}/></th>}
             <th style={th1} rowSpan={2}>GAJI KOTOR</th>
             <th style={th4} colSpan={isKhawistaPiling?6:5}>POTONGAN</th>
             <th style={th1} rowSpan={2}>GAJI BERSIH</th>
             <th style={th5} colSpan={4}>ABSENSI</th>
           </tr>
           <tr>
-            <th style={thE}>Transport ✏️</th><th style={thE}>Tunj. Jabatan ✏️</th>{!isMd && <th style={th2}>Upah Penuh</th>}
-            {activeTTT.map(f=><th key={f.key} style={thE}>{f.label}{f.key !== 'kompensasi_pwt' ? ' ✏️' : ''}</th>)}
+            <th style={thE}>Transport <Pencil size={9} style={{verticalAlign:2}}/></th><th style={thE}>Tunj. Jabatan <Pencil size={9} style={{verticalAlign:2}}/></th>{!isMd && <th style={th2}>Upah Penuh</th>}
+            {activeTTT.map(f=><th key={f.key} style={thE}>{f.label}{f.key !== 'kompensasi_pwt' ? <Pencil size={9} style={{verticalAlign:2,marginLeft:2}}/> : null}</th>)}
             {isMd && <><th style={th5}>H.Basic</th><th style={th5}>U.Basic</th><th style={th5}>H.Kerja</th><th style={th5}>U.Kerja</th></>}
             <th style={th3}>Jml Jam Lembur</th><th style={th3}>Upah Lembur</th>
-            <th style={th4}>BPJS JHT 2%</th><th style={th4}>BPJS Pensiun 1%</th><th style={th4}>BPJS Kes 1%</th><th style={{...th4,background:'#FFCDD2'}}>Alpa/Prorata</th><th style={{...th4,background:'#FFCDD2'}}>Pot. Insentif</th>{isKhawistaPiling&&<th style={{...th4,background:'#FFCDD2'}}>Pot. Tabung O₂ ✏️</th>}
+            <th style={th4}>BPJS JHT {bpjsPct.jht}%</th><th style={th4}>BPJS Pensiun {bpjsPct.pensiun}%</th><th style={th4}>BPJS Kes {bpjsPct.kes}%</th><th style={{...th4,background:'#FFCDD2'}}>Alpa/Prorata</th><th style={{...th4,background:'#FFCDD2'}}>Pot. Insentif</th>{isKhawistaPiling&&<th style={{...th4,background:'#FFCDD2'}}>Pot. Tabung O₂ <Pencil size={9} style={{verticalAlign:2}}/></th>}
             <th style={th5}>Izin</th><th style={th5}>Sakit</th><th style={th5}>Alpa</th><th style={th5}>Cuti</th>
           </tr>
         </thead>
         <tbody>
           {data.map((r,idx)=>{
-            const bg=idx%2===0?'':'rgba(0,0,0,.025)';
-            return (<tr key={r.employee_id}>
-              <td style={{...td(),textAlign:'center',color:'var(--muted)',background:idx%2===0?solidBg0:solidBg1,position:'sticky',left:0,zIndex:5}}>{idx+1}</td>
-              <td style={{...td(),textAlign:'left',background:idx%2===0?solidBg0:solidBg1,fontWeight:600,paddingLeft:8,position:'sticky',left:28,zIndex:5}}>{r.nama_lengkap}</td>
+            const isSel=selectedRow===r.employee_id;
+            const bg=isSel?'rgba(58,143,224,.16)':(idx%2===0?'':'rgba(0,0,0,.025)');
+            const stickyBg=isSel?(isDark?'#1B3A5C':'#DCEBFB'):(idx%2===0?solidBg0:solidBg1);
+            return (<tr key={r.employee_id} onClick={()=>setSelectedRow(r.employee_id)} style={{cursor:'pointer',boxShadow:isSel?'inset 0 0 0 1.5px var(--blue)':'none'}}>
+              <td style={{...td(),textAlign:'center',color:'var(--muted)',background:stickyBg,position:'sticky',left:0,zIndex:5}}>{idx+1}</td>
+              <td style={{...td(),textAlign:'left',background:stickyBg,fontWeight:600,paddingLeft:8,position:'sticky',left:28,zIndex:5}}>{r.nama_lengkap}</td>
               <td style={{...td(),textAlign:'left',color:'var(--muted2)',fontSize:9,background:bg}}>{r.jabatan}</td>
               <td style={{...td(),textAlign:'center',fontSize:9,background:bg}}>{r.ptkp||'—'}</td>
               <td style={{...td(),background:'rgba(255,252,180,.25)',border:'1px solid rgba(200,160,0,.2)'}}><EditCell val={r.gaji_pokok||0} onSave={v=>handleEdit(r.employee_id,'gaji_pokok',v)}/></td>
@@ -1047,7 +1294,7 @@ function TabelPerJam({ data, activeTTT, onEdit, onScheduleSave, isDark, projectK
   );
 }
 
-function TabelFlat({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKode='' }) {
+function TabelFlat({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKode='', bpjsPct={jht:2,pensiun:1,kes:1} }) {
   const solidBg0=isDark?'#121620':'#FFFFFF', solidBg1=isDark?'#181E2A':'#F8F9FC';
   const thB={padding:'5px 5px',fontSize:8.5,fontWeight:700,textAlign:'center',border:'1px solid #BDBDBD',whiteSpace:'nowrap'};
   const th1={...thB,background:'#F4A010',color:'#1A0A00'}, th2={...thB,background:'#FFF2CC',color:'#7B5E00'};
@@ -1056,8 +1303,15 @@ function TabelFlat({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKod
   function td(c,b,bg){return{padding:'3px 5px',fontSize:10,textAlign:'right',border:'1px solid var(--border)',color:c||'var(--text)',fontWeight:b?700:400,background:bg||'transparent',whiteSpace:'nowrap'};}
   function handleEdit(id,f,v){onEdit(id,f,v);onScheduleSave(id);}
   const isKhawista = ['khawista', 'nk'].includes(projectKode);
+  const [selectedRow,setSelectedRow] = useState(null);
+  const containerRef = useRef(null);
+  useEffect(()=>{
+    function handleClickOutside(e){ if(containerRef.current && !containerRef.current.contains(e.target)) setSelectedRow(null); }
+    document.addEventListener('mousedown', handleClickOutside);
+    return ()=>document.removeEventListener('mousedown', handleClickOutside);
+  },[]);
   return (
-    <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 320px)'}}>
+    <div ref={containerRef} style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 210px)'}}>
       <table style={{borderCollapse:'collapse',fontSize:10.5,whiteSpace:'nowrap',width:'100%'}}>
         <thead style={{position:'sticky',top:0,zIndex:20}}>
           <tr>
@@ -1065,30 +1319,32 @@ function TabelFlat({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKod
             <th style={{...th1,minWidth:160,textAlign:'left',position:'sticky',left:25,zIndex:30,background:'#F4A010'}} rowSpan={2}>NAMA KARYAWAN</th>
             <th style={{...th1,minWidth:90,textAlign:'left'}} rowSpan={2}>JABATAN</th>
             <th style={th1} rowSpan={2}>PTKP</th>
-            <th style={thE} rowSpan={2}>GAJI POKOK ✏️</th>
+            <th style={thE} rowSpan={2}>GAJI POKOK <Pencil size={9} style={{verticalAlign:2}}/></th>
             <th style={th2} colSpan={3}>TUNJANGAN TETAP</th>
-            {activeTTT.length>0&&<th style={th2} colSpan={activeTTT.length}>TUNJANGAN TIDAK TETAP ✏️</th>}
+            {activeTTT.length>0&&<th style={th2} colSpan={activeTTT.length}>TUNJANGAN TIDAK TETAP <Pencil size={9} style={{verticalAlign:2}}/></th>}
             {!isKhawista && <th style={th3} colSpan={3}>LEMBUR FLAT</th>}
-            <th style={thE} rowSpan={2}>U. HADIR ✏️</th>
+            <th style={thE} rowSpan={2}>U. HADIR <Pencil size={9} style={{verticalAlign:2}}/></th>
             <th style={th1} rowSpan={2}>H.KERJA</th><th style={th1} rowSpan={2}>GAJI KOTOR</th>
             <th style={th4} colSpan={5}>POTONGAN</th>
             <th style={th1} rowSpan={2}>GAJI BERSIH</th>
             <th style={th5} colSpan={4}>ABSENSI</th>
           </tr>
           <tr>
-            <th style={thE}>Transport ✏️</th><th style={thE}>Tunj. Jabatan ✏️</th><th style={th2}>Upah Penuh</th>
-            {activeTTT.map(f=><th key={f.key} style={thE}>{f.label}{f.key !== 'kompensasi_pwt' ? ' ✏️' : ''}</th>)}
+            <th style={thE}>Transport <Pencil size={9} style={{verticalAlign:2}}/></th><th style={thE}>Tunj. Jabatan <Pencil size={9} style={{verticalAlign:2}}/></th><th style={th2}>Upah Penuh</th>
+            {activeTTT.map(f=><th key={f.key} style={thE}>{f.label}{f.key !== 'kompensasi_pwt' ? <Pencil size={9} style={{verticalAlign:2,marginLeft:2}}/> : null}</th>)}
             {!isKhawista && <><th style={{...th3,background:'#C6EFCE'}}>L Sabtu (×75rb)</th><th style={{...th3,background:'#C6EFCE'}}>L Libur (×200rb)</th><th style={th3}>Total Lembur</th></>}
-            <th style={th4}>BPJS JHT 2%</th><th style={th4}>BPJS Pensiun 1%</th><th style={th4}>BPJS Kes 1%</th><th style={{...th4,background:'#FFCDD2'}}>Alpa/Prorata</th><th style={{...th4,background:'#FFCDD2'}}>Pot. Insentif</th>
+            <th style={th4}>BPJS JHT {bpjsPct.jht}%</th><th style={th4}>BPJS Pensiun {bpjsPct.pensiun}%</th><th style={th4}>BPJS Kes {bpjsPct.kes}%</th><th style={{...th4,background:'#FFCDD2'}}>Alpa/Prorata</th><th style={{...th4,background:'#FFCDD2'}}>Pot. Insentif</th>
             <th style={th5}>Izin</th><th style={th5}>Sakit</th><th style={th5}>Alpa</th><th style={th5}>Cuti</th>
           </tr>
         </thead>
         <tbody>
           {data.map((r,idx)=>{
-            const bg=idx%2===0?'':'rgba(0,0,0,.025)';
-            return (<tr key={r.employee_id}>
-              <td style={{...td(),textAlign:'center',color:'var(--muted)',background:idx%2===0?solidBg0:solidBg1,position:'sticky',left:0,zIndex:5}}>{idx+1}</td>
-              <td style={{...td(),textAlign:'left',background:idx%2===0?solidBg0:solidBg1,fontWeight:600,paddingLeft:8,position:'sticky',left:28,zIndex:5}}>{r.nama_lengkap}</td>
+            const isSel=selectedRow===r.employee_id;
+            const bg=isSel?'rgba(58,143,224,.16)':(idx%2===0?'':'rgba(0,0,0,.025)');
+            const stickyBg=isSel?(isDark?'#1B3A5C':'#DCEBFB'):(idx%2===0?solidBg0:solidBg1);
+            return (<tr key={r.employee_id} onClick={()=>setSelectedRow(r.employee_id)} style={{cursor:'pointer',boxShadow:isSel?'inset 0 0 0 1.5px var(--blue)':'none'}}>
+              <td style={{...td(),textAlign:'center',color:'var(--muted)',background:stickyBg,position:'sticky',left:0,zIndex:5}}>{idx+1}</td>
+              <td style={{...td(),textAlign:'left',background:stickyBg,fontWeight:600,paddingLeft:8,position:'sticky',left:28,zIndex:5}}>{r.nama_lengkap}</td>
               <td style={{...td(),textAlign:'left',color:'var(--muted2)',fontSize:9,background:bg}}>{r.jabatan}</td>
               <td style={{...td(),textAlign:'center',fontSize:9,background:bg}}>{r.ptkp||'—'}</td>
               <td style={{...td(),background:'rgba(255,252,180,.25)',border:'1px solid rgba(200,160,0,.2)'}}><EditCell val={r.gaji_pokok||0} onSave={v=>handleEdit(r.employee_id,'gaji_pokok',v)}/></td>
@@ -1160,7 +1416,195 @@ function TabelFlat({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKod
   );
 }
 
-function TabelGabung({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKode='', isMd=false }) {
+// ── TABEL HO — kantor pusat: tanpa timesheet, tanpa lembur sama sekali ──
+// Dipisah per unit (HO-1/HO-2, sama seperti 2 sheet terpisah di Excel sumbernya) karena
+// masing-masing unit punya riwayat gaji dengan nama kolom sendiri-sendiri. Setiap blok unit
+// nampilin: identitas -> riwayat gaji 2018-2026 apa adanya (read-only, arsip) -> kolom Gaji
+// [periode aktif] yang BISA diedit -> Gaji Kotor/BPJS/Gaji Bersih (masih dihitung otomatis,
+// dipertahankan karena tetap dipakai buat proses payroll bulan berjalan).
+const PTKP_OPTIONS = ['TK/0','TK/1','TK/2','TK/3','K/0','K/1','K/2','K/3'];
+const STATUS_KARYAWAN_OPTIONS = ['PKWTT','PKWT','OWNER','Umum'];
+// Sama persis dengan daftar bank di halaman Edit Karyawan (resources/js/Pages/Employee/Edit.jsx)
+const BANK_OPTIONS = ['BCA','Mandiri','BRI','BNI','BSI','CIMB Niaga','Danamon','Permata','BTN','Mega','Bank Riau Kepri'];
+
+// 'd-m-Y' (format tampilan backend) <-> 'Y-m-d' (format input type=date)
+function toIsoDate(ddmmyyyy) {
+  if (!ddmmyyyy) return '';
+  const parts = ddmmyyyy.split('-');
+  if (parts.length !== 3) return '';
+  const [d, m, y] = parts;
+  return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+}
+function fromIsoDate(isoDate) {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  return `${d}-${m}-${y}`;
+}
+
+function TabelHo({ data, activeTTT, onEdit, onScheduleSave, onEditInfo, isDark, bpjsPct={jht:2,pensiun:1,kes:1}, salaryMatrix={}, bulanNama='', tahun, token }) {
+  const { auth } = usePage().props;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
+  const solidBg0=isDark?'#121620':'#FFFFFF', solidBg1=isDark?'#181E2A':'#F8F9FC';
+  const thB={padding:'5px 5px',fontSize:8.5,fontWeight:700,textAlign:'center',border:'1px solid #BDBDBD',whiteSpace:'nowrap'};
+  const th1={...thB,background:'#F4A010',color:'#1A0A00'}, th2={...thB,background:'#FFF2CC',color:'#7B5E00'};
+  const th3={...thB,background:'#EAEAEA',color:'#333'}, th4={...thB,background:'#FCE4D6',color:'#9C0006'}, thE={...thB,background:'#FFFACD',color:'#7B5E00'};
+  const thHist={...thB,background:'#F0F0F0',color:'#555',fontWeight:600,maxWidth:90,overflow:'hidden',textOverflow:'ellipsis'};
+  function td(c,b,bg){return{padding:'3px 5px',fontSize:10,textAlign:'right',border:'1px solid var(--border)',color:c||'var(--text)',fontWeight:b?700:400,background:bg||'transparent',whiteSpace:'nowrap'};}
+  function tdEdit(){return{...td(),background:'rgba(255,252,180,.25)',border:'1px solid rgba(200,160,0,.2)'};}
+  function handleEdit(id,f,v){onEdit(id,f,v);onScheduleSave(id);}
+  const inpStyle={width:'100%',minWidth:82,border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--text)',fontSize:9,textAlign:'center',outline:'none',padding:'2px 3px',borderRadius:3,fontFamily:"'Outfit',sans-serif"};
+  const selStyle={...inpStyle,minWidth:64,cursor:'pointer'};
+
+  const [histValues, setHistValues] = useState(()=>JSON.parse(JSON.stringify(salaryMatrix?.values||{})));
+  useEffect(()=>{ setHistValues(JSON.parse(JSON.stringify(salaryMatrix?.values||{}))); },[salaryMatrix]);
+
+  const histSaveTimer=useRef({});
+  function handleHistoryEdit(empId,label,val){
+    setHistValues(prev=>({ ...prev, [empId]:{...(prev[empId]||{}),[label]:val} }));
+    const timerKey=`${empId}::${label}`;
+    clearTimeout(histSaveTimer.current[timerKey]);
+    histSaveTimer.current[timerKey]=setTimeout(()=>{
+      const period=salaryMatrix?.periods?.[label];
+      const req=period
+        ? axios.put(`/timesheet/payroll/${empId}/manual`,{tahun:period.tahun,bulan:period.bulan,gaji_pokok:val},{headers:{'X-CSRF-TOKEN':token}})
+        : axios.put(`/timesheet/payroll/${empId}/salary-history`,{label,nominal:val},{headers:{'X-CSRF-TOKEN':token}});
+      req.catch(e=>console.error('Gagal simpan riwayat gaji',e));
+    },500);
+  }
+
+  const labels = salaryMatrix?.labels || [];
+  const rows = [...data].sort((a,b)=>(a.ho_unit||'').localeCompare(b.ho_unit||'') || (a.nama_lengkap||'').localeCompare(b.nama_lengkap||''));
+  const [selectedRow,setSelectedRow] = useState(null);
+  const containerRef = useRef(null);
+  useEffect(()=>{
+    function handleClickOutside(e){ if(containerRef.current && !containerRef.current.contains(e.target)) setSelectedRow(null); }
+    document.addEventListener('mousedown', handleClickOutside);
+    return ()=>document.removeEventListener('mousedown', handleClickOutside);
+  },[]);
+
+  return (
+    <div>
+      <div ref={containerRef} style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 270px)',border:'1px solid var(--border)',borderRadius:8}}>
+        <table style={{borderCollapse:'collapse',fontSize:10.5,whiteSpace:'nowrap',width:'100%'}}>
+          <thead style={{position:'sticky',top:0,zIndex:20}}>
+            <tr>
+              <th style={{...th1,width:30,minWidth:30,position:'sticky',left:0,zIndex:30,background:'#F4A010'}} rowSpan={2}>#</th>
+              <th style={{...th1,minWidth:160,textAlign:'left',position:'sticky',left:25,zIndex:30,background:'#F4A010'}} rowSpan={2}>NAMA KARYAWAN</th>
+              <th style={th3} rowSpan={2}>UNIT</th>
+              <th style={{...th1,minWidth:90,textAlign:'left'}} rowSpan={2}>JABATAN</th>
+              <th style={th3} rowSpan={2}>STATUS</th>
+              <th style={th3} rowSpan={2}>TGL MASUK</th>
+              <th style={th3} rowSpan={2}>PTKP</th>
+              <th style={{...th3,minWidth:110}} rowSpan={2}>NO. REKENING</th>
+              <th style={th3} rowSpan={2}>BANK</th>
+              {labels.length>0 && <th style={{...thB,background:'#DDD'}} colSpan={labels.length}>RIWAYAT GAJI (ARSIP) <Pencil size={9} style={{verticalAlign:2}}/></th>}
+              <th style={thE} rowSpan={2}>GAJI {(bulanNama||'').toUpperCase()} {tahun} <Pencil size={9} style={{verticalAlign:2}}/></th>
+              <th style={th2} colSpan={2}>TUNJANGAN TETAP</th>
+              {activeTTT.length>0&&<th style={th2} colSpan={activeTTT.length}>TUNJANGAN TIDAK TETAP <Pencil size={9} style={{verticalAlign:2}}/></th>}
+              <th style={th1} rowSpan={2}>GAJI KOTOR</th>
+              <th style={th4} colSpan={3}>POTONGAN WAJIB</th>
+              <th style={th1} rowSpan={2}>GAJI BERSIH</th>
+            </tr>
+            <tr>
+              {labels.map(l=><th key={l} title={l} style={thHist}>{l}</th>)}
+              <th style={thE}>Tunj. Tetap <Pencil size={9} style={{verticalAlign:2}}/></th><th style={th2}>Komp. PWT</th>
+              {activeTTT.map(f=><th key={f.key} style={thE}>{f.label}<Pencil size={9} style={{verticalAlign:2,marginLeft:2}}/></th>)}
+              <th style={th4}>BPJS JHT {bpjsPct.jht}%</th><th style={th4}>BPJS Pensiun {bpjsPct.pensiun}%</th><th style={th4}>BPJS Kes {bpjsPct.kes}%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r,idx)=>{
+              const isSel=selectedRow===r.employee_id;
+              const bg=isSel?'rgba(58,143,224,.16)':(idx%2===0?'':'rgba(0,0,0,.025)');
+              const stickyBg=isSel?(isDark?'#1B3A5C':'#DCEBFB'):(idx%2===0?solidBg0:solidBg1);
+              const rowValues = histValues[r.employee_id] || {};
+              return (<tr key={r.employee_id} onClick={()=>setSelectedRow(r.employee_id)} style={{cursor:'pointer',boxShadow:isSel?'inset 0 0 0 1.5px var(--blue)':'none'}}>
+                <td style={{...td(),textAlign:'center',color:'var(--muted)',background:stickyBg,position:'sticky',left:0,zIndex:5}}>{idx+1}</td>
+                <td style={{...td(),textAlign:'left',background:stickyBg,fontWeight:600,paddingLeft:8,position:'sticky',left:28,zIndex:5}}>{r.nama_lengkap}</td>
+                <td style={{...td(),textAlign:'center',fontSize:9,fontWeight:700,background:bg}}>{r.ho_unit||'—'}</td>
+                <td style={{...td(),textAlign:'left',color:'var(--muted2)',fontSize:9,background:bg}}>{r.jabatan}</td>
+                <td style={{...td(),textAlign:'center',fontSize:9,background:bg,padding:'2px 3px'}}>
+                  {isViewer ? (r.ho_status_karyawan||'—') : (
+                    <select value={r.ho_status_karyawan||''} onChange={e=>onEditInfo(r.employee_id,'ho_status_karyawan',e.target.value)} onClick={e=>e.stopPropagation()} style={selStyle}>
+                      <option value="">—</option>
+                      {[...new Set([...STATUS_KARYAWAN_OPTIONS, ...(r.ho_status_karyawan?[r.ho_status_karyawan]:[])])].map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
+                  )}
+                </td>
+                <td style={{...td(),textAlign:'center',fontSize:9,background:bg,padding:'2px 3px'}}>
+                  {isViewer ? (r.tanggal_masuk||'—') : (
+                    <input type="date" value={toIsoDate(r.tanggal_masuk)} onChange={e=>onEditInfo(r.employee_id,'tanggal_masuk',fromIsoDate(e.target.value))} onClick={e=>e.stopPropagation()} style={inpStyle}/>
+                  )}
+                </td>
+                <td style={{...td(),textAlign:'center',fontSize:9,background:bg,padding:'2px 3px'}}>
+                  {isViewer ? (r.ptkp||'—') : (
+                    <select value={r.ptkp||''} onChange={e=>onEditInfo(r.employee_id,'ptkp',e.target.value)} onClick={e=>e.stopPropagation()} style={selStyle}>
+                      <option value="">—</option>
+                      {[...new Set([...PTKP_OPTIONS, ...(r.ptkp&&r.ptkp!=='—'?[r.ptkp]:[])])].map(p=><option key={p} value={p}>{p}</option>)}
+                    </select>
+                  )}
+                </td>
+                <td style={{...td(),textAlign:'center',fontSize:9,background:bg,padding:'2px 3px'}}>
+                  {isViewer ? (r.no_rekening||'—') : (
+                    <input type="text" value={r.no_rekening||''} onChange={e=>onEditInfo(r.employee_id,'no_rekening',e.target.value)} onClick={e=>e.stopPropagation()} style={inpStyle} placeholder="No. Rekening"/>
+                  )}
+                </td>
+                <td style={{...td(),textAlign:'center',fontSize:9,background:bg,padding:'2px 3px'}}>
+                  {isViewer ? (r.nama_bank||'—') : (
+                    <select value={r.nama_bank||''} onChange={e=>onEditInfo(r.employee_id,'nama_bank',e.target.value)} onClick={e=>e.stopPropagation()} style={selStyle}>
+                      <option value="">—</option>
+                      {[...new Set([...BANK_OPTIONS, ...(r.nama_bank?[r.nama_bank]:[])])].map(b=><option key={b} value={b}>{b}</option>)}
+                    </select>
+                  )}
+                </td>
+                {labels.map(l=>(
+                  <td key={l} style={{...td('var(--muted2)',false,bg),fontSize:9,background:'rgba(255,252,180,.15)'}}>
+                    <EditCell val={rowValues[l]||0} onSave={v=>handleHistoryEdit(r.employee_id,l,v)} width={62}/>
+                  </td>
+                ))}
+                <td style={tdEdit()}><EditCell val={r.gaji_pokok||0} onSave={v=>handleEdit(r.employee_id,'gaji_pokok',v)}/></td>
+                <td style={tdEdit()}><EditCell val={r.tunj_tetap||0} onSave={v=>handleEdit(r.employee_id,'tunj_tetap',v)}/></td>
+                <td style={td('var(--muted2)',false,bg)}>{rp(r.kompensasi_pwt)}</td>
+                {activeTTT.map(f=>(
+                  <td key={f.key} style={tdEdit()}><EditCell val={r[f.key]||0} onSave={v=>handleEdit(r.employee_id,f.key,v)}/></td>
+                ))}
+                <td style={td('var(--accent)',true,bg)}>{rp(r.gaji_kotor)}</td>
+                <td style={{...td(),padding:'2px 4px',background:bg}}><BpjsCell val={r.potongan_jht} overridden={r._no_jht} onToggle={()=>handleEdit(r.employee_id,'_no_jht',!r._no_jht)}/></td>
+                <td style={{...td(),padding:'2px 4px',background:bg}}><BpjsCell val={r.potongan_pensiun} overridden={r._no_pensiun} onToggle={()=>handleEdit(r.employee_id,'_no_pensiun',!r._no_pensiun)}/></td>
+                <td style={{...td(),padding:'2px 4px',background:bg}}><BpjsCell val={r.potongan_kes} overridden={r._no_kes} onToggle={()=>handleEdit(r.employee_id,'_no_kes',!r._no_kes)}/></td>
+                <td style={td('#22C97A',true,bg)}>{rp(r.gaji_bersih)}</td>
+              </tr>);
+            })}
+          </tbody>
+          <tfoot style={{position:'sticky',bottom:0,zIndex:20}}>
+            <tr>
+              <td colSpan={2} style={{...th1,textAlign:'right',paddingRight:8,position:'sticky',left:0,zIndex:30,fontSize:9}}>TOTAL ({rows.length})</td>
+              <td style={th3}>—</td>
+              <td style={th1}>—</td>
+              <td style={th3}>—</td>
+              <td style={th3}>—</td>
+              <td style={th3}>—</td>
+              <td style={th3}>—</td>
+              <td style={th3}>—</td>
+              {labels.map(l=><td key={l} style={{...thB,background:'#DDD',fontSize:8}}>{rp(rows.reduce((s,r)=>s+((histValues[r.employee_id]||{})[l]||0),0))}</td>)}
+              <td style={th1}>{rp(rows.reduce((s,r)=>s+(r.gaji_pokok||0),0))}</td>
+              <td style={{...thB,background:'#FFF2CC',color:'#7B5E00'}}>{rp(rows.reduce((s,r)=>s+(r.tunj_tetap||0),0))}</td>
+              <td style={{...thB,background:'#FFF2CC',color:'#7B5E00'}}>{rp(rows.reduce((s,r)=>s+(r.kompensasi_pwt||0),0))}</td>
+              {activeTTT.map(f=>(<td key={f.key} style={{...thB,background:'#FFF2CC',color:'#7B5E00'}}>{rp(rows.reduce((s,r)=>s+(r[f.key]||0),0))}</td>))}
+              <td style={{...th1,fontWeight:700}}>{rp(rows.reduce((s,r)=>s+(r.gaji_kotor||0),0))}</td>
+              <td style={{...thB,background:'#FCE4D6',color:'#9C0006'}}>{rp(rows.reduce((s,r)=>s+(r.potongan_jht||0),0))}</td>
+              <td style={{...thB,background:'#FCE4D6',color:'#9C0006'}}>{rp(rows.reduce((s,r)=>s+(r.potongan_pensiun||0),0))}</td>
+              <td style={{...thB,background:'#FCE4D6',color:'#9C0006'}}>{rp(rows.reduce((s,r)=>s+(r.potongan_kes||0),0))}</td>
+              <td style={{...thB,background:'#E2EFDA',color:'#276221',fontWeight:700,fontSize:9.5}}>{rp(rows.reduce((s,r)=>s+(r.gaji_bersih||0),0))}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TabelGabung({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKode='', isMd=false, bpjsPct={jht:2,pensiun:1,kes:1} }) {
   const solidBg0=isDark?'#121620':'#FFFFFF', solidBg1=isDark?'#181E2A':'#F8F9FC';
   const thB={padding:'5px 5px',fontSize:8.5,fontWeight:700,textAlign:'center',border:'1px solid #BDBDBD',whiteSpace:'nowrap'};
   const th1={...thB,background:'#F4A010',color:'#1A0A00'}, th2={...thB,background:'#FFF2CC',color:'#7B5E00'};
@@ -1168,9 +1612,23 @@ function TabelGabung({ data, activeTTT, onEdit, onScheduleSave, isDark, projectK
   const th5={...thB,background:'#DAEEF3',color:'#0C4B6E'}, thE={...thB,background:'#FFFACD',color:'#7B5E00'};
   function td(c,b,bg){return{padding:'3px 5px',fontSize:10,textAlign:'right',border:'1px solid var(--border)',color:c||'var(--text)',fontWeight:b?700:400,background:bg||'transparent',whiteSpace:'nowrap'};}
   function handleEdit(id,f,v){onEdit(id,f,v);onScheduleSave(id);}
+  function fmtFlatLembur(r){
+    const parts=[];
+    if(r.l_sabtu)      parts.push(`${r.l_sabtu} Sabtu`);
+    if(r.l_libur)      parts.push(`${r.l_libur} Libur`);
+    if(r.lembur_biasa) parts.push(`${r.lembur_biasa} Biasa`);
+    return parts.length?parts.join(' · '):'—';
+  }
   const isKhawista = ['khawista', 'nk'].includes(projectKode);
+  const [selectedRow,setSelectedRow] = useState(null);
+  const containerRef = useRef(null);
+  useEffect(()=>{
+    function handleClickOutside(e){ if(containerRef.current && !containerRef.current.contains(e.target)) setSelectedRow(null); }
+    document.addEventListener('mousedown', handleClickOutside);
+    return ()=>document.removeEventListener('mousedown', handleClickOutside);
+  },[]);
   return (
-    <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 320px)'}}>
+    <div ref={containerRef} style={{overflowX:'auto',overflowY:'auto',maxHeight:'calc(100vh - 210px)'}}>
       <table style={{borderCollapse:'collapse',fontSize:10.5,whiteSpace:'nowrap',width:'100%'}}>
         <thead style={{position:'sticky',top:0,zIndex:20}}>
           <tr>
@@ -1178,33 +1636,36 @@ function TabelGabung({ data, activeTTT, onEdit, onScheduleSave, isDark, projectK
             <th style={{...th1,minWidth:160,textAlign:'left',position:'sticky',left:25,zIndex:30,background:'#F4A010'}} rowSpan={2}>NAMA KARYAWAN</th>
             <th style={{...th1,minWidth:85,textAlign:'left'}} rowSpan={2}>JABATAN</th>
             <th style={th1} rowSpan={2}>PTKP</th>
-            <th style={thE} rowSpan={2}>GAJI POKOK ✏️</th>
+            <th style={thE} rowSpan={2}>GAJI POKOK <Pencil size={9} style={{verticalAlign:2}}/></th>
             <th style={th2} colSpan={isMd ? 2 : 3}>TUNJANGAN TETAP</th>
-            {activeTTT.length>0&&<th style={th2} colSpan={activeTTT.length}>TUNJANGAN TIDAK TETAP ✏️</th>}
+            {activeTTT.length>0&&<th style={th2} colSpan={activeTTT.length}>TUNJANGAN TIDAK TETAP <Pencil size={9} style={{verticalAlign:2}}/></th>}
             {isMd && <th style={th5} colSpan={4}>KOMPONEN MD</th>}
             <th style={th3} colSpan={2}>LEMBUR</th>
             <th style={th1} rowSpan={2}>H.KERJA</th>
-            {isMd && <th style={thE} rowSpan={2}>Kekurangan Bln Lalu ✏️</th>}
+            {isMd && <th style={thE} rowSpan={2}>Kekurangan Bln Lalu <Pencil size={9} style={{verticalAlign:2}}/></th>}
             <th style={th1} rowSpan={2}>GAJI KOTOR</th>
             <th style={th4} colSpan={5}>POTONGAN</th>
             <th style={th1} rowSpan={2}>GAJI BERSIH</th>
             <th style={th5} colSpan={4}>ABSENSI</th>
           </tr>
           <tr>
-            <th style={thE}>Transport ✏️</th><th style={thE}>Tunj. Jabatan ✏️</th>{!isMd && <th style={th2}>Upah Penuh</th>}
-            {activeTTT.map(f=><th key={f.key} style={thE}>{f.label}{f.key !== 'kompensasi_pwt' ? ' ✏️' : ''}</th>)}
+            <th style={thE}>Transport <Pencil size={9} style={{verticalAlign:2}}/></th><th style={thE}>Tunj. Jabatan <Pencil size={9} style={{verticalAlign:2}}/></th>{!isMd && <th style={th2}>Upah Penuh</th>}
+            {activeTTT.map(f=><th key={f.key} style={thE}>{f.label}{f.key !== 'kompensasi_pwt' ? <Pencil size={9} style={{verticalAlign:2,marginLeft:2}}/> : null}</th>)}
             {isMd && <><th style={th5}>H.Basic</th><th style={th5}>U.Basic</th><th style={th5}>H.Kerja</th><th style={th5}>U.Kerja</th></>}
             <th style={th3}>Jam / Flat</th><th style={th3}>Upah Lembur</th>
-            <th style={th4}>BPJS JHT 2%</th><th style={th4}>BPJS Pensiun 1%</th><th style={th4}>BPJS Kes 1%</th><th style={{...th4,background:'#FFCDD2'}}>Alpa/Prorata</th><th style={{...th4,background:'#FFCDD2'}}>Pot. Insentif</th>
+            <th style={th4}>BPJS JHT {bpjsPct.jht}%</th><th style={th4}>BPJS Pensiun {bpjsPct.pensiun}%</th><th style={th4}>BPJS Kes {bpjsPct.kes}%</th><th style={{...th4,background:'#FFCDD2'}}>Alpa/Prorata</th><th style={{...th4,background:'#FFCDD2'}}>Pot. Insentif</th>
             <th style={th5}>Izin</th><th style={th5}>Sakit</th><th style={th5}>Alpa</th><th style={th5}>Cuti</th>
           </tr>
         </thead>
         <tbody>
           {data.map((r,idx)=>{
-            const isFlat=r.kelompok==='flat', bg=idx%2===0?'':'rgba(0,0,0,.025)';
-            return (<tr key={r.employee_id}>
-              <td style={{...td(),textAlign:'center',color:'var(--muted)',background:idx%2===0?solidBg0:solidBg1,position:'sticky',left:0,zIndex:5}}>{idx+1}</td>
-              <td style={{...td(),textAlign:'left',background:idx%2===0?solidBg0:solidBg1,fontWeight:600,paddingLeft:8,position:'sticky',left:28,zIndex:5}}>{r.nama_lengkap}</td>
+            const isFlat=r.kelompok==='flat';
+            const isSel=selectedRow===r.employee_id;
+            const bg=isSel?'rgba(58,143,224,.16)':(idx%2===0?'':'rgba(0,0,0,.025)');
+            const stickyBg=isSel?(isDark?'#1B3A5C':'#DCEBFB'):(idx%2===0?solidBg0:solidBg1);
+            return (<tr key={r.employee_id} onClick={()=>setSelectedRow(r.employee_id)} style={{cursor:'pointer',boxShadow:isSel?'inset 0 0 0 1.5px var(--blue)':'none'}}>
+              <td style={{...td(),textAlign:'center',color:'var(--muted)',background:stickyBg,position:'sticky',left:0,zIndex:5}}>{idx+1}</td>
+              <td style={{...td(),textAlign:'left',background:stickyBg,fontWeight:600,paddingLeft:8,position:'sticky',left:28,zIndex:5}}>{r.nama_lengkap}</td>
               <td style={{...td(),textAlign:'left',color:'var(--muted2)',fontSize:9,background:bg}}>{r.jabatan}</td>
               <td style={{...td(),textAlign:'center',fontSize:9,background:bg}}>{r.ptkp||'—'}</td>
               <td style={{...td(),background:'rgba(255,252,180,.25)',border:'1px solid rgba(200,160,0,.2)'}}><EditCell val={r.gaji_pokok||0} onSave={v=>handleEdit(r.employee_id,'gaji_pokok',v)}/></td>
@@ -1217,7 +1678,7 @@ function TabelGabung({ data, activeTTT, onEdit, onScheduleSave, isDark, projectK
                 <td style={{...td(),textAlign:'center',background:bg}}>{r.h_kerja||0}</td>
                 <td style={{...td(),textAlign:'right',background:bg}}>{rp(r.u_kerja||0)}</td>
               </>}
-              <td style={td('#22C97A',true,bg)}>{isFlat?(isKhawista?'—':((r.l_sabtu||0)===0&&(r.l_libur||0)===0&&(r.lembur_biasa||0)===0?'—':`${r.l_sabtu||0}S+${r.l_libur||0}L+${r.lembur_biasa||0}B`)):((r.jml_jam_lembur||0)===0?'—':`${(r.jml_jam_lembur||0).toFixed(1)} jam`)}</td>
+              <td style={{...td('#22C97A',true,bg),fontSize:9}}>{isFlat?(isKhawista?'—':fmtFlatLembur(r)):((r.jml_jam_lembur||0)===0?'—':`${(r.jml_jam_lembur||0).toFixed(1)} jam`)}</td>
               <td style={td('#22C97A',true,bg)}>{isFlat&&isKhawista?'—':rp(isFlat?r.total_lembur_flat:r.upah_lembur)}</td>
               <td style={{...td(),textAlign:'center',fontWeight:700,background:bg}}>{r.h_kerja||0}</td>
               {isMd && <td style={{...td(),background:'rgba(255,252,180,.25)',border:'1px solid rgba(200,160,0,.2)'}}><EditCell val={r.kekurangan_bulan_lalu||0} onSave={v=>handleEdit(r.employee_id,'kekurangan_bulan_lalu',v)}/></td>}
@@ -1490,7 +1951,7 @@ function TabelOvertimeCustom({ tahun, bulan, token, isViewer=false, subGroup='al
   };
 
   if (loading) return (
-    <div style={{padding:40,textAlign:'center',color:'var(--muted)',fontSize:12}}>⏳ Memuat data overtime...</div>
+    <div style={{padding:40,textAlign:'center',color:'var(--muted)',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> Memuat data overtime...</div>
   );
 
   return (
@@ -1498,15 +1959,15 @@ function TabelOvertimeCustom({ tahun, bulan, token, isViewer=false, subGroup='al
       {/* Header */}
       <div style={{padding:'10px 16px',background:'rgba(232,160,32,.06)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
         <div style={{fontSize:11.5,color:'var(--muted2)'}}>
-          <b style={{color:'var(--accent)'}}>⏰ Overtime Custom — KHAWISTA</b>
+          <b style={{color:'var(--accent)'}}><AlarmClock size={12} style={{verticalAlign:'-2px'}}/> Overtime Custom — KHAWISTA</b>
           <span style={{marginLeft:10}}>Tarif per orang bisa berbeda · Hari otomatis dari timesheet</span>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <span style={{fontSize:11,color:'var(--muted)'}}>{displayed.length} dari {members.length} anggota</span>
           {!isViewer && (
             <button onClick={()=>setShowAdd(v=>!v)}
-              style={{padding:'5px 12px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-              ➕ Tambah
+              style={{padding:'5px 12px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}>
+              <Plus size={12}/> Tambah
             </button>
           )}
         </div>
@@ -1544,11 +2005,11 @@ function TabelOvertimeCustom({ tahun, bulan, token, isViewer=false, subGroup='al
               {!isViewer && <th style={{...thB,background:'var(--bg2)',color:'var(--muted)',width:50}} rowSpan={2}>Hapus</th>}
             </tr>
             <tr>
-              <th style={{...thE,background:'#C6EFCE',color:'#276221'}}>Tarif/Hari ✏️</th>
-              <th style={{...thE,background:'#C6EFCE',color:'#276221'}}>Jml Hari ✏️</th>
+              <th style={{...thE,background:'#C6EFCE',color:'#276221'}}>Tarif/Hari <Pencil size={9} style={{verticalAlign:2}}/></th>
+              <th style={{...thE,background:'#C6EFCE',color:'#276221'}}>Jml Hari <Pencil size={9} style={{verticalAlign:2}}/></th>
               <th style={{...th3,background:'#C6EFCE'}}>Subtotal</th>
-              <th style={{...thE,background:'#DAEEF3',color:'#0C4B6E'}}>Tarif/Hari ✏️</th>
-              <th style={{...thE,background:'#DAEEF3',color:'#0C4B6E'}}>Jml Hari ✏️</th>
+              <th style={{...thE,background:'#DAEEF3',color:'#0C4B6E'}}>Tarif/Hari <Pencil size={9} style={{verticalAlign:2}}/></th>
+              <th style={{...thE,background:'#DAEEF3',color:'#0C4B6E'}}>Jml Hari <Pencil size={9} style={{verticalAlign:2}}/></th>
               <th style={{...thB,background:'#DAEEF3',color:'#0C4B6E'}}>Subtotal</th>
             </tr>
           </thead>
@@ -1630,8 +2091,8 @@ function TabelOvertimeCustom({ tahun, bulan, token, isViewer=false, subGroup='al
                   {!isViewer && (
                     <td style={{padding:'4px',textAlign:'center',border:'1px solid var(--border)',background:bg}}>
                       <button onClick={()=>removeMember(r.employee_id)}
-                        style={{padding:'2px 8px',borderRadius:6,border:'1px solid rgba(224,69,69,.3)',background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                        🗑️
+                        style={{padding:'2px 8px',borderRadius:6,border:'1px solid rgba(224,69,69,.3)',background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}>
+                        <Trash2 size={11}/>
                       </button>
                     </td>
                   )}
@@ -1641,7 +2102,7 @@ function TabelOvertimeCustom({ tahun, bulan, token, isViewer=false, subGroup='al
             {displayed.length===0 && (
               <tr>
                 <td colSpan={!isViewer?11:10} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>
-                  {members.length===0 ? 'Belum ada anggota. Klik ➕ Tambah untuk menambahkan.' : 'Tidak ada hasil pencarian.'}
+                  {members.length===0 ? 'Belum ada anggota. Klik Tambah untuk menambahkan.' : 'Tidak ada hasil pencarian.'}
                 </td>
               </tr>
             )}
@@ -1692,10 +2153,10 @@ function TabelOvertime({ dataFlat, allFlat, onOvertimeChange, token, tahun, bula
   return (
     <div>
       <div style={{padding:'10px 16px',background:'rgba(232,160,32,.06)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
-        <div style={{fontSize:11.5,color:'var(--muted2)'}}><b style={{color:'var(--accent)'}}>⏰ Overtime — Kelompok FLAT</b><span style={{marginLeft:10}}>L Sabtu ×75rb · L Libur ×200rb · Lembur Biasa ×20rb</span></div>
+        <div style={{fontSize:11.5,color:'var(--muted2)'}}><b style={{color:'var(--accent)',display:'inline-flex',alignItems:'center',gap:5}}><AlarmClock size={13}/> Overtime — Kelompok FLAT</b><span style={{marginLeft:10}}>L Sabtu ×75rb · L Libur ×200rb · Lembur Biasa ×20rb</span></div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <span style={{fontSize:11,color:'var(--muted)'}}>{displayed.length} anggota</span>
-          {!isViewer && <button onClick={()=>setShowAdd(v=>!v)} style={{padding:'5px 12px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>➕ Tambah</button>}
+          {!isViewer && <button onClick={()=>setShowAdd(v=>!v)} style={{padding:'5px 12px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Plus size={12}/> Tambah</button>}
         </div>
       </div>
       {showAdd&&(<div style={{padding:'10px 16px',background:'var(--bg3)',borderBottom:'1px solid var(--border)'}}>
@@ -1709,9 +2170,9 @@ function TabelOvertime({ dataFlat, allFlat, onOvertimeChange, token, tahun, bula
           <thead style={{position:'sticky',top:0,zIndex:20}}>
             <tr>
               <th style={{...th1,width:32}}>#</th><th style={{...th1,minWidth:200,textAlign:'left'}}>NAMA KARYAWAN</th><th style={{...th1,minWidth:100,textAlign:'left'}}>JABATAN</th>
-              <th style={thE}>L Sabtu ✏️</th><th style={th3}>× Rp75.000</th>
-              <th style={thE}>L Libur ✏️</th><th style={th3}>× Rp200.000</th>
-              <th style={thE}>Lembur Biasa ✏️</th><th style={th3}>× Rp20.000</th>
+              <th style={thE}>L Sabtu <Pencil size={9} style={{verticalAlign:2}}/></th><th style={th3}>× Rp75.000</th>
+              <th style={thE}>L Libur <Pencil size={9} style={{verticalAlign:2}}/></th><th style={th3}>× Rp200.000</th>
+              <th style={thE}>Lembur Biasa <Pencil size={9} style={{verticalAlign:2}}/></th><th style={th3}>× Rp20.000</th>
               <th style={th1}>TOTAL LEMBUR</th><th style={{...thB,background:'var(--bg2)',color:'var(--muted)',width:50}}>Hapus</th>
             </tr>
           </thead>
@@ -1741,10 +2202,10 @@ function TabelOvertime({ dataFlat, allFlat, onOvertimeChange, token, tahun, bula
                   style={{...inp, color:'var(--muted2)', cursor:isViewer?'default':'text', opacity:isViewer?0.6:1}}/></td>
                 <td style={{padding:'5px 8px',textAlign:'right',fontWeight:600,color:'var(--muted2)',fontSize:11,border:'1px solid var(--border)',background:bg}}>{bb>0?rp(bb):'—'}</td>
                 <td style={{padding:'5px 10px',textAlign:'right',fontWeight:700,fontSize:12,color:tt>0?'var(--accent)':'var(--muted)',border:'1px solid var(--border)',background:tt>0?'rgba(232,160,32,.08)':bg}}>{tt>0?rp(tt):'—'}</td>
-                <td style={{padding:'4px',textAlign:'center',border:'1px solid var(--border)',background:bg}}><button onClick={()=>removeMember(r.employee_id)} style={{padding:'2px 8px',borderRadius:6,border:'1px solid rgba(224,69,69,.3)',background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🗑️</button></td>
+                <td style={{padding:'4px',textAlign:'center',border:'1px solid var(--border)',background:bg}}><button onClick={()=>removeMember(r.employee_id)} style={{padding:'2px 8px',borderRadius:6,border:'1px solid rgba(224,69,69,.3)',background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><Trash2 size={11}/></button></td>
               </tr>);
             })}
-            {displayed.length===0&&<tr><td colSpan={11} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Belum ada anggota. Klik <b>➕ Tambah</b>.</td></tr>}
+            {displayed.length===0&&<tr><td colSpan={11} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Belum ada anggota. Klik <b style={{display:'inline-flex',alignItems:'center',gap:3}}><Plus size={11}/> Tambah</b>.</td></tr>}
           </tbody>
           <tfoot style={{position:'sticky',bottom:0,zIndex:20}}>
             <tr>
@@ -1762,14 +2223,15 @@ function TabelOvertime({ dataFlat, allFlat, onOvertimeChange, token, tahun, bula
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
-export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[], ttt_items=[], project_info=null }) {
+export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[], ttt_items=[], project_info=null, bpjs_pct=null, ttd_list=null, salary_matrix=null }) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
+  const bpjsPct = bpjs_pct || {jht:2,pensiun:1,kes:1};
   const [selTahun,setSelTahun]=useState(tahun), [selBulan,setSelBulan]=useState(bulan);
   const [data,setData]=useState(()=>{
     const kode=(project_info?.kode||'').toLowerCase();
     const keys=ttt_items.filter(t=>t.aktif).map(t=>t.key);
-    return rows.map(r=>recalc({...r,project_kode:kode},keys));
+    return rows.map(r=>recalc({...r,project_kode:kode},keys,bpjsPct));
   });
   const dataRef=useRef([]);
   const [search,setSearch]=useState('');
@@ -1779,20 +2241,11 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
   const [activeTab,setActiveTab]=useState('semua');
   const [tttItems, setTttItems] = useState(ttt_items);
   const [showTttModal, setShowTttModal] = useState(false);
-  const [showHitungUlangConfirm, setShowHitungUlangConfirm] = useState(false);
-  const [hitungUlangLoading, setHitungUlangLoading] = useState(false);
-
-  function doHitungUlang() {
-    setHitungUlangLoading(true);
-    router.post('/timesheet/payroll/simpan', { tahun, bulan }, {
-      onSuccess: () => {
-        setHitungUlangLoading(false);
-        setShowHitungUlangConfirm(false);
-      },
-      onError: () => setHitungUlangLoading(false),
-    });
-  }
-  const activeTTT = tttItems.filter(t => t.aktif);
+  const [showBpjsTtdModal, setShowBpjsTtdModal] = useState(false);
+  // Komp. PWT sengaja dibuang dari daftar ini walau ke-tandai "aktif" di config TTT bawaan —
+  // dia sudah punya kolom sendiri di grup Tunjangan Tetap, jadi kalau ikut masuk ke sini
+  // kolomnya (dan totalnya di baris paling bawah) kehitung dobel.
+  const activeTTT = tttItems.filter(t => t.aktif && t.key !== 'kompensasi_pwt');
 
   function handleSaveTtt(newItems){ setTttItems(newItems); }
 
@@ -1803,11 +2256,34 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
   useEffect(()=>{
     const kode=(project_info?.kode||'').toLowerCase();
     const keys=tttItems.filter(t=>t.aktif).map(t=>t.key);
-    setData(rows.map(r=>recalc({...r,project_kode:kode},keys)));
+    setData(rows.map(r=>recalc({...r,project_kode:kode},keys,bpjsPct)));
   },[rows]);
   useEffect(()=>{dataRef.current=data;},[data]);
 
   function navigate(t,b){router.get('/timesheet/data-gaji',{tahun:t,bulan:b},{preserveState:false});}
+
+  // Update state lokal untuk field teks — tanpa koersi ke angka & tanpa recalc gaji, beda dari updateField.
+  function updateTextField(empId,field,val){
+    setData(prev=>{
+      const next=prev.map(r=>r.employee_id===empId?{...r,[field]:val}:r);
+      dataRef.current=next;
+      return next;
+    });
+  }
+
+  // Field induk karyawan (tanggal masuk, status karyawan HO, PTKP, no rekening, bank) — disimpan
+  // ke tabel employees / employee_ho_details lewat endpoint terpisah, BUKAN snapshot payroll per
+  // bulan, supaya nyambung juga ke halaman Edit Karyawan (bukan cuma kelihatan di Data Gaji).
+  const infoSaveTimerRef=useRef({});
+  function scheduleInfoSave(empId,field,val){
+    updateTextField(empId,field,val);
+    const timerKey=`${empId}::${field}`;
+    clearTimeout(infoSaveTimerRef.current[timerKey]);
+    infoSaveTimerRef.current[timerKey]=setTimeout(()=>{
+      axios.put(`/timesheet/payroll/${empId}/info`,{[field]:val},{headers:{'X-CSRF-TOKEN':token}})
+        .catch(e=>console.error('Gagal simpan data karyawan',e));
+    },500);
+  }
 
   function updateField(empId,field,val){
     setData(prev=>{
@@ -1816,7 +2292,7 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
         const newVal=typeof val==='boolean'?val:(parseFloat(val)||0);
         const keys=dataRef.current.find(x=>x.employee_id===empId)?.project_kode
           ? tttItems.filter(t=>t.aktif).map(t=>t.key) : [];
-        return recalc({...r,[field]:newVal},tttItems.filter(t=>t.aktif).map(t=>t.key));
+        return recalc({...r,[field]:newVal},tttItems.filter(t=>t.aktif).map(t=>t.key),bpjsPct);
       });
       dataRef.current=next;
       return next;
@@ -1840,7 +2316,7 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
 
   function handleOvertimeChange(empId,overtimeFields){
     const keys=tttItems.filter(t=>t.aktif).map(t=>t.key);
-    setData(prev=>prev.map(r=>r.employee_id!==empId?r:recalc({...r,...overtimeFields},keys)));
+    setData(prev=>prev.map(r=>r.employee_id!==empId?r:recalc({...r,...overtimeFields},keys,bpjsPct)));
     scheduleSave(empId);
   }
 
@@ -1865,6 +2341,10 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
         insentif:              row.insentif               || 0,
         com_day:               row.com_day                || 0,
         uang_hadir:            row.uang_hadir             || 0,
+        izin:                  row.izin                   || 0,
+        sakit:                 row.sakit                  || 0,
+        alpa:                  row.alpa                   || 0,
+        cuti:                  row.cuti                   || 0,
         ttt_custom: (() => {
           const custom = {};
           tttItems.filter(t => !t.is_default).forEach(t => {
@@ -1890,38 +2370,23 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
   const totalPot    =aktif.reduce((s,r)=>s+(r.potongan_jht||0)+(r.potongan_pensiun||0)+(r.potongan_kes||0)+(r.potongan_alpa||0),0);
 
   const isMdProject = (project_info?.tipe_gaji||'') === 'md';
+  const isHoProject = (project_info?.tipe_gaji||'') === 'ho';
 
   const TABS = [
-      {key:'semua',    label:`\u{1F465} Semua (${dataSemua.length})`,  bg:'linear-gradient(135deg,#E8A020,#A06010)'},
-      {key:'jam',      label:`\u23F1\uFE0F Per Jam (${dataJam.length})`, bg:'linear-gradient(135deg,#22C97A,#148050)'},
-      ...(!isMdProject ? [
-          {key:'flat',     label:`\u{1F4CB} Flat (${dataFlat.length})`,    bg:'linear-gradient(135deg,#3A8FE0,#1A5FA0)'},
-          {key:'overtime', label:`\u23F0 Overtime (${dataFlat.length})`,   bg:'linear-gradient(135deg,#9B59B6,#6C3483)'},
+      {key:'semua',    label:`Semua (${dataSemua.length})`,  icon:Users,       bg:'linear-gradient(135deg,#E8A020,#A06010)'},
+      ...(!isHoProject ? [{key:'jam', label:`Per Jam (${dataJam.length})`, icon:Timer, bg:'linear-gradient(135deg,#22C97A,#148050)'}] : []),
+      ...(!isMdProject && !isHoProject ? [
+          {key:'flat',     label:`Flat (${dataFlat.length})`,    icon:ClipboardList, bg:'linear-gradient(135deg,#3A8FE0,#1A5FA0)'},
+          {key:'overtime', label:`Overtime (${dataFlat.length})`,   icon:AlarmClock, bg:'linear-gradient(135deg,#9B59B6,#6C3483)'},
       ] : []),
-      {key:'panduan',  label:'\u{1F4D6} Panduan Perhitungan',           bg:'linear-gradient(135deg,#E04545,#901010)'},
+      {key:'panduan',  label:'Panduan Perhitungan',           icon:BookOpen, bg:'linear-gradient(135deg,#E04545,#901010)'},
   ];
 
   return (
     <AppLayout title="Timesheet" subtitle="Data Gaji">
       {showTttModal && <TttConfigModal items={tttItems} onSave={handleSaveTtt} onClose={()=>setShowTttModal(false)}/>}
+      {showBpjsTtdModal && <BpjsTtdConfigModal onSaved={()=>router.reload({only:['bpjs_pct','ttd_list']})} onClose={()=>setShowBpjsTtdModal(false)}/>}
 
-      <ConfirmModal
-        open={showHitungUlangConfirm}
-        onCancel={()=>setShowHitungUlangConfirm(false)}
-        onConfirm={doHitungUlang}
-        title="Hitung Ulang Lembur & Potongan"
-        message={
-          <>
-            Sistem akan menghitung ulang <b style={{color:'var(--text)'}}>lembur, BPJS, dan potongan</b> seluruh karyawan untuk periode <b style={{color:'var(--text)'}}>{bulan_nama} {tahun}</b> berdasarkan data timesheet terbaru.
-            <br/><br/>
-            Gaji Pokok, Tunjangan, dan TTT yang sudah diisi manual <b>tidak akan diubah</b>.
-            <br/><br/>
-            📌 <b>Gunakan ini saat:</b> ada koreksi timesheet, atau setelah ada perbaikan rumus perhitungan dari sistem.
-          </>
-        }
-        confirmLabel={hitungUlangLoading ? '⏳ Memproses...' : 'Ya, Hitung Ulang'}
-        type="warning"
-      />
       <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
         <select value={selBulan} onChange={e=>{setSelBulan(+e.target.value);navigate(selTahun,e.target.value);}}
           style={{padding:'7px 11px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:12.5,fontFamily:"'Outfit',sans-serif"}}>
@@ -1932,22 +2397,15 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
           {tahunList.map(y=><option key={y} value={y}>{y}</option>)}
         </select>
         <div style={{position:'relative',flex:1,minWidth:180,maxWidth:280}}>
-          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',fontSize:13}}>🔍</span>
+          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={13}/></span>
           <input className="search-input" type="text" value={search} onChange={e=>setSearch(e.target.value)}
             placeholder="Cari nama / jabatan / badge..." style={{paddingLeft:28,width:'100%'}}/>
-          {search && <span onClick={()=>setSearch('')} style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',cursor:'pointer',color:'var(--muted)',fontSize:13}}>✕</span>}
+          {search && <span onClick={()=>setSearch('')} style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={13}/></span>}
         </div>
         <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
-        {!isViewer && (
-          <button type="button" onClick={()=>setShowHitungUlangConfirm(true)}
-            title="Hitung ulang lembur, BPJS, dan potongan dari timesheet terbaru. Nilai manual (Gaji Pokok, Tunjangan, TTT) tidak akan diubah."
-            style={{padding:'8px 14px',borderRadius:8,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}>
-            Hitung Ulang
-          </button>
-        )}
         <a href={`/timesheet/data-gaji/export?tahun=${tahun}&bulan=${bulan}`}
           style={{padding:'8px 14px',borderRadius:8,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:12,fontWeight:600,textDecoration:'none',display:'flex',alignItems:'center',gap:6}}>
-          📤 Export Excel
+          <Download size={13}/> Export Excel
         </a>
         <a href={`/timesheet/slip-gaji?tahun=${tahun}&bulan=${bulan}`}
           style={{padding:'8px 14px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',color:'var(--muted2)',fontSize:12,fontWeight:600,textDecoration:'none'}}>
@@ -1978,9 +2436,10 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
               {TABS.map(t=>(
                 <button key={t.key} onClick={()=>setActiveTab(t.key)}
                   style={{padding:'5px 14px',borderRadius:99,border:'none',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
+                    display:'flex',alignItems:'center',gap:6,
                     background:activeTab===t.key?t.bg:'var(--bg3)',
                     color:activeTab===t.key?'#fff':'var(--muted2)'}}>
-                  {t.label}
+                  <t.icon size={13}/> {t.label}
                 </button>
               ))}
             </div>
@@ -1996,6 +2455,15 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
                   {activeTTT.length} aktif
                 </span>
               </button>
+              <button onClick={()=>setShowBpjsTtdModal(true)}
+                style={{padding:'5px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--card)',
+                  color:'var(--muted2)',fontSize:11.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
+                  display:'flex',alignItems:'center',gap:5}}>
+                BPJS & TTD
+                <span style={{fontSize:10,background:'rgba(232,160,32,.15)',color:'var(--accent)',padding:'1px 6px',borderRadius:99,fontWeight:700}}>
+                  JHT {bpjsPct.jht}% P {bpjsPct.pensiun}% Kes {bpjsPct.kes}%
+                </span>
+              </button>
               <span style={{fontSize:10.5,color:'var(--muted)'}}>
                 Sel <span style={{background:'rgba(255,252,200,.6)',padding:'0 4px',borderRadius:3,border:'1px solid #E8C030'}}>kuning</span> = klik untuk edit
               </span>
@@ -2003,35 +2471,45 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
           )}
         </div>
 
-        {hasSubGroup && (
-          <div style={{display:'flex',gap:4,padding:'8px 16px',borderBottom:'1px solid var(--border)',background:'var(--bg3)',alignItems:'center'}}>
-            <span style={{fontSize:11,color:'var(--muted)',marginRight:4}}>Sub-Group:</span>
-            {[
-              { key:'all',          label:'Semua' },
-              { key:'construction', label:'🏗️ Construction' },
-              { key:'piling',       label:'🔩 Piling' },
-            ].map(t => (
-              <button key={t.key} onClick={() => setSubGroupTab(t.key)}
-                style={{
-                  padding:'4px 12px', borderRadius:99,
-                  fontSize:11.5, fontWeight:600, cursor:'pointer',
-                  fontFamily:"'Outfit',sans-serif",
-                  background: subGroupTab===t.key
-                    ? (t.key==='construction' ? 'linear-gradient(135deg,#E8A020,#A06010)'
-                      : t.key==='piling'     ? 'linear-gradient(135deg,#3A8FE0,#1A5FA0)'
-                      : 'var(--bg2)')
-                    : 'var(--bg3)',
-                  color: subGroupTab===t.key && t.key!=='all' ? '#fff' : subGroupTab===t.key ? 'var(--text)' : 'var(--muted2)',
-                  border: subGroupTab===t.key ? 'none' : '1px solid var(--border)',
-                }}>
-                {t.label}
-              </button>
-            ))}
-          </div>
+        {hasSubGroup && (() => {
+          const subGroupOpts = SUB_GROUP_OPTIONS[(project_info?.kode||'').toLowerCase()] || [];
+          const SG_GRADIENTS = [
+            'linear-gradient(135deg,#E8A020,#A06010)',
+            'linear-gradient(135deg,#3A8FE0,#1A5FA0)',
+            'linear-gradient(135deg,#22C97A,#148050)',
+            'linear-gradient(135deg,#9B59B6,#6B3D80)',
+          ];
+          const tabs = [
+            { key:'all', label:'Semua', icon:null },
+            ...subGroupOpts.map((o, i) => ({ key:o.value, label:o.label, icon:o.icon, gradient: SG_GRADIENTS[i % SG_GRADIENTS.length] })),
+          ];
+          return (
+            <div style={{display:'flex',gap:4,padding:'8px 16px',borderBottom:'1px solid var(--border)',background:'var(--bg3)',alignItems:'center'}}>
+              <span style={{fontSize:11,color:'var(--muted)',marginRight:4}}>Sub-Group:</span>
+              {tabs.map(t => (
+                <button key={t.key} onClick={() => setSubGroupTab(t.key)}
+                  style={{
+                    padding:'4px 12px', borderRadius:99,
+                    fontSize:11.5, fontWeight:600, cursor:'pointer',
+                    fontFamily:"'Outfit',sans-serif",
+                    display:'inline-flex', alignItems:'center', gap:5,
+                    background: subGroupTab===t.key ? (t.gradient || 'var(--bg2)') : 'var(--bg3)',
+                    color: subGroupTab===t.key && t.key!=='all' ? '#fff' : subGroupTab===t.key ? 'var(--text)' : 'var(--muted2)',
+                    border: subGroupTab===t.key ? 'none' : '1px solid var(--border)',
+                  }}>
+                  {t.icon && <t.icon size={12}/>} {t.label}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+        {activeTab==='semua' && (
+          isHoProject
+            ? <TabelHo data={dataSemua} activeTTT={activeTTT} onEdit={updateField} onScheduleSave={scheduleSave} onEditInfo={scheduleInfoSave} isDark={isDark} bpjsPct={bpjsPct} salaryMatrix={salary_matrix} bulanNama={bulan_nama} tahun={tahun} token={token}/>
+            : <TabelGabung data={dataSemua} activeTTT={activeTTT} onEdit={updateField} onScheduleSave={scheduleSave} isDark={isDark} projectKode={(project_info?.kode||'').toLowerCase()} isMd={(project_info?.tipe_gaji||'')==='md'} bpjsPct={bpjsPct}/>
         )}
-        {activeTab==='semua' && <TabelGabung data={dataSemua} activeTTT={activeTTT} onEdit={updateField} onScheduleSave={scheduleSave} isDark={isDark} projectKode={(project_info?.kode||'').toLowerCase()} isMd={(project_info?.tipe_gaji||'')==='md'}/>}
-        {activeTab==='jam' && <TabelPerJam data={dataJam} activeTTT={activeTTT} onEdit={updateField} onScheduleSave={scheduleSave} isDark={isDark} projectKode={(project_info?.kode||'').toLowerCase()} isMd={(project_info?.tipe_gaji||'')==='md'}/>}
-        {activeTab==='flat'     && <TabelFlat     data={dataFlat}  activeTTT={activeTTT} onEdit={updateField} onScheduleSave={scheduleSave} isDark={isDark} projectKode={(project_info?.kode||'').toLowerCase()}/>}
+        {activeTab==='jam' && <TabelPerJam data={dataJam} activeTTT={activeTTT} onEdit={updateField} onScheduleSave={scheduleSave} isDark={isDark} projectKode={(project_info?.kode||'').toLowerCase()} isMd={(project_info?.tipe_gaji||'')==='md'} bpjsPct={bpjsPct}/>}
+        {activeTab==='flat'     && <TabelFlat     data={dataFlat}  activeTTT={activeTTT} onEdit={updateField} onScheduleSave={scheduleSave} isDark={isDark} projectKode={(project_info?.kode||'').toLowerCase()} bpjsPct={bpjsPct}/>}
         {activeTab==='overtime' && (
           ['khawista', 'nk'].includes(project_info?.kode?.toLowerCase())
             ? <TabelOvertimeCustom tahun={tahun} bulan={bulan} token={token} isViewer={isViewer} subGroup={subGroupTab} searchQuery={search} flatIds={data.filter(r=>r.kelompok==='flat').map(r=>r.employee_id)}/>
@@ -2041,9 +2519,11 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
           projectIds={(() => {
             const u = auth?.user;
             if (!u) return [];
-            if (u.can?.is_super_admin || !u.project_id) return [1,2,3,4,5];
+            // Super-admin & viewer lihat semua project (termasuk HO) — bukan cuma yang tidak punya project_id.
+            if (u.can?.is_super_admin || u.can?.is_viewer) return [1,2,3,4,5,6];
             if (u.project_ids && u.project_ids.length > 0) return u.project_ids;
-            return [u.project_id];
+            if (u.project_id) return [u.project_id];
+            return [];
           })()}
           isSuperAdmin={auth?.user?.can?.is_super_admin || false}
         />}

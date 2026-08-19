@@ -1,7 +1,8 @@
 // resources/js/Pages/Timesheet/SlipGaji.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
-import { router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
+import { ClipboardList } from 'lucide-react';
 
 function rp(val) {
   if (val === null || val === undefined || val === '' || isNaN(val)) return 'Rp -';
@@ -94,7 +95,8 @@ function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
   const potKes      = num(slip.potongan_kes);
   const potAlpa     = num(slip.potongan_alpa);
   const potInsentif = num(slip.potongan_insentif);
-  const totalPot    = potJht + potPensiun + potKes + potAlpa + potInsentif;
+  const potOksigen  = num(slip.pot_tabung_oksigen);
+  const totalPot    = potJht + potPensiun + potKes + potAlpa + potInsentif + potOksigen;
   const gajiBersih  = num(slip.gaji_bersih);
 
   const today=new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
@@ -110,6 +112,13 @@ function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
   ];
 
   const tttRows = Object.entries(TTT_LABELS).filter(([k])=>(slip[k]||0)>0).map(([k,l])=>({label:l,val:slip[k]}));
+
+  // Rincian formula gaji kotor — subtotal tiap section, dipakai untuk catatan "= A + B + C" di bawah total.
+  const perolehanSubtotal = gajiPokok + tunjTetap + kompPwt;
+  const tttSubtotal = isMd
+    ? num(slip.ttt_total) + num(slip.tunj_makan_total) + num(slip.com_day_total) + num(slip.insentif)
+    : tttRows.reduce((s,t)=>s+num(t.val),0);
+  const lemburSubtotal = isMd ? upahLembur : (slip.kelompok==='flat' ? num(slip.total_lembur_flat) : upahLembur);
 
   const base = {
     fontFamily:'Arial,Helvetica,sans-serif',
@@ -238,6 +247,15 @@ function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
           </>)}
 
           <TotRow label="GAJI SEBULAN (KOTOR)" val={gajiKotor} bold/>
+          <tr>
+            <td colSpan={4} style={{fontSize:'6.5pt',color:'#888',fontStyle:'italic',paddingBottom:2}}>
+              {'= ' + [
+                `${rpC(perolehanSubtotal)} (Perolehan)`,
+                tttSubtotal > 0 && `${rpC(tttSubtotal)} (TTT)`,
+                lemburSubtotal > 0 && `${rpC(lemburSubtotal)} (Lembur)`,
+              ].filter(Boolean).join(' + ')}
+            </td>
+          </tr>
 
           <SecHead letter={(() => {
             const adaTTT = !isMd && tttRows.length > 0;
@@ -262,6 +280,7 @@ function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
             return <Row no="4." label={`Potongan Alpa (${labelHari})`} val={potAlpa}/>;
           })()}
           {potInsentif>0&&<Row no="5." label={`Pot. Insentif (${slip.sub_group||''})`} val={potInsentif}/>}
+          {potOksigen>0&&<Row no="6." label="Potongan Tabung Oksigen" val={potOksigen}/>}
           <TotRow label="TOTAL POTONGAN" val={totalPot}/>
 
           {/* RINCIAN NETTO */}
@@ -316,127 +335,58 @@ function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
   );
 }
 
-// ── Modal TTD — hanya tampilkan kolom yang bisa diedit (bukan kolom otomatis karyawan) ──
-function TtdSettingsModal({ ttd, onSave, onClose }) {
-  const defaultList = [
-    {label:'Disetujui Oleh,',name:'H. Syahrul Akmal',jabatan:'Direktur Utama'},
-    {label:'Dibayar Oleh,',  name:'Yulhamdani',       jabatan:'Finance'},
-  ];
-  // Ambil hanya kolom yang bukan "otomatis karyawan" (bukan kolom terakhir default)
-  const initList = ttd && ttd.length > 0
-    ? ttd.filter((_,i,arr) => i < arr.length - 1) // buang kolom terakhir (otomatis)
-    : defaultList;
+function EmployeeSearchSelect({ employeeList, value, onChange, style }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
 
-  const [list, setList] = useState(initList);
+  const selected = employeeList.find(e => String(e.id) === String(value));
 
-  const inp = {
-    background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--text)',
-    borderRadius:7,padding:'7px 10px',fontSize:12.5,
-    fontFamily:"'Outfit',sans-serif",outline:'none',width:'100%',boxSizing:'border-box',
-  };
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
 
-  function update(i,field,val) { setList(prev=>prev.map((item,idx)=>idx===i?{...item,[field]:val}:item)); }
-  function addKolom() { if(list.length>=4) return; setList(prev=>[...prev,{label:'',name:'',jabatan:''}]); }
-  function hapusKolom(i) { if(list.length<=1) return; setList(prev=>prev.filter((_,idx)=>idx!==i)); }
-
-  function handleSave() {
-    // Selalu append kolom karyawan di akhir
-    const full = [...list, {label:'Diterima Oleh,',name:'',jabatan:''}];
-    onSave(full);
-    onClose();
-  }
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return employeeList;
+    return employeeList.filter(e => (e.nama_lengkap||'').toLowerCase().includes(q) || (e.jabatan||'').toLowerCase().includes(q));
+  }, [query, employeeList]);
 
   return (
-    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(520px,calc(100vw - 24px))',maxHeight:'90vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:1}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>Pengaturan Tanda Tangan</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>x</div>
-        </div>
-        <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
-          {list.map((item,i)=>(
-            <div key={i} style={{background:'var(--bg3)',borderRadius:9,padding:'12px 14px',border:'1px solid var(--border)'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                <div style={{fontSize:11,fontWeight:700,color:'var(--accent)'}}>Kolom {i+1}</div>
-                {list.length > 1 && (
-                  <button type="button" onClick={()=>hapusKolom(i)}
-                    style={{fontSize:11,padding:'2px 8px',borderRadius:5,border:'1px solid rgba(224,69,69,.3)',background:'rgba(224,69,69,.08)',color:'#E04545',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                    Hapus
-                  </button>
-                )}
-              </div>
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                <div>
-                  <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Label (cth: Disetujui Oleh,)</label>
-                  <input style={inp} value={item.label} onChange={e=>update(i,'label',e.target.value)}/>
-                </div>
-                <div className="form-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  <div>
-                    <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Nama</label>
-                    <input style={inp} value={item.name} onChange={e=>update(i,'name',e.target.value)}/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:3,display:'block'}}>Jabatan</label>
-                    <input style={inp} value={item.jabatan} onChange={e=>update(i,'jabatan',e.target.value)}/>
-                  </div>
-                </div>
-              </div>
+    <div ref={boxRef} style={{position:'relative',...style}}>
+      <input
+        type="text"
+        value={open ? query : (selected ? `${selected.nama_lengkap} (${selected.jabatan})` : '')}
+        placeholder="-- Cari Karyawan --"
+        onFocus={() => { setQuery(''); setOpen(true); }}
+        onChange={e => setQuery(e.target.value)}
+        style={{padding:'7px 11px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:12.5,fontFamily:"'Outfit',sans-serif",width:'100%',boxSizing:'border-box'}}
+      />
+      {open && (
+        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,right:0,maxHeight:260,overflowY:'auto',background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:8,boxShadow:'0 12px 32px rgba(0,0,0,.35)',zIndex:50}}>
+          {value && (
+            <div onClick={() => { onChange(''); setOpen(false); setQuery(''); }}
+              style={{padding:'8px 12px',fontSize:12,color:'var(--muted)',cursor:'pointer',borderBottom:'1px solid var(--border)'}}>
+              -- Pilih Karyawan --
             </div>
-          ))}
-
-          {/* Kolom karyawan — hanya info, tidak bisa diedit */}
-          <div style={{background:'rgba(34,201,122,.06)',borderRadius:9,padding:'12px 14px',border:'1px solid rgba(34,201,122,.2)'}}>
-            <div style={{fontSize:11,fontWeight:700,color:'#22C97A',marginBottom:4}}>Kolom {list.length+1} — Diterima Oleh (Otomatis)</div>
-            <div style={{fontSize:11,color:'var(--muted2)'}}>Kolom ini otomatis diisi nama dan jabatan karyawan yang bersangkutan</div>
-          </div>
-
-          {list.length < 4 && (
-            <button type="button" onClick={addKolom}
-              style={{padding:'10px',borderRadius:8,border:'1px dashed var(--border)',background:'transparent',color:'var(--muted)',fontSize:12,cursor:'pointer',width:'100%',fontFamily:"'Outfit',sans-serif"}}>
-              + Tambah Kolom ({list.length}/4 — maks 4 + 1 otomatis)
-            </button>
           )}
-        </div>
-        <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)',position:'sticky',bottom:0,background:'var(--bg2)'}}>
-          <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-          <button type="button" onClick={handleSave} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Simpan</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Modal BPJS ────────────────────────────────────────────────
-function BpjsSettingsModal({ pct, onSave, onClose }) {
-  const [form,setForm]=useState({jht:pct?.jht??2,pensiun:pct?.pensiun??1,kes:pct?.kes??1});
-  const inp={background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:7,padding:'7px 10px',fontSize:12.5,fontFamily:"'Outfit',sans-serif",outline:'none',width:'100%',boxSizing:'border-box'};
-  return (
-    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(420px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>Pengaturan Potongan BPJS</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>x</div>
-        </div>
-        <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
-          {[{key:'jht',label:'BPJS TK - JHT (%)'},{key:'pensiun',label:'BPJS TK - Pensiun (%)'},{key:'kes',label:'BPJS Kesehatan (%)'}].map(f=>(
-            <div key={f.key}>
-              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>{f.label}</label>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <input type="number" min="0" max="100" step="0.5" style={{...inp,flex:1}} value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:parseFloat(e.target.value)||0}))}/>
-                <span style={{fontSize:13,fontWeight:700,color:'var(--muted2)'}}>%</span>
-              </div>
+          {filtered.length === 0 && (
+            <div style={{padding:'10px 12px',fontSize:12,color:'var(--muted)'}}>Tidak ditemukan</div>
+          )}
+          {filtered.map(e => (
+            <div key={e.id} onClick={() => { onChange(e.id); setOpen(false); setQuery(''); }}
+              style={{padding:'8px 12px',fontSize:12.5,cursor:'pointer',background: String(e.id)===String(value) ? 'rgba(232,160,32,.12)' : 'transparent'}}
+              onMouseEnter={ev=>ev.currentTarget.style.background='rgba(232,160,32,.08)'}
+              onMouseLeave={ev=>ev.currentTarget.style.background= String(e.id)===String(value) ? 'rgba(232,160,32,.12)' : 'transparent'}>
+              {e.nama_lengkap} ({e.jabatan})
             </div>
           ))}
-          <div style={{fontSize:11,color:'var(--muted)',background:'rgba(232,160,32,.08)',borderRadius:8,padding:'8px 12px'}}>
-            Dihitung dari Upah Penuh (Gapok + Tunj. Tetap)
-          </div>
         </div>
-        <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
-          <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-          <button type="button" onClick={()=>{onSave(form);onClose();}} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Terapkan</button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -447,23 +397,12 @@ export default function SlipGaji({
   employee_id, employee_list=[], project_id,
   slip, hari_details=[],
 }) {
-  const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
   const [selTahun,setSelTahun]=useState(tahun);
   const [selBulan,setSelBulan]=useState(bulan);
   const [selEmp,setSelEmp]=useState(employee_id||'');
   const [showRincianJam,setShowRincianJam]=useState(false);
   const [loadingPdf,setLoadingPdf]=useState(false);
-  const [showTtdModal,setShowTtdModal]=useState(false);
-  const [showBpjsModal,setShowBpjsModal]=useState(false);
   const slipRef=useRef(null);
-
-  // Storage key per project — settings TTD berbeda per project
-  const ttdKey  = `slip-ttd-${project_id||'default'}`;
-  const bpjsKey = `slip-bpjs-pct-${project_id||'default'}`;
-
-  const [ttd,setTtd]=useState(()=>{ try{const s=localStorage.getItem(ttdKey);return s?JSON.parse(s):null;}catch{return null;} });
-  const [bpjsPct,setBpjsPct]=useState(()=>{ try{const s=localStorage.getItem(bpjsKey);return s?JSON.parse(s):{jht:2,pensiun:1,kes:1};}catch{return {jht:2,pensiun:1,kes:1};} });
 
   const [isDark]=useState(()=>typeof window!=='undefined'&&localStorage.getItem('akm-theme')!=='light');
   const currentYear = new Date().getFullYear();
@@ -471,33 +410,18 @@ export default function SlipGaji({
   const inpStyle={padding:'7px 11px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:12.5,fontFamily:"'Outfit',sans-serif"};
 
   function navigate(t,b,empId){ router.get('/timesheet/slip-gaji',{tahun:t,bulan:b,employee_id:empId||''},{preserveState:false}); }
-  function saveTtd(list){ setTtd(list); localStorage.setItem(ttdKey,JSON.stringify(list)); }
-  function saveBpjsPct(pct){ setBpjsPct(pct); localStorage.setItem(bpjsKey,JSON.stringify(pct)); }
 
-  const slipWithPct = slip ? {
-    ...slip,
-    pct_jht:bpjsPct.jht, pct_pensiun:bpjsPct.pensiun, pct_kes:bpjsPct.kes,
-    potongan_jht:     Math.round((slip.gaji_pokok+slip.tunj_tetap)*bpjsPct.jht/100),
-    potongan_pensiun: Math.round((slip.gaji_pokok+slip.tunj_tetap)*bpjsPct.pensiun/100),
-    potongan_kes:     Math.round((slip.gaji_pokok+slip.tunj_tetap)*bpjsPct.kes/100),
-  } : null;
+  // Persentase BPJS & TTD sudah dihitung backend sesuai konfigurasi project (lihat PayrollController::getSlipData) —
+  // tidak perlu dihitung ulang di sini, supaya layar/PDF/Excel selalu sama dengan yang tersimpan.
+  const slipFinal = slip;
+  const bpjsPct = { jht: slip?.pct_jht ?? 2, pensiun: slip?.pct_pensiun ?? 1, kes: slip?.pct_kes ?? 1 };
 
-  const slipFinal = slipWithPct ? {
-    ...slipWithPct,
-    gaji_bersih: slipWithPct.gaji_kotor - slipWithPct.potongan_jht - slipWithPct.potongan_pensiun - slipWithPct.potongan_kes - (slipWithPct.potongan_alpa||0) - (slipWithPct.potongan_insentif||0) + (slipWithPct.kekurangan_bulan_lalu||0),
-  } : null;
-
-  // TTD final — kolom terakhir otomatis diisi karyawan
-  const ttdFinal = ttd && ttd.length > 0 ? ttd.map((item,i,arr)=>({
-    ...item,
-    name:    (!item.name    && i===arr.length-1)?(slip?.nama_lengkap||''):item.name,
-    jabatan: (!item.jabatan && i===arr.length-1)?(slip?.jabatan||''):item.jabatan,
-  })) : null;
-
-  // TTD untuk preview layar
-  const ttdDisplay = ttdFinal || [
-    {label:'Disetujui Oleh,',name:'H. Syahrul Akmal',jabatan:'Direktur Utama'},
-    {label:'Dibayar Oleh,',  name:'Yulhamdani',       jabatan:'Finance'},
+  // TTD — 2 slot dari konfigurasi project + kolom "Diterima Oleh" otomatis untuk karyawan yang dilihat.
+  const ttdDisplay = [
+    ...(slip?.ttd_list?.length ? slip.ttd_list : [
+      {label:'Disetujui Oleh,',name:'H. Syahrul Akmal',jabatan:'Direktur Utama'},
+      {label:'Dibayar Oleh,',  name:'Yulhamdani',       jabatan:'Finance'},
+    ]),
     {label:'Diterima Oleh,', name:slipFinal?.nama_lengkap||'',jabatan:slipFinal?.jabatan||''},
   ];
 
@@ -521,11 +445,8 @@ export default function SlipGaji({
   }
 
   function handleExcel(){
-    const params=new URLSearchParams({
-      tahun,bulan,employee_id,
-      pct_jht:bpjsPct.jht,pct_pensiun:bpjsPct.pensiun,pct_kes:bpjsPct.kes,
-      ttd:JSON.stringify(ttdFinal||[]),
-    });
+    // BPJS % & TTD sudah diresolve backend dari konfigurasi project — tidak perlu dikirim dari sini lagi.
+    const params=new URLSearchParams({ tahun,bulan,employee_id });
     window.location.href=`/timesheet/slip-gaji/export-excel?${params}`;
   }
 
@@ -545,9 +466,6 @@ export default function SlipGaji({
 
   return (
     <AppLayout title="Timesheet" subtitle="Slip Gaji">
-      {showTtdModal  && <TtdSettingsModal  ttd={ttdFinal} onSave={saveTtd}     onClose={()=>setShowTtdModal(false)}/>}
-      {showBpjsModal && <BpjsSettingsModal pct={bpjsPct}  onSave={saveBpjsPct} onClose={()=>setShowBpjsModal(false)}/>}
-
       <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
         <select value={selBulan} onChange={e=>{setSelBulan(+e.target.value);navigate(selTahun,e.target.value,selEmp);}} style={inpStyle}>
           {Object.entries(bulan_list).map(([k,v])=><option key={k} value={k}>{v}</option>)}
@@ -555,15 +473,17 @@ export default function SlipGaji({
         <select value={selTahun} onChange={e=>{setSelTahun(+e.target.value);navigate(e.target.value,selBulan,selEmp);}} style={inpStyle}>
           {tahunList.map(y=><option key={y} value={y}>{y}</option>)}
         </select>
-        <select value={selEmp} onChange={e=>{setSelEmp(e.target.value);navigate(selTahun,selBulan,e.target.value);}} style={{...inpStyle,flex:1,minWidth:240,maxWidth:400}}>
-          <option value="">-- Pilih Karyawan --</option>
-          {employee_list.map(e=>(<option key={e.id} value={e.id}>{e.nama_lengkap} ({e.jabatan})</option>))}
-        </select>
+        <EmployeeSearchSelect
+          employeeList={employee_list}
+          value={selEmp}
+          onChange={val=>{setSelEmp(val);navigate(selTahun,selBulan,val);}}
+          style={{flex:1,minWidth:240,maxWidth:400}}
+        />
       </div>
 
       {!slipFinal && (
         <div className="panel" style={{padding:48,textAlign:'center',color:'var(--muted)'}}>
-          <div style={{fontSize:32,marginBottom:12}}>📋</div>
+          <div style={{marginBottom:12,display:'flex',justifyContent:'center'}}><ClipboardList size={32}/></div>
           <div style={{fontSize:14,fontWeight:600}}>Pilih karyawan untuk melihat slip gaji</div>
           <div style={{fontSize:12,marginTop:6}}>Slip gaji dihitung otomatis dari data timesheet</div>
         </div>
@@ -575,18 +495,8 @@ export default function SlipGaji({
             <input type="checkbox" checked={showRincianJam} onChange={e=>setShowRincianJam(e.target.checked)} style={{cursor:'pointer',accentColor:'#E8A020',width:14,height:14}}/>
             Rincian Jam
           </label>
-          {!isViewer && (
-            <button onClick={()=>setShowBpjsModal(true)} style={{padding:'7px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}>
-              BPJS <span style={{fontSize:10,color:'var(--accent)'}}>JHT {bpjsPct.jht}% P {bpjsPct.pensiun}% Kes {bpjsPct.kes}%</span>
-            </button>
-          )}
-          {!isViewer && (
-            <button onClick={()=>setShowTtdModal(true)} style={{padding:'7px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-              Tanda Tangan <span style={{fontSize:10,color:'var(--muted)'}}>({ttdDisplay.length} kolom)</span>
-            </button>
-          )}
           <div style={{flex:1}}/>
-          <button onClick={handleExcel} style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Excel</button>
+          <button onClick={handleExcel} style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Export Excel</button>
           <button onClick={handleDownloadPdf} disabled={loadingPdf} style={{padding:'8px 20px',borderRadius:8,border:'none',background:loadingPdf?'#666':'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loadingPdf?'wait':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loadingPdf?0.7:1}}>
             {loadingPdf?'Generating...':'Download PDF'}
           </button>
@@ -598,8 +508,8 @@ export default function SlipGaji({
               <div style={{fontFamily:'Syne,sans-serif',fontSize:14,fontWeight:700,color:isDark?'#E8A020':'#1A0A00'}}>PT. ANDALAS KARYA MULIA</div>
               <div style={{fontSize:11,color:isDark?'#A06010':'#3D1F00',marginTop:2}}>SLIP GAJI KARYAWAN - Periode: {bulan_nama} {tahun}</div>
             </div>
-            <div style={{background:slipFinal.kelompok==='flat'?'rgba(58,143,224,.2)':'rgba(34,201,122,.2)',color:slipFinal.kelompok==='flat'?'var(--blue)':'#22C97A',padding:'4px 14px',borderRadius:99,fontSize:11,fontWeight:700}}>
-              {slipFinal.kelompok==='flat'?'Sistem Flat':'Sistem Per Jam'}
+            <div style={{background:slipFinal.tipe_project==='ho'?'rgba(107,114,128,.2)':slipFinal.kelompok==='flat'?'rgba(58,143,224,.2)':'rgba(34,201,122,.2)',color:slipFinal.tipe_project==='ho'?'var(--muted2)':slipFinal.kelompok==='flat'?'var(--blue)':'#22C97A',padding:'4px 14px',borderRadius:99,fontSize:11,fontWeight:700}}>
+              {slipFinal.tipe_project==='ho'?'Kantor Pusat (HO)':slipFinal.kelompok==='flat'?'Sistem Flat':'Sistem Per Jam'}
             </div>
           </div>
 
@@ -614,7 +524,11 @@ export default function SlipGaji({
                 ))}
               </div>
               <div>
-                {[['Gaji Pokok',rp(slipFinal.gaji_pokok)],['Tunj. Tetap',rp(slipFinal.tunj_tetap)],['Upah Lembur',rp(slipFinal.upah_lembur||slipFinal.total_lembur_flat)],['Nilai OT/jam','Rp '+Number(slipFinal.nilai_lembur_per_jam||0).toFixed(3)]].map(([k,v],i)=>(
+                {(slipFinal.tipe_project==='ho'
+                  ? [['Gaji Pokok',rp(slipFinal.gaji_pokok)],['Tunj. Tetap',rp(slipFinal.tunj_tetap)],['Kompensasi PWT',rp(slipFinal.kompensasi_pwt)]]
+                  : [['Gaji Pokok',rp(slipFinal.gaji_pokok)],['Tunj. Tetap',rp(slipFinal.tunj_tetap)],['Upah Lembur',rp(slipFinal.upah_lembur||slipFinal.total_lembur_flat)],
+                     ...(slipFinal.kelompok==='flat' ? [] : [['Nilai OT/jam','Rp '+Number(slipFinal.nilai_lembur_per_jam||0).toFixed(3)]])]
+                ).map(([k,v],i)=>(
                   <div key={i} style={{display:'flex',justifyContent:'space-between',marginBottom:6,fontSize:12}}>
                     <span style={{color:'var(--muted)'}}>{k}</span>
                     <span style={{fontWeight:600,color:i===2?'#22C97A':'var(--text)'}}>{v}</span>
@@ -667,8 +581,14 @@ export default function SlipGaji({
                     <RpRow no={3} label={`BPJS Kesehatan (${bpjsPct.kes}%)`} sub={`${bpjsPct.kes}% x ${rp(slipFinal.gaji_pokok+slipFinal.tunj_tetap)}`} val={slipFinal.potongan_kes} color="#E04545"/>
                     {(slipFinal.potongan_alpa||0)>0&&<RpRow no={4} label={`Alpa (${slipFinal.alpa} hari)`} sub={`/ 25 x ${slipFinal.alpa} hari`} val={slipFinal.potongan_alpa} color="#E04545"/>}
                     {(slipFinal.potongan_insentif||0)>0&&<RpRow no={5} label={`Pot. Insentif (${slipFinal.sub_group||''})`} sub={slipFinal.sub_group==='construction'?`Insentif / 25 × (Izin+Sakit+Cuti)`:`Tunj. Lapangan / 25 × Izin`} val={slipFinal.potongan_insentif} color="#E04545"/>}
+                    {(slipFinal.pot_tabung_oksigen||0)>0&&<RpRow no={6} label="Potongan Tabung Oksigen" val={slipFinal.pot_tabung_oksigen} color="#E04545"/>}
                   </tbody>
                 </table>
+                {slipFinal.tipe_project==='ho' && ((slipFinal.potongan_simulasi||0)+(slipFinal.potongan_custom_sum||0))>0 && (
+                  <div style={{marginTop:8,padding:'8px 12px',borderRadius:8,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',fontSize:11,color:'var(--muted2)'}}>
+                    ℹ️ Info: potensi potongan cuti/alpa & lainnya (belum dipotong) = {rp((slipFinal.potongan_simulasi||0)+(slipFinal.potongan_custom_sum||0))}
+                  </div>
+                )}
                 <div style={{marginTop:16,padding:'14px 16px',borderRadius:10,background:'rgba(34,201,122,.08)',border:'1px solid rgba(34,201,122,.2)'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                     <div style={{fontSize:13,fontWeight:700}}>Gaji Bersih (Netto)</div>
@@ -711,7 +631,7 @@ export default function SlipGaji({
         {/* Area PDF */}
         <div style={{position:'fixed',top:0,left:'-9999px',width:510,overflow:'visible',zIndex:-1,background:'#fff'}}>
           <div ref={slipRef}>
-            <SlipCetak slip={slipFinal} bulan_nama={bulan_nama} tahun={tahun} ttd={ttdFinal}/>
+            <SlipCetak slip={slipFinal} bulan_nama={bulan_nama} tahun={tahun} ttd={ttdDisplay}/>
           </div>
         </div>
       </>)}

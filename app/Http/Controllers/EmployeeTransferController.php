@@ -142,6 +142,83 @@ class EmployeeTransferController extends Controller
         ]);
     }
 
+    // Pindah/ajukan mutasi banyak karyawan sekaligus. Super admin -> langsung pindah (seperti
+    // transferDirect); role lain -> kirim pengajuan massal (seperti requestTransfer), menunggu approval.
+    public function transferBulk(Request $request)
+    {
+        $user         = auth()->user();
+        $isSuperAdmin = $user->hasRole('super-admin');
+
+        $data = $request->validate([
+            'employee_ids'   => 'required|array|min:1',
+            'employee_ids.*' => 'exists:employees,id',
+            'to_project_id'  => 'required|exists:projects,id',
+            'catatan'        => 'nullable|string|max:500',
+        ]);
+
+        $toProject = Project::find($data['to_project_id']);
+        $employees = Employee::whereIn('id', $data['employee_ids'])->get();
+
+        $moved = 0; $requested = 0; $skipped = 0;
+
+        foreach ($employees as $employee) {
+            if ($employee->project_id == $data['to_project_id']) { $skipped++; continue; }
+
+            if ($isSuperAdmin) {
+                $fromProjectId = $employee->project_id;
+                $employee->update(['project_id' => $data['to_project_id']]);
+
+                if ($fromProjectId) {
+                    TimesheetMember::where('id_badge', $employee->id_badge)
+                        ->where('project_id', $fromProjectId)
+                        ->update(['project_id' => $data['to_project_id']]);
+                }
+
+                EmployeeTransfer::create([
+                    'employee_id'      => $employee->id,
+                    'from_project_id'  => $fromProjectId,
+                    'to_project_id'    => $data['to_project_id'],
+                    'requested_by'     => $user->id,
+                    'approved_by'      => $user->id,
+                    'status'           => 'approved',
+                    'catatan'          => $data['catatan'] ?? null,
+                    'catatan_approval' => 'Transfer massal oleh Super Admin',
+                    'approved_at'      => now(),
+                ]);
+                $moved++;
+            } else {
+                if (!$employee->project_id) { $skipped++; continue; }
+
+                $existing = EmployeeTransfer::where('employee_id', $employee->id)
+                    ->where('status', 'pending')->exists();
+                if ($existing) { $skipped++; continue; }
+
+                EmployeeTransfer::create([
+                    'employee_id'     => $employee->id,
+                    'from_project_id' => $employee->project_id,
+                    'to_project_id'   => $data['to_project_id'],
+                    'requested_by'    => $user->id,
+                    'status'          => 'pending',
+                    'catatan'         => $data['catatan'] ?? null,
+                ]);
+                $requested++;
+            }
+        }
+
+        ActivityLog::record(
+            'update', 'Pindah Project', $toProject?->nama,
+            $isSuperAdmin
+                ? "Transfer massal {$moved} karyawan ke {$toProject?->nama}"
+                : "Pengajuan mutasi massal {$requested} karyawan ke {$toProject?->nama}"
+        );
+
+        $message = $isSuperAdmin
+            ? "{$moved} karyawan berhasil dipindahkan ke {$toProject?->nama}." . ($skipped ? " {$skipped} dilewati (sudah di project tujuan)." : '')
+            : "{$requested} pengajuan mutasi dikirim, menunggu persetujuan Super Admin." . ($skipped ? " {$skipped} dilewati." : '');
+
+        return response()->json(['ok' => true, 'message' => $message, 'moved' => $moved, 'requested' => $requested, 'skipped' => $skipped]);
+    }
+
     public function requestTransfer(Request $request, Employee $employee)
     {
         $user = auth()->user();

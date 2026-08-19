@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
+import { Check, Calendar, HardHat, X, Shirt, Save, Search, Pencil, Plus, Download } from 'lucide-react';
 
 function CheckPill({ val, tgl }) {
   if (!val) return <span className="pill pill-gray">—</span>;
@@ -81,12 +82,12 @@ function EditPpeModal({ employee, onClose }) {
             userSelect:'none', display:'flex', alignItems:'center', gap:6,
             transition:'all .15s',
           }}>
-          {form[k] ? '✅ Ada' : '— Tidak Ada'}
+          {form[k] ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Check size={12}/>Ada</span> : '— Tidak Ada'}
           <span style={{fontSize:9.5,opacity:.6,fontWeight:400}}>{form[k] ? '(klik untuk hapus)' : '(klik untuk tandai)'}</span>
         </div>
         {form[k] && tglKey && (
           <div style={{display:'flex',flexDirection:'column',gap:3,flex:1,minWidth:140}}>
-            <label style={{fontSize:10,color:'var(--muted)',letterSpacing:'.02em'}}>📅 Tgl Pengambilan</label>
+            <label style={{fontSize:10,color:'var(--muted)',letterSpacing:'.02em',display:'flex',alignItems:'center',gap:4}}><Calendar size={10}/> Tgl Pengambilan</label>
             <input type="date" style={{...inp,width:'100%'}}
               defaultValue={form[tglKey]||''} onBlur={e=>setForm(f=>({...f,[tglKey]:e.target.value}))} />
           </div>
@@ -97,14 +98,14 @@ function EditPpeModal({ employee, onClose }) {
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(560px, calc(100vw - 24px))',maxHeight:'90vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:10}}>
           <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>
-            🦺 Edit PPE — {employee.nama_lengkap}
+            <HardHat size={15} style={{verticalAlign:-2}}/> Edit PPE — {employee.nama_lengkap}
           </div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
 
         <form onSubmit={submit}>
@@ -113,7 +114,7 @@ function EditPpeModal({ employee, onClose }) {
             {/* Ukuran */}
             <div>
               <div style={{fontSize:11,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10,paddingBottom:6,borderBottom:'1px solid var(--border)'}}>
-                👕 Ukuran
+                <Shirt size={13} style={{verticalAlign:-2}}/> Ukuran
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 14px'}}>
                 <div>
@@ -156,7 +157,7 @@ function EditPpeModal({ employee, onClose }) {
             {/* Atribut */}
             <div>
               <div style={{fontSize:11,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10,paddingBottom:6,borderBottom:'1px solid var(--border)'}}>
-                🪖 Atribut Keselamatan
+                <HardHat size={13} style={{verticalAlign:-2}}/> Atribut Keselamatan
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
                 <Toggle label="Helmet (Putih)" k="white_helmet" tglKey="tgl_helm" />
@@ -183,7 +184,7 @@ function EditPpeModal({ employee, onClose }) {
             </button>
             <button type="submit"
               style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-              💾 Simpan
+              <Save size={13} style={{verticalAlign:-2}}/> Simpan
             </button>
           </div>
         </form>
@@ -194,7 +195,7 @@ function EditPpeModal({ employee, onClose }) {
 
 export default function PpePage({ employees={data:[],total:0,links:[],current_page:1,last_page:1}, stats={}, search='', filter='all' }) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [searchVal, setSearchVal] = useState(search);
   const [editEmp,   setEditEmp]   = useState(null);
 
@@ -243,7 +244,7 @@ export default function PpePage({ employees={data:[],total:0,links:[],current_pa
                 border: `1px solid ${isActive ? col : 'var(--border)'}`,
                 boxShadow: isActive ? `0 0 0 1px ${col}` : 'none',
               }}>
-              <div style={{fontSize:20,marginBottom:4}}>👕</div>
+              <div style={{marginBottom:4,display:'flex',justifyContent:'center'}}><Shirt size={20}/></div>
               <div style={{fontSize:10,color:isActive?col:'var(--muted)',marginBottom:4,fontWeight:isActive?600:400}}>
                 {s.label}
               </div>
@@ -258,16 +259,16 @@ export default function PpePage({ employees={data:[],total:0,links:[],current_pa
 
       <div className="panel" style={{marginTop:8}}>
         <div className="panel-head">
-          <div className="panel-title">🦺 Data PPE & Atribut Keselamatan</div>
+          <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><HardHat size={14}/> Data PPE & Atribut Keselamatan</div>
           <div style={{display:'flex',gap:10,alignItems:'center'}}>
-            <a href="/export/ppe" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif"}}>📤 Export</a>
+            <a href="/export/ppe" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Download size={13}/> Export</a>
           </div>
         </div>
 
         {/* Search - sejajar dengan menu lain */}
         <div style={{padding:'14px 16px 0'}}>
           <div style={{position:'relative',marginBottom:14}}>
-            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',fontSize:15,color:'var(--muted)'}}>🔍</span>
+            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={15}/></span>
             <input className="search-input" type="text" value={searchVal}
               placeholder="Cari nama atau NIK..."
               onChange={e=>{setSearchVal(e.target.value); doFilter(filter, e.target.value);}}
@@ -331,12 +332,12 @@ export default function PpePage({ employees={data:[],total:0,links:[],current_pa
                           ? (
                             <button onClick={()=>setEditEmp(e)}
                               style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                              ✏️ Edit
+                              <Pencil size={11} style={{verticalAlign:-2}}/> Edit
                             </button>
                           ) : (
                             <button onClick={()=>setEditEmp(e)}
                               style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(34,201,122,.1)',color:'var(--green)',border:'1px solid rgba(34,201,122,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                              ➕ Tambah
+                              <Plus size={11} style={{verticalAlign:-2}}/> Tambah
                             </button>
                           )}
                       </td>

@@ -33,7 +33,7 @@ class TimesheetMemberController extends Controller
             'id_badge'      => 'required|string|exists:employees,id_badge',
             'nama_override' => 'nullable|string|max:100',
             'urutan'        => 'nullable|integer',
-            'sub_group'     => 'nullable|in:construction,piling',
+            'sub_group'     => 'nullable|string|max:30',
             'kelompok'      => 'nullable|in:per_jam,flat',
         ]);
 
@@ -73,7 +73,7 @@ class TimesheetMemberController extends Controller
         $request->validate([
             'badges'    => 'required|array|min:1',
             'badges.*'  => 'required|string',
-            'sub_group' => 'nullable|in:construction,piling',
+            'sub_group' => 'nullable|string|max:30',
             'kelompok'  => 'nullable|in:per_jam,flat',
         ]);
 
@@ -131,7 +131,7 @@ class TimesheetMemberController extends Controller
             'urutan'        => 'nullable|integer',
             'aktif'         => 'boolean',
             'tipe'          => 'nullable|in:7jam,8jam',
-            'sub_group'     => 'nullable|in:construction,piling',
+            'sub_group'     => 'nullable|string|max:30',
             'kelompok'      => 'nullable|in:per_jam,flat',
         ]);
 

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
+import { Stethoscope, X, Save, Search, Pencil, Download } from 'lucide-react';
 
 function StatusPill({ status }){
   if(status==='expired') return <span className="pill pill-red">Expired</span>;
@@ -28,11 +29,11 @@ function EditMcuModal({ employee, onClose }){
   const inp = {background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:8,padding:'8px 11px',fontSize:12.5,fontFamily:"'Outfit',sans-serif",outline:'none',width:'100%',boxSizing:'border-box'};
   function submit(e){ e.preventDefault(); router.put(`/compliance/mcu/${employee.id}`, form, {preserveScroll:true, onSuccess:onClose}); }
   return (
-    <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(440px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>🏥 Edit MCU — {employee.nama_lengkap}</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Stethoscope size={16}/> Edit MCU — {employee.nama_lengkap}</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -58,7 +59,7 @@ function EditMcuModal({ employee, onClose }){
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-            <button type="submit" style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>💾 Simpan</button>
+            <button type="submit" style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Save size={14}/> Simpan</button>
           </div>
         </form>
       </div>
@@ -68,7 +69,7 @@ function EditMcuModal({ employee, onClose }){
 
 export default function McuPage({ employees={data:[],total:0,links:[],current_page:1,last_page:1}, stats={}, filter='all', search='', highlight=null }){
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [searchVal, setSearchVal] = useState(search);
   const [editEmp,   setEditEmp]   = useState(null);
 
@@ -132,12 +133,12 @@ export default function McuPage({ employees={data:[],total:0,links:[],current_pa
 
       <div className="panel">
         <div className="panel-head">
-          <div className="panel-title">🏥 Data MCU Karyawan</div>
-          <a href="/export/mcu" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif"}}>📤 Export</a>
+          <div className="panel-title" style={{display:'flex',alignItems:'center',gap:8}}><Stethoscope size={15}/> Data MCU Karyawan</div>
+          <a href="/export/mcu" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif",display:'inline-flex',alignItems:'center',gap:6}}><Download size={14}/> Export</a>
         </div>
         <div style={{padding:'14px 16px'}}>
           <div style={{position:'relative',marginBottom:14}}>
-            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',fontSize:15,color:'var(--muted)'}}>🔍</span>
+            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={15}/></span>
             <input className="search-input" type="text" value={searchVal} placeholder="Cari nama atau NIK..."
               onChange={e=>{setSearchVal(e.target.value); doFilter(filter, e.target.value);}} style={{paddingLeft:'36px'}}/>
           </div>
@@ -159,7 +160,7 @@ export default function McuPage({ employees={data:[],total:0,links:[],current_pa
                     <td style={{fontSize:11.5,color:'var(--muted2)'}}>{e.derajat_kesehatan||'—'}</td>
                     {!isViewer && (
                       <td style={{textAlign:'center'}}>
-                        <button onClick={()=>setEditEmp(e)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>✏️ Edit</button>
+                        <button onClick={()=>setEditEmp(e)} style={{padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'inline-flex',alignItems:'center',gap:4}}><Pencil size={12}/> Edit</button>
                       </td>
                     )}
                   </tr>

@@ -3,6 +3,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import ImportModal from '@/Components/ImportModal';
+import {
+  Settings, X, Check, Plus, Pencil, Construction, FileText, Lock, Search,
+  RefreshCw, TriangleAlert, Loader2, CheckCircle2, HardHat, Trash2, Truck,
+  Upload, Download, Lightbulb, Save,
+} from 'lucide-react';
 
 // Kolom opsional tab Operator & Driver
 const OPERATOR_COLS = [
@@ -86,11 +91,11 @@ function ColPickerModal({ cols, selected, onClose, onApply, title }) {
   }
   return (
     <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(520px, calc(100vw - 24px))',maxHeight:'80vh',overflow:'auto',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:1}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>⚙️ {title}</div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Settings size={16}/> {title}</div>
+          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <div style={{padding:'16px 20px'}}>
           <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:16,padding:'8px 12px',background:'var(--bg3)',borderRadius:8}}>
@@ -99,11 +104,11 @@ function ColPickerModal({ cols, selected, onClose, onApply, title }) {
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
             {cols.map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
-                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',
+                style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',display:'flex',alignItems:'center',gap:5,
                   background:sel.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
                   color:sel.includes(col.key)?'var(--accent)':'var(--muted2)',
                   border:`1px solid ${sel.includes(col.key)?'var(--accent)':'var(--border)'}`}}>
-                {sel.includes(col.key)?'✓ ':''}{col.label}
+                {sel.includes(col.key) && <Check size={13} color="var(--accent)"/>}{col.label}
               </div>
             ))}
           </div>
@@ -118,8 +123,8 @@ function ColPickerModal({ cols, selected, onClose, onApply, title }) {
             Batal
           </button>
           <button type="button" onClick={()=>{ onApply(sel); onClose(); }}
-            style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-            ✓ Terapkan
+            style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}>
+            <Check size={14}/> Terapkan
           </button>
         </div>
       </div>
@@ -174,13 +179,13 @@ function EquipmentModal({ mode, data, onClose, onSave }) {
       onClick={e => e.target===e.currentTarget && onClose()}>
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:16, width:'min(780px, calc(100vw - 24px))', maxHeight:'90vh', overflow:'auto', boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)', position:'sticky', top:0, background:'var(--bg2)', zIndex:10 }}>
-          <div style={{ fontFamily:'Syne,sans-serif', fontSize:15, fontWeight:700, color:'var(--text)' }}>
-            {mode==='add' ? '➕ Tambah Unit Equipment' : `✏️ Edit — ${data?.no_unit}`}
+          <div style={{ fontFamily:'Syne,sans-serif', fontSize:15, fontWeight:700, color:'var(--text)', display:'flex', alignItems:'center', gap:8 }}>
+            {mode==='add' ? <><Plus size={16}/> Tambah Unit Equipment</> : <><Pencil size={16}/> Edit — {data?.no_unit}</>}
           </div>
-          <div onClick={onClose} style={{ cursor:'pointer', fontSize:18, color:'var(--muted)' }}>✕</div>
+          <div onClick={onClose} style={{ cursor:'pointer', fontSize:18, color:'var(--muted)', display:'flex' }}><X size={18}/></div>
         </div>
         <div style={{ padding:'18px 20px' }}>
-          <Section title="🏗️ Identitas Unit">
+          <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><Construction size={13}/> Identitas Unit</span>}>
             <F label="No. Unit AKM *" k="no_unit" />
             <F label="No. Polisi" k="plat_nomor" />
             <F label="Type Equipment" k="type_unit" opts={['DUMP TRUCK','EXCAVATOR TRACK','BULLDOZER','COMPACTOR SMOOTH DRUM','COMPACTOR PADFOOT','MOTOR GRADER','FUEL TRUCK','WATER TRUCK','MICROBUS','PRIME MOVER','LOW BOY','HI BOY','FOCO TRUCK','CRAWLER CRANE','PICK UP D.CABIN','PICK UP S.CABIN','MINIBUS','DOUBLE CABIN','WELDING MACHINE','DROP HAMMER']} />
@@ -192,7 +197,7 @@ function EquipmentModal({ mode, data, onClose, onSave }) {
             <F label="Kategori" k="kategori" opts={['HEAVY VEHICLE','LIGHT VEHICLE']} />
             <F label="Kapasitas" k="kapasitas" />
           </Section>
-          <Section title="📄 Dokumen & Expired">
+          <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><FileText size={13}/> Dokumen & Expired</span>}>
             <F label="STNK Expired" k="stnk_expired" type="date" />
             <F label="TAX/Pajak Expired" k="tax_expired" type="date" />
             <F label="KIR Expired" k="kir_expired" type="date" />
@@ -202,14 +207,14 @@ function EquipmentModal({ mode, data, onClose, onSave }) {
             <F label="SMBR Pass Expired (x6 bln)" k="smbr_pass_expired" type="date" />
             <F label="Green Stiker Expired" k="green_stiker_expired" type="date" />
           </Section>
-          <Section title="🔒 SIO / K3">
+          <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><Lock size={13}/> SIO / K3</span>}>
             <F label="SIO Migas / K3 Disnaker No." k="sio_migas_no" />
             <F label="SIO Migas Expired" k="sio_migas_expired" type="date" />
             <F label="SIO Disnaker Expired" k="sio_disnaker_expired" type="date" />
             <F label="K3 P3A2 No." k="k3_p3a2_no" />
             <F label="K3 P3A2 Expired" k="k3_p3a2_expired" type="date" />
           </Section>
-          <Section title="🔍 Inspeksi">
+          <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><Search size={13}/> Inspeksi</span>}>
             <F label="TPE CEM Inspector" k="tpe_cem_inspector" />
             <F label="Contractor CEM Inspector" k="contractor_cem_inspector" />
             <F label="Location of Inspection" k="location_of_inspection" />
@@ -223,8 +228,8 @@ function EquipmentModal({ mode, data, onClose, onSave }) {
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end', padding:'12px 20px', borderTop:'1px solid var(--border)', position:'sticky', bottom:0, background:'var(--bg2)' }}>
           <button onClick={onClose} style={{ padding:'9px 18px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg3)', color:'var(--muted2)', fontSize:12.5, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>Batal</button>
           <button onClick={() => { if(!form.no_unit.trim()){alert('No. Unit wajib diisi!');return;} onSave(form); }}
-            style={{ padding:'9px 22px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#E8A020,#A06010)', color:'#0C0F14', fontSize:12.5, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
-            {mode==='add' ? '➕ Tambah' : '💾 Simpan'}
+            style={{ padding:'9px 22px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#E8A020,#A06010)', color:'#0C0F14', fontSize:12.5, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif", display:'flex', alignItems:'center', gap:6 }}>
+            {mode==='add' ? <><Plus size={14}/> Tambah</> : <><Save size={14}/> Simpan</>}
           </button>
         </div>
       </div>
@@ -265,23 +270,23 @@ function GantiOperatorModal({ equipment, employees, onClose }) {
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(520px, calc(100vw - 24px))',maxHeight:'85vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
 
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)',position:'sticky',top:0,background:'var(--bg2)',zIndex:10}}>
           <div>
-            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700}}>🔄 Ganti Operator</div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><RefreshCw size={15}/> Ganti Operator</div>
             <div style={{fontSize:11.5,color:'var(--muted)',marginTop:2}}>Unit: <b style={{color:'var(--text)'}}>{equipment.no_unit}</b>{equipment.operator && <> · Operator sekarang: <b style={{color:'var(--accent)'}}>{equipment.operator.operator_name}</b></>}</div>
           </div>
-          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)'}}>✕</div>
+          <div onClick={onClose} style={{cursor:'pointer',fontSize:18,color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
 
         {!confirm ? (
           <>
             {/* Search */}
             <div style={{padding:'14px 20px 0'}}>
-              <input style={inp} placeholder="🔍 Cari nama atau badge..." value={search} onChange={e=>setSearch(e.target.value)} />
+              <input style={inp} placeholder="Cari nama atau badge..." value={search} onChange={e=>setSearch(e.target.value)} />
             </div>
 
             {/* List karyawan */}
@@ -301,7 +306,7 @@ function GantiOperatorModal({ equipment, employees, onClose }) {
                     <div style={{fontSize:12.5,fontWeight:600,color:'var(--text)'}}>{emp.nama_lengkap}</div>
                     <div style={{fontSize:11,color:'var(--muted)',marginTop:1}}>{emp.id_badge||'—'}{emp.rfid ? ` · RFID: ${emp.rfid}` : ''}</div>
                   </div>
-                  {selected?.id===emp.id && <span style={{color:'#22C97A',fontSize:16}}>✓</span>}
+                  {selected?.id===emp.id && <Check size={16} color="#22C97A"/>}
                 </div>
               ))}
             </div>
@@ -318,8 +323,9 @@ function GantiOperatorModal({ equipment, employees, onClose }) {
         ) : (
           /* Konfirmasi */
           <div style={{padding:'24px 20px',display:'flex',flexDirection:'column',gap:16}}>
-            <div style={{padding:'14px 16px',borderRadius:10,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.25)',fontSize:12.5,lineHeight:1.6}}>
-              ⚠️ Kamu akan mengganti operator unit <b style={{color:'var(--text)'}}>{equipment.no_unit}</b> dari{' '}
+            <div style={{padding:'14px 16px',borderRadius:10,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.25)',fontSize:12.5,lineHeight:1.6,display:'flex',alignItems:'flex-start',gap:8}}>
+              <TriangleAlert size={15} color="#E8A020" style={{flexShrink:0,marginTop:2}}/>
+              <div>Kamu akan mengganti operator unit <b style={{color:'var(--text)'}}>{equipment.no_unit}</b> dari{' '}
               <b style={{color:'#E04545'}}>{equipment.operator?.operator_name || '(kosong)'}</b> ke{' '}
               <b style={{color:'#22C97A'}}>{selected.nama_lengkap}</b>.
               {equipment.operator && (
@@ -327,12 +333,13 @@ function GantiOperatorModal({ equipment, employees, onClose }) {
                   Operator lama akan dinonaktifkan dari unit ini. Data compliance-nya tetap tersimpan.
                 </div>
               )}
+              </div>
             </div>
             <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
               <button onClick={()=>setConfirm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>← Kembali</button>
               <button onClick={handleConfirm} disabled={loading}
                 style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?0.7:1}}>
-                {loading ? '⏳ Menyimpan...' : '✅ Ya, Ganti Operator'}
+                {loading ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>Menyimpan...</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><CheckCircle2 size={14}/>Ya, Ganti Operator</span>}
               </button>
             </div>
           </div>
@@ -366,9 +373,9 @@ function OperatorModal({ equipment, data, onClose, onSave }) {
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:16, width:'min(660px, calc(100vw - 24px))', maxHeight:'90vh', overflow:'auto', boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)', position:'sticky', top:0, background:'var(--bg2)', zIndex:10 }}>
           <div style={{ fontFamily:'Syne,sans-serif', fontSize:15, fontWeight:700 }}>
-            👷 {data ? 'Edit Operator' : 'Tambah Operator'} — {equipment?.no_unit}
+            <HardHat size={15} style={{verticalAlign:-2}}/> {data ? 'Edit Operator' : 'Tambah Operator'} — {equipment?.no_unit}
           </div>
-          <div onClick={onClose} style={{ cursor:'pointer', fontSize:18, color:'var(--muted)' }}>✕</div>
+          <div onClick={onClose} style={{ cursor:'pointer', color:'var(--muted)', display:'flex' }}><X size={18}/></div>
         </div>
         <div className="form-grid-2" style={{ padding:'18px 20px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px 16px' }}>
           <div style={{ gridColumn:'1/-1' }}>
@@ -409,7 +416,7 @@ function OperatorModal({ equipment, data, onClose, onSave }) {
           <button onClick={onClose} style={{ padding:'9px 18px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg3)', color:'var(--muted2)', fontSize:12.5, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>Batal</button>
           <button onClick={() => { if(!form.operator_name.trim()){alert('Nama wajib diisi!');return;} onSave(form); }}
             style={{ padding:'9px 22px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#E8A020,#A06010)', color:'#0C0F14', fontSize:12.5, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
-            💾 Simpan
+            <Save size={13} style={{verticalAlign:-2}}/> Simpan
           </button>
         </div>
       </div>
@@ -420,7 +427,7 @@ function OperatorModal({ equipment, data, onClose, onSave }) {
 // ── MAIN COMPONENT ──
 export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters = {}, employees = [], highlight = null }) {
   const { auth } = usePage().props;
-  const isViewer = auth?.user?.can?.is_viewer || false;
+  const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState(filters.search || '');
   const [view,   setView]   = useState(filters.view || 'operator');
@@ -550,7 +557,7 @@ export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters
             color: eq.operator ? 'var(--accent)' : 'var(--green)',
             border: eq.operator ? '1px solid rgba(232,160,32,.25)' : '1px solid rgba(34,201,122,.2)',
             cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
-          {eq.operator ? '🔄 Ganti Operator' : '➕ Assign Operator'}
+          {eq.operator ? <span style={{display:'inline-flex',alignItems:'center',gap:5}}><RefreshCw size={12}/>Ganti Operator</span> : <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Plus size={12}/>Assign Operator</span>}
         </button>
       )}
       {!isViewer && eq.operator && (
@@ -559,7 +566,7 @@ export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters
             background:'rgba(58,143,224,.1)',color:'var(--blue)',
             border:'1px solid rgba(58,143,224,.25)',
             cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
-          ✏️ Edit Operator
+          <Pencil size={12} style={{verticalAlign:-2}}/> Edit Operator
         </button>
       )}
       {!isViewer && eq.operator && (
@@ -574,7 +581,7 @@ export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters
             background:'rgba(224,69,69,.1)',color:'#E04545',
             border:'1px solid rgba(224,69,69,.2)',
             cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
-          🗑️ Hapus Operator
+          <Trash2 size={12} style={{verticalAlign:-2}}/> Hapus Operator
         </button>
       )}
     </div>
@@ -588,7 +595,7 @@ export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters
             background:'rgba(232,160,32,.12)',color:'var(--accent)',
             border:'1px solid rgba(232,160,32,.25)',
             cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
-          ✏️ Edit Unit
+          <Pencil size={12} style={{verticalAlign:-2}}/> Edit Unit
         </button>
       )}
       {!isViewer && (
@@ -601,7 +608,7 @@ export default function EquipmentIndex({ equipment = {data:[],stats:{}}, filters
             background:'rgba(224,69,69,.1)',color:'#E04545',
             border:'1px solid rgba(224,69,69,.2)',
             cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
-          🗑️ Hapus Unit
+          <Trash2 size={12} style={{verticalAlign:-2}}/> Hapus Unit
         </button>
       )}
     </div>
@@ -699,7 +706,7 @@ return (
         {/* Title + Controls */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
           <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>
-            🚜 Equipment & Operator — PT. Andalas Karya Mulia
+            <Truck size={15} style={{verticalAlign:-2}}/> Equipment & Operator — PT. Andalas Karya Mulia
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <select value={type} onChange={e=>{setType(e.target.value);doFilter(search,e.target.value,status);}}>
@@ -715,33 +722,33 @@ return (
             {!isViewer && view==='vehicle' && (
               <button onClick={()=>setModal({mode:'eq_add'})}
                 style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                ➕ Tambah Unit
+                <Plus size={13} style={{verticalAlign:-2}}/> Tambah Unit
               </button>
             )}
             {!isViewer && (
               <button onClick={()=>setShowImport(true)}
                 style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.08)',color:'var(--green)',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
-                📥 Import Equipment
+                <Upload size={13} style={{verticalAlign:-2}}/> Import Equipment
               </button>
             )}
             <button onClick={()=>setShowColPicker(true)}
               style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}>
-              ⚙️ Kolom
+              <Settings size={13} style={{verticalAlign:-2}}/> Kolom
             </button>
             <a href="/export/equipment-unit"
               style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif"}}>
-              📤 Export Unit
+              <Download size={13} style={{verticalAlign:-2}}/> Export Unit
             </a>
             <a href="/export/equipment-operator"
               style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif"}}>
-              📤 Export Operator
+              <Download size={13} style={{verticalAlign:-2}}/> Export Operator
             </a>
           </div>
         </div>
 
         {/* Search */}
         <div style={{position:'relative',marginBottom:12}}>
-          <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',fontSize:15,color:'var(--muted)'}}>🔍</span>
+          <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={15}/></span>
           <input className="search-input" type="text" value={search}
             placeholder="Cari no. unit, plat, model, operator..."
             onChange={e=>{setSearch(e.target.value);doFilter(e.target.value,type,status);}}
@@ -754,12 +761,12 @@ return (
             <div className={`tab ${view==='operator'?'active':''}`}
             onClick={()=>{ setView('operator'); doFilter(search,type,status,'operator'); }}
             style={{cursor:'pointer'}}>
-            👷 Operator & Driver
+            <HardHat size={13} style={{verticalAlign:-2}}/> Operator & Driver
             </div>
             <div className={`tab ${view==='vehicle'?'active':''}`}
             onClick={()=>{ setView('vehicle'); doFilter(search,type,status,'vehicle'); }}
             style={{cursor:'pointer'}}>
-            🚜 Equipment & Vehicle
+            <Truck size={13} style={{verticalAlign:-2}}/> Equipment & Vehicle
             </div>
         </div>
         {view === 'operator' && (
@@ -769,20 +776,20 @@ return (
           background:'var(--bg3)', border:'1px solid var(--border)',
           display:'flex', alignItems:'center', gap:8,
         }}>
-          <span style={{fontSize:14}}>💡</span>
+          <span style={{display:'flex'}}><Lightbulb size={14}/></span>
           <span>
             Untuk ganti operator, klik{' '}
             <span style={{
               background:'rgba(34,201,122,.1)', color:'var(--green)',
               border:'1px solid rgba(34,201,122,.2)', borderRadius:5,
               padding:'1px 7px', fontSize:11, fontWeight:600,
-            }}>🔄 Ganti Operator</span>{' '}
+              display:'inline-flex',alignItems:'center',gap:4}}><RefreshCw size={11}/>Ganti Operator</span>{' '}
             di kolom Aksi. Untuk edit data operator aktif, klik{' '}
             <span style={{
               background:'rgba(58,143,224,.1)', color:'var(--blue)',
               border:'1px solid rgba(58,143,224,.2)', borderRadius:5,
               padding:'1px 7px', fontSize:11, fontWeight:600,
-            }}>✏️ Edit Operator</span>
+            }}><Pencil size={12} style={{verticalAlign:-2}}/> Edit Operator</span>
           </span>
         </div>
       )}

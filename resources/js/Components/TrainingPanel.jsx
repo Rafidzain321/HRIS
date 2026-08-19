@@ -1,6 +1,7 @@
 // resources/js/Components/TrainingPanel.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Plus, Pencil, X, Loader2, Save, BookOpen, Trash2, TriangleAlert } from 'lucide-react';
 
 const STATUS_CONFIG = {
   expired:  { label:'Expired',      bg:'rgba(224,69,69,.12)',   color:'#E04545' },
@@ -52,14 +53,14 @@ function TrainingModal({ mode, training, types, employeeId, onClose, onSaved }) 
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:16, width:'min(480px,calc(100vw - 24px))', maxHeight:'90vh', overflow:'auto', boxShadow:'0 24px 80px rgba(0,0,0,.5)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 18px', borderBottom:'1px solid var(--border)', position:'sticky', top:0, background:'var(--bg2)', zIndex:1 }}>
           <div style={{ fontFamily:'Syne,sans-serif', fontSize:14, fontWeight:700 }}>
-            {mode==='add' ? '➕ Tambah Training' : '✏️ Edit Training'}
+            {mode==='add' ? <span style={{display:'inline-flex',alignItems:'center',gap:8}}><Plus size={15}/>Tambah Training</span> : <span style={{display:'inline-flex',alignItems:'center',gap:8}}><Pencil size={15}/>Edit Training</span>}
           </div>
-          <div onClick={onClose} style={{ cursor:'pointer', fontSize:17, color:'var(--muted)' }}>✕</div>
+          <div onClick={onClose} style={{ cursor:'pointer', color:'var(--muted)', display:'flex' }}><X size={17}/></div>
         </div>
 
         <form onSubmit={submit}>
           <div style={{ padding:'16px 18px', display:'flex', flexDirection:'column', gap:12 }}>
-            {error && <div style={{ background:'rgba(224,69,69,.1)', border:'1px solid rgba(224,69,69,.2)', borderRadius:8, padding:'8px 12px', fontSize:12, color:'#E04545' }}>⚠️ {error}</div>}
+            {error && <div style={{ background:'rgba(224,69,69,.1)', border:'1px solid rgba(224,69,69,.2)', borderRadius:8, padding:'8px 12px', fontSize:12, color:'#E04545', display:'flex', alignItems:'center', gap:6 }}><TriangleAlert size={13}/> {error}</div>}
 
             {/* Jenis Training */}
             <div>
@@ -139,7 +140,7 @@ function TrainingModal({ mode, training, types, employeeId, onClose, onSaved }) 
             </button>
             <button type="submit" disabled={loading}
               style={{ padding:'8px 20px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#E8A020,#A06010)', color:'#0C0F14', fontSize:12, fontWeight:700, cursor:loading?'not-allowed':'pointer', fontFamily:"'Outfit',sans-serif", opacity:loading?.7:1 }}>
-              {loading ? '⏳...' : mode==='add' ? '➕ Tambah' : '💾 Simpan'}
+              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : mode==='add' ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Tambah</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan</span>}
             </button>
           </div>
         </form>
@@ -188,19 +189,19 @@ export default function TrainingPanel({ employeeId }) {
       <div style={{ marginBottom:24 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, paddingBottom:8, borderBottom:'1px solid var(--border)' }}>
           <div style={{ fontSize:12, fontWeight:600, color:'var(--accent)', textTransform:'uppercase', letterSpacing:'.08em' }}>
-            📚 Training Karyawan
+            <BookOpen size={13} style={{verticalAlign:-2}}/> Training Karyawan
           </div>
           <button type="button" onClick={()=>setModal({mode:'add'})}
             style={{ padding:'6px 14px', borderRadius:7, border:'none', background:'linear-gradient(135deg,#E8A020,#A06010)', color:'#0C0F14', fontSize:11.5, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
-            ➕ Tambah Training
+            <Plus size={12} style={{verticalAlign:-2}}/> Tambah Training
           </button>
         </div>
 
         {loading ? (
-          <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12 }}>⏳ Memuat training...</div>
+          <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> Memuat training...</div>
         ) : trainings.length === 0 ? (
           <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12, borderRadius:9, border:'1px dashed var(--border)' }}>
-            Belum ada data training. Klik ➕ untuk menambahkan.
+            Belum ada data training. Klik tombol Tambah untuk menambahkan.
           </div>
         ) : (
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -263,11 +264,11 @@ export default function TrainingPanel({ employeeId }) {
                   <div style={{ display:'flex', gap:5, flexShrink:0 }}>
                     <button type="button" onClick={()=>setModal({mode:'edit', training:t})}
                       style={{ padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:600, background:'rgba(232,160,32,.12)', color:'var(--accent)', border:'1px solid rgba(232,160,32,.25)', cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
-                      ✏️
+                      <Pencil size={12}/>
                     </button>
                     <button type="button" onClick={()=>handleDelete(t)}
                       style={{ padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:600, background:'rgba(224,69,69,.1)', color:'#E04545', border:'1px solid rgba(224,69,69,.2)', cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
-                      🗑️
+                      <Trash2 size={12}/>
                     </button>
                   </div>
                 </div>

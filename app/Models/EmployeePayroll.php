@@ -23,7 +23,7 @@ class EmployeePayroll extends Model
         'izin', 'sakit', 'alpa', 'cuti','stb',
         'nama_bank', 'no_rekening', 'ptkp', 'no_bpjs_tk', 'no_bpjs_kes',
         'dibuat_oleh', 'catatan', 'tunj_jabatan',
-        'h_basic', 'u_basic', 'u_kerja',
+        'h_basic', 'u_basic', 'u_kerja', 'ttt_custom', 'potongan_custom',
     ];
 
     protected $casts = [
@@ -42,6 +42,7 @@ class EmployeePayroll extends Model
         'l_sabtu' => 'integer', 'l_libur' => 'integer', 'lembur_biasa' => 'integer',
         'h_kerja' => 'integer', 'izin' => 'integer', 'sakit' => 'integer',
         'alpa' => 'integer', 'cuti' => 'integer', 'ttt_custom' => 'array',
+        'potongan_custom' => 'array',
     ];
 
     public function employee(): BelongsTo

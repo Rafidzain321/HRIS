@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Http\Middleware\ProjectAccessMiddleware::class,
         ]);
+        $middleware->alias([
+            'payroll.access' => \App\Http\Middleware\CheckPayrollAccess::class,
+            'menu'           => \App\Http\Middleware\CheckMenuPermission::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
