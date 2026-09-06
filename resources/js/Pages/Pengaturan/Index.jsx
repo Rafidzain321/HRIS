@@ -516,6 +516,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
   const [changePwModal,  setChangePwModal]  = useState(false);
   const [jabatanModal,   setJabatanModal]   = useState(null);
   const [jabatanSearch,  setJabatanSearch]  = useState('');
+  const [userSearch,     setUserSearch]     = useState('');
   const [projectModal,   setProjectModal]   = useState(null);
   const [confirmModal,   setConfirmModal]   = useState(null);
   const [showPw, setShowPw] = useState({});
@@ -557,6 +558,15 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     !jabatanSearch || p.nama_jabatan.toLowerCase().includes(jabatanSearch.toLowerCase())
   );
 
+  const filteredUsers = users.filter(u => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return true;
+    return u.name.toLowerCase().includes(q)
+      || u.email.toLowerCase().includes(q)
+      || (u.role||'').toLowerCase().includes(q)
+      || (u.project_nama||'').toLowerCase().includes(q);
+  });
+
   // Filter + paginate logs
   const modules = [...new Set(logs.map(l=>l.module))].sort();
   const actions  = [...new Set(logs.map(l=>l.action))].sort();
@@ -581,7 +591,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     ...(isSuperAdmin ? [{key:'users', label:<><User size={14}/> Manajemen User</>, count:users.length}] : []),
     ...(isSuperAdmin ? [{key:'project', label:<><Building2 size={14}/> Project</>, count:projects.length}] : []),
     {key:'jabatan',        label:<><Briefcase size={14}/> Jabatan</>,        count:positions.length},
-    {key:'log',            label:<><ClipboardList size={14}/> Log Aktivitas</>,   count:logs.length},
+    ...(!auth?.user?.can?.restrict_activity_log ? [{key:'log', label:<><ClipboardList size={14}/> Log Aktivitas</>, count:logs.length}] : []),
   ];
 
   const tabBtn = (active) => ({
@@ -671,6 +681,12 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
             }}><Plus size={14}/> Tambah User</button>
           </div>
           <div style={{padding:'14px 16px'}}>
+            <div style={{position:'relative',marginBottom:14,maxWidth:320}}>
+              <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={14}/></span>
+              <input type="text" value={userSearch} placeholder="Cari nama, email, role, atau project..."
+                onChange={e=>setUserSearch(e.target.value)}
+                style={{...INP,paddingLeft:32,width:'100%',boxSizing:'border-box'}} />
+            </div>
             <div style={{overflowX:'auto'}}>
             <table className="kar-table">
                   <thead>
@@ -687,7 +703,10 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                     </tr>
                   </thead>
               <tbody>
-                {users.map((u,i)=>{
+                {filteredUsers.length===0 && (
+                  <tr><td colSpan={9} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Tidak ada user yang cocok.</td></tr>
+                )}
+                {filteredUsers.map((u,i)=>{
                   const rc   = ROLE_COLOR[u.role]||ROLE_COLOR['viewer'];
                   const isSelf = auth?.user?.id===u.id;
                   return (

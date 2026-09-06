@@ -808,11 +808,6 @@ class PayrollController extends Controller
             'dibuat_oleh','catatan',
         ];
 
-        // Ambil nilai asli SEBELUM ditimpa, untuk dibandingkan manual di bawah —
-        // isDirty() bawaan Eloquent kurang cocok di sini karena kolom desimal yang belum
-        // punya $casts akan dibaca sebagai string ("0.00") dari database, sehingga
-        // dibandingkan dengan angka PHP (0) akan selalu dianggap "berubah" padahal
-        // nilainya sama persis.
         $originalAttrs = $payroll->getOriginal();
 
         foreach ($updateData as $k => $v) {
@@ -821,10 +816,6 @@ class PayrollController extends Controller
             }
         }
 
-        // Hanya catat ke Log Aktivitas kalau memang ada nilai yang benar-benar berubah —
-        // klik "Edit" lalu blur tanpa mengubah angka apapun tidak perlu tercatat sebagai
-        // update. "dibuat_oleh" dikecualikan karena selalu ikut ter-set ulang ke user yang
-        // sedang login setiap kali baris disimpan, walau tidak ada perubahan nilai lain.
         $hasChanges = false;
         foreach (array_diff($allowedColumns, ['dibuat_oleh']) as $col) {
             $old = $originalAttrs[$col] ?? null;
@@ -857,10 +848,6 @@ class PayrollController extends Controller
         return response()->json(['ok' => true, 'message' => 'Berhasil disimpan.']);
     }
 
-    // Update data induk karyawan (bukan snapshot payroll per periode) langsung dari tabel Data
-    // Gaji — tanggal masuk, PTKP, no rekening, bank (kolom employees) & status karyawan HO
-    // (employee_ho_details). Ditulis ke data induk (sama seperti dari halaman Edit Karyawan),
-    // BUKAN ke snapshot EmployeePayroll, supaya nyambung ke halaman Data Karyawan juga.
     public function updateEmployeeInfo(Request $request, Employee $employee)
     {
         if ($this->isViewer()) {
@@ -1091,9 +1078,6 @@ class PayrollController extends Controller
             $r++;
         };
 
-        // Huruf section (A/B/C/D...) mengikuti section mana yang benar-benar tampil —
-        // sama seperti di PDF/slip layar (SlipCetak), supaya tidak ada huruf yang "bolong"
-        // kalau TTT/Lembur di-skip.
         $letters = ['A', 'B', 'C', 'D', 'E', 'F'];
         $li = 0;
 
@@ -1104,9 +1088,6 @@ class PayrollController extends Controller
         $addItem('3.', 'Kompensasi PWT', $kompPwt);
         $perolehanSubtotal = $gajiPokok + $tunjTetap + $kompPwt;
 
-        // B. TTT — kalau semua nilai TTT kosong, section ini (header + isi) di-skip total
-        // dan langsung lanjut ke Lembur, sama seperti PDF. Daftar item disamakan dengan
-        // TTT_LABELS di SlipCetak (Timesheet/SlipGaji.jsx) supaya kontennya konsisten.
         $tttSubtotal = 0;
         if ($isMd) {
             $addSectionHeader($letters[$li++], 'TUNJANGAN TIDAK TETAP (MD)');
@@ -1158,8 +1139,6 @@ class PayrollController extends Controller
 
         $addTotal('GAJI SEBULAN (KOTOR)', $gajiKotor, true);
 
-        // Rincian formula gaji kotor — biar kelihatan dari mana totalnya berasal
-        // (jumlah semua subtotal section di atas), bukan cuma angka akhir.
         $rincianKotorParts = [$fmtRp($perolehanSubtotal) . ' (Perolehan)'];
         if ($tttSubtotal > 0)   $rincianKotorParts[] = $fmtRp($tttSubtotal) . ' (TTT)';
         if ($lemburSubtotal > 0) $rincianKotorParts[] = $fmtRp($lemburSubtotal) . ' (Lembur)';

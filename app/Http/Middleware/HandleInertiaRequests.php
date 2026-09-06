@@ -75,6 +75,7 @@ class HandleInertiaRequests extends Middleware
                         'is_project_user' => $user->hasRole('project-user'),
                         'is_project_readonly' => $isProjectReadonly,
                         'restrict_payroll' => (bool) $user->restrict_payroll,
+                        'restrict_activity_log' => (bool) $user->restrict_activity_log,
                     ],
                     'permissions' => $permissions,
                 ] : null,

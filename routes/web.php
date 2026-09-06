@@ -162,7 +162,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pengaturan/users/{user}/toggle', [UserManagementController::class, 'toggleActive']);
     Route::post('/pengaturan/users/{user}/reset-password', [UserManagementController::class, 'resetPassword']);
     Route::post('/pengaturan/change-password', [UserManagementController::class, 'changePassword']);
-    Route::post('/logout', [UserManagementController::class, 'logout'])->name('logout');
 
     Route::get('/employees/{employee}/documents', [EmployeeDocumentController::class, 'index'])->middleware('menu:karyawan,view');
     Route::post('/employees/{employee}/documents', [EmployeeDocumentController::class, 'upload'])->middleware('menu:karyawan,edit');
@@ -183,10 +182,16 @@ Route::middleware(['auth'])->group(function () {
     // ── KPI (khusus karyawan Head Office) ──────────────────
     Route::get('/kpi', [EmployeeKpiController::class, 'index'])->middleware('menu:kpi,view')->name('kpi');
     Route::get('/kpi/summary', [EmployeeKpiController::class, 'summary'])->middleware('menu:kpi,view')->name('kpi.summary');
-    Route::post('/kpi/indicators', [EmployeeKpiController::class, 'storeIndicator'])->middleware('menu:kpi,edit')->name('kpi.indicators.store');
-    Route::put('/kpi/indicators/{indicator}', [EmployeeKpiController::class, 'updateIndicator'])->middleware('menu:kpi,edit')->name('kpi.indicators.update');
-    Route::delete('/kpi/indicators/{indicator}', [EmployeeKpiController::class, 'destroyIndicator'])->middleware('menu:kpi,edit')->name('kpi.indicators.destroy');
-    Route::post('/kpi/scores', [EmployeeKpiController::class, 'saveScore'])->middleware('menu:kpi,edit')->name('kpi.scores.save');
+    // Gerbang route cuma "view" (harus bisa buka menu KPI) — pengecekan detail "boleh edit
+    // goal siapa" (HR semua orang, akun self-input cuma dirinya + tim langsungnya) ditangani di
+    // controller lewat canEditKpiFor(), supaya akun self-input (cuma punya izin view-kpi) tetap
+    // bisa lewat.
+    Route::get('/kpi/goals/create', [EmployeeKpiController::class, 'create'])->middleware('menu:kpi,view')->name('kpi.goals.create');
+    Route::get('/kpi/goals/{goal}/edit', [EmployeeKpiController::class, 'edit'])->middleware('menu:kpi,view')->name('kpi.goals.edit');
+    Route::post('/kpi/goals', [EmployeeKpiController::class, 'storeGoal'])->middleware('menu:kpi,view')->name('kpi.goals.store');
+    Route::put('/kpi/goals/{goal}', [EmployeeKpiController::class, 'updateGoal'])->middleware('menu:kpi,view')->name('kpi.goals.update');
+    Route::put('/kpi/goals/{goal}/progress', [EmployeeKpiController::class, 'updateProgress'])->middleware('menu:kpi,view')->name('kpi.goals.progress');
+    Route::delete('/kpi/goals/{goal}', [EmployeeKpiController::class, 'destroyGoal'])->middleware('menu:kpi,view')->name('kpi.goals.destroy');
 
     Route::get('/employees/{employee}/trainings', [TrainingController::class, 'forEmployee'])->middleware('menu:training,view');
     Route::post('/employees/{employee}/trainings', [TrainingController::class, 'store'])->middleware('menu:training,edit');

@@ -6,7 +6,6 @@ use App\Models\ActivityLog;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
 
@@ -73,17 +72,21 @@ class UserManagementController extends Controller
                 $logQuery->whereIn('user_id', $userIds);
             }
         }
-        $logs = $logQuery->get()->map(fn($l) => [
-            'id'          => $l->id,
-            'user_name'   => $l->user?->name ?? 'System',
-            'user_project'=> $l->user?->project?->nama ?? '—',
-            'action'      => $l->action,
-            'module'      => $l->module,
-            'target_name' => $l->target_name,
-            'description' => $l->description,
-            'ip_address'  => $l->ip_address,
-            'created_at'  => $l->created_at->format('d M Y H:i:s'),
-        ]);
+        // Beberapa akun sengaja tidak boleh lihat Log Aktivitas sama sekali (mis. Nedriyanto,
+        // Rahmat Sjukri) — sama seperti restrict_payroll, dikunci per akun lewat kolom ini.
+        $logs = (!$isSuperAdmin && auth()->user()->restrict_activity_log)
+            ? collect()
+            : $logQuery->get()->map(fn($l) => [
+                'id'          => $l->id,
+                'user_name'   => $l->user?->name ?? 'System',
+                'user_project'=> $l->user?->project?->nama ?? '—',
+                'action'      => $l->action,
+                'module'      => $l->module,
+                'target_name' => $l->target_name,
+                'description' => $l->description,
+                'ip_address'  => $l->ip_address,
+                'created_at'  => $l->created_at->format('d M Y H:i:s'),
+            ]);
 
         $training_types = \App\Models\TrainingType::orderBy('urutan')
             ->withCount('trainings')->get()
@@ -242,12 +245,4 @@ class UserManagementController extends Controller
         return back()->with('success', "User {$nama} berhasil dihapus.");
     }
 
-    public function logout(Request $request)
-    {
-        ActivityLog::record('logout', 'Auth', auth()->user()?->name);
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-        return redirect('/login');
-    }
 }

@@ -27,7 +27,7 @@ class Employee extends Model
         'hasil_posttest_swp','status_posttest_pwtha','post_test_mvshe','spotter_flagman',
         'start_pkwt','end_pkwt','bln_pkwt','no_contract','no_rekening',
         'no_bpjs_tk','no_bpjs_kes','nama_bank',
-        'disnaker','project_id',
+        'disnaker','project_id','atasan_id',
     ];
 
     protected $casts = [
@@ -56,6 +56,9 @@ class Employee extends Model
     public function project() { return $this->belongsTo(Project::class); }
     public function hoDetail(): HasOne       { return $this->hasOne(EmployeeHoDetail::class); }
     public function kpiIndicators(): HasMany { return $this->hasMany(EmployeeKpiIndicator::class); }
+    public function goals(): HasMany         { return $this->hasMany(EmployeeGoal::class); }
+    public function atasan(): BelongsTo      { return $this->belongsTo(Employee::class, 'atasan_id'); }
+    public function bawahan(): HasMany       { return $this->hasMany(Employee::class, 'atasan_id'); }
     // ── COMPUTED ATTRIBUTES ──
     public function getUmurAttribute(): ?int
     {

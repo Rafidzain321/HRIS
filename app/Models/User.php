@@ -18,9 +18,11 @@ class User extends Authenticatable
         'plain_password',
         'project_id',
         'project_ids',
+        'employee_id',
         'is_active',
         'last_login_at',
         'restrict_payroll',
+        'restrict_activity_log',
     ];
 
     protected $hidden = [
@@ -35,12 +37,20 @@ class User extends Authenticatable
             'last_login_at'     => 'datetime',
             'password'          => 'hashed',
             'restrict_payroll'  => 'boolean',
+            'restrict_activity_log' => 'boolean',
         ];
     }
 
     public function project()
     {
         return $this->belongsTo(Project::class);
+    }
+
+    // Karyawan (data HR) pemilik akun login ini — dipakai fitur self-input KPI supaya user
+    // cuma bisa edit KPI dirinya sendiri, bukan orang lain.
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
     }
 
     // Helper: apakah user bisa akses project ini?
