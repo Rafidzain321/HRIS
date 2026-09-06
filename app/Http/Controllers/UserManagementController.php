@@ -13,8 +13,24 @@ class UserManagementController extends Controller
 {
     public function index(Request $request)
     {
-        $isSuperAdmin = auth()->user()->hasRole('super-admin');
-        $pid          = $this->activeProjectId();
+        $isSuperAdmin    = auth()->user()->hasRole('super-admin');
+        $isAdminSettings = $this->isAdminSettings();
+        $pid             = $this->activeProjectId();
+
+        // ── Bukan HR/super-admin (manager, project-user, viewer) cuma dapat halaman Pengaturan
+        // versi sederhana: profil sendiri + ganti password. Tidak boleh lihat/kelola Jabatan
+        // maupun Log Aktivitas seluruh user HO.
+        if (!$isAdminSettings) {
+            return Inertia::render('Pengaturan/Index', [
+                'is_admin_settings' => false,
+                'profile' => [
+                    'name'  => auth()->user()->name,
+                    'email' => auth()->user()->email,
+                ],
+                'users' => [], 'roles' => [], 'projects' => [], 'positions' => [],
+                'training_types' => [], 'logs' => [], 'menus' => [],
+            ]);
+        }
 
         // ── User list cuma untuk super-admin — user lain (project-user, viewer, dst) tidak boleh
         // ikut menerima daftar akun/izin orang lain lewat props Inertia, meskipun tab-nya sudah
@@ -101,9 +117,10 @@ class UserManagementController extends Controller
                 'trainings_count'    => $t->trainings_count,
             ]);
 
-        return Inertia::render('Pengaturan/Index', compact(
-            'users', 'roles', 'projects', 'positions', 'training_types', 'logs', 'menus'
-        ));
+        return Inertia::render('Pengaturan/Index', [
+            'is_admin_settings' => true,
+            ...compact('users', 'roles', 'projects', 'positions', 'training_types', 'logs', 'menus'),
+        ]);
     }
 
     // menu+action ('view'|'edit') -> nama permission Spatie ("view-karyawan" dst), tervalidasi terhadap config/menus.php.
@@ -206,14 +223,26 @@ class UserManagementController extends Controller
     // ── User ganti password sendiri ──
     public function changePassword(Request $request)
     {
+        // current_password & password_confirmation opsional — dipakai modal Ganti Password di
+        // halaman Pengaturan lengkap (HR/super-admin). Halaman profil sederhana (manager, dst)
+        // cuma kirim "password" saja, tanpa perlu password lama.
         $data = $request->validate([
-            'current_password' => 'required|string',
-            'password'         => 'required|string|min:6|confirmed',
+            'current_password'      => 'nullable|string',
+            'password'               => 'nullable|string|min:6',
+            'password_confirmation' => 'nullable|string',
         ]);
+
+        if (empty($data['password'])) {
+            return back(); // dikosongkan = tidak diubah, diamkan saja
+        }
+
+        if (!empty($data['password_confirmation']) && $data['password_confirmation'] !== $data['password']) {
+            return back()->withErrors(['password_confirmation' => 'Konfirmasi password tidak sama.']);
+        }
 
         $user = auth()->user();
 
-        if (!Hash::check($data['current_password'], $user->password)) {
+        if (!empty($data['current_password']) && !Hash::check($data['current_password'], $user->password)) {
             return back()->withErrors(['current_password' => 'Password lama tidak sesuai.']);
         }
 
@@ -224,6 +253,7 @@ class UserManagementController extends Controller
 
     public function toggleActive(User $user)
     {
+        if (!auth()->user()->hasRole('super-admin')) abort(403);
         if ($user->id === auth()->id()) {
             return back()->with('error', 'Tidak bisa menonaktifkan akun sendiri.');
         }

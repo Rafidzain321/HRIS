@@ -9,6 +9,8 @@ class PositionController extends Controller
 {
     public function store(Request $request)
     {
+        if (!$this->isAdminSettings()) abort(403);
+
         $data = $request->validate([
             'nama_jabatan' => 'required|string|max:150|unique:positions,nama_jabatan',
         ]);
@@ -19,6 +21,8 @@ class PositionController extends Controller
 
     public function update(Request $request, Position $position)
     {
+        if (!$this->isAdminSettings()) abort(403);
+
         $data = $request->validate([
             'nama_jabatan' => "required|string|max:150|unique:positions,nama_jabatan,{$position->id}",
         ]);
@@ -30,6 +34,8 @@ class PositionController extends Controller
 
     public function destroy(Position $position)
     {
+        if (!$this->isAdminSettings()) abort(403);
+
         $nama  = $position->nama_jabatan;
         $count = $position->employees()->count();
         if ($count > 0) {

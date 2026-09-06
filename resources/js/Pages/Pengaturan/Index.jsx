@@ -506,7 +506,7 @@ function ProjectModal({ mode, project, onClose }) {
 // ═══════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════
-export default function PengaturanIndex({ users=[], roles=[], projects=[], positions=[], logs=[], menus=[] }) {
+export default function PengaturanIndex({ users=[], roles=[], projects=[], positions=[], logs=[], menus=[], is_admin_settings=true, profile=null }) {
   const { auth }     = usePage().props;
   const isSuperAdmin = auth?.user?.can?.is_super_admin;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
@@ -520,6 +520,9 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
   const [projectModal,   setProjectModal]   = useState(null);
   const [confirmModal,   setConfirmModal]   = useState(null);
   const [showPw, setShowPw] = useState({});
+  const [profilePw,        setProfilePw]        = useState('');
+  const [profilePwLoading, setProfilePwLoading] = useState(false);
+  const [profilePwError,   setProfilePwError]   = useState('');
   // confirmModal: { title, message, confirmLabel, confirmColor, confirmBg, onConfirm }
 
   // Log state
@@ -552,6 +555,95 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
       confirmBg: 'rgba(224,69,69,.12)',
       onConfirm: () => router.post('/logout'),
     });
+  }
+
+  // ── Bukan HR/super-admin: halaman Pengaturan versi sederhana, cuma profil sendiri ──
+  if (!is_admin_settings) {
+    const initials = (profile?.name || '?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+
+    function submitProfilePassword(e) {
+      e.preventDefault();
+      if (!profilePw) return; // dikosongkan = tidak diubah, tidak perlu kirim request
+      setProfilePwLoading(true); setProfilePwError('');
+      router.post('/pengaturan/change-password', { password: profilePw }, {
+        preserveScroll: true,
+        onSuccess: () => { setProfilePwLoading(false); setProfilePw(''); },
+        onError:   (err) => { setProfilePwLoading(false); setProfilePwError(err.password || 'Gagal menyimpan.'); },
+      });
+    }
+
+    return (
+      <AppLayout title="Profil Saya" subtitle="Akun">
+        <style>{`
+          /* Sembunyikan icon mata bawaan browser (Edge) supaya tidak dobel sama toggle custom */
+          input[type="password"]::-ms-reveal { display: none !important; }
+          input[type="password"]::-ms-clear { display: none !important; }
+          input::-webkit-credentials-auto-fill-button { display: none !important; }
+          input[type="password"]::-webkit-textfield-decoration-container { display: none !important; }
+        `}</style>
+        {confirmModal && (
+          <ConfirmModal
+            title={confirmModal.title} message={confirmModal.message}
+            confirmLabel={confirmModal.confirmLabel} confirmColor={confirmModal.confirmColor}
+            confirmBg={confirmModal.confirmBg} icon={confirmModal.icon}
+            onConfirm={confirmModal.onConfirm} onClose={()=>setConfirmModal(null)}
+          />
+        )}
+        <div style={{display:'flex',justifyContent:'center',paddingTop:24}}>
+          <div style={{width:'min(420px, 100%)',background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:20,overflow:'hidden',boxShadow:'0 12px 40px rgba(0,0,0,.25)'}}>
+            <div style={{height:64,background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)'}}/>
+            <div style={{padding:'0 24px 24px',marginTop:-40}}>
+              <div style={{width:76,height:76,borderRadius:'50%',background:'linear-gradient(135deg,#E8A020,#A06010)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Syne,sans-serif',fontSize:24,fontWeight:700,color:'#0C0F14',border:'4px solid var(--bg2)',marginBottom:12}}>
+                {initials}
+              </div>
+              <div style={{fontFamily:'Syne,sans-serif',fontSize:18,fontWeight:700}}>{profile?.name}</div>
+              <div style={{fontSize:12.5,color:'var(--muted2)',marginTop:2}}>{profile?.email}</div>
+              {auth?.user?.project?.nama && (
+                <div style={{display:'flex',gap:6,marginTop:10}}>
+                  <span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:99,background:'var(--bg3)',color:'var(--muted2)'}}>{auth.user.project.nama}</span>
+                </div>
+              )}
+
+              <div style={{marginTop:22,paddingTop:18,borderTop:'1px solid var(--border)'}}>
+                <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Password Baru</label>
+                <form onSubmit={submitProfilePassword} style={{display:'flex',gap:8}}>
+                  <div style={{flex:1}}>
+                    <PasswordInput value={profilePw} placeholder="******"
+                      hasError={!!profilePwError} onChange={e=>{setProfilePw(e.target.value); setProfilePwError('');}} />
+                  </div>
+                  <button type="submit" disabled={profilePwLoading} style={{
+                    padding:'0 16px',borderRadius:8,border:'none',flexShrink:0,
+                    background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',
+                    fontSize:12.5,fontWeight:700,cursor:profilePwLoading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",
+                    opacity:profilePwLoading?.7:1,display:'flex',alignItems:'center',gap:6,
+                  }}>
+                    {profilePwLoading?<Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>:<Save size={14}/>}
+                    Simpan
+                  </button>
+                </form>
+                {profilePwError && (
+                  <div style={{display:'flex',alignItems:'center',gap:4,fontSize:10.5,color:'#E04545',marginTop:5}}>
+                    <TriangleAlert size={12}/>{profilePwError}
+                  </div>
+                )}
+                <div style={{fontSize:10,color:'var(--muted)',marginTop:6}}>Kosongkan kalau tidak ingin mengubah password.</div>
+              </div>
+
+              <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid var(--border)'}}>
+                <button onClick={handleLogout} style={{
+                  width:'100%',padding:'10px 16px',borderRadius:10,border:'1px solid rgba(224,69,69,.3)',
+                  background:'rgba(224,69,69,.08)',color:'#E04545',
+                  fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
+                  display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+                }}>
+                  <LogOut size={15}/> Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
   }
 
   const filteredPositions = positions.filter(p =>

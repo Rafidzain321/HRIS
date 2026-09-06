@@ -52,4 +52,18 @@ abstract class Controller extends BaseController
     {
         return auth()->user()?->hasRole('viewer') ?? false;
     }
+
+    /**
+     * Cek apakah user boleh kelola Pengaturan versi lengkap (Manajemen User, Project, Jabatan,
+     * Log Aktivitas semua HO) — super-admin, role hr-staff, atau HR dengan permission edit-kpi
+     * (Budi/Efendi/Ali). Selain itu (manager, project-user, viewer) cuma dapat versi sederhana
+     * berupa profil pribadi (nama, email, ganti password).
+     */
+    protected function isAdminSettings(): bool
+    {
+        $user = auth()->user();
+        if (!$user) return false;
+
+        return $user->hasRole('super-admin') || $user->hasRole('hr-staff') || $user->can('edit-kpi');
+    }
 }

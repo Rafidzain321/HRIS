@@ -2235,7 +2235,7 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
   });
   const dataRef=useRef([]);
   const [search,setSearch]=useState('');
-  const [isDark]=useState(()=>typeof window!=='undefined'&&localStorage.getItem('akm-theme')!=='light');
+  const isDark=false;
   const hasSubGroup = data.some(r => r.sub_group);
   const [subGroupTab, setSubGroupTab] = useState('all');
   const [activeTab,setActiveTab]=useState('semua');

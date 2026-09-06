@@ -5,7 +5,7 @@ import { PROJECT_COLORS } from '@/Constants/projectColors';
 import {
   LayoutDashboard, User, Shield, Stethoscope, CreditCard, HardHat,
   ClipboardList, Car, Truck, Calendar, Receipt, Wallet, BookOpen, Bell,
-  Settings, Moon, Sun, X, Loader2, CheckCircle2, XCircle, TriangleAlert,
+  Settings, X, Loader2, CheckCircle2, XCircle, TriangleAlert,
   Trash2, LogOut, Menu, Eye, Building2, Check, Target,
 } from 'lucide-react';
 
@@ -32,7 +32,7 @@ const NAV = [
   { key: 'pengaturan', icon: Settings, label: 'Pengaturan',   href: '/pengaturan' },
 ];
 
-function SnowCanvas({ dark }) {
+function SnowCanvas() {
   const canvasRef = useRef(null);
   const animRef   = useRef(null);
   useEffect(() => {
@@ -50,8 +50,8 @@ function SnowCanvas({ dark }) {
       opacity: Math.random() * 0.6 + 0.5,
     }));
     const CONNECT_DIST = 140;
-    const DOT_COLOR  = dark ? '232,160,32' : '100,140,220';
-    const LINE_COLOR = dark ? '232,160,32' : '100,140,220';
+    const DOT_COLOR  = '100,140,220';
+    const LINE_COLOR = '100,140,220';
     function draw() {
       ctx.clearRect(0, 0, W, H);
       for (let i = 0; i < dots.length; i++) {
@@ -85,37 +85,8 @@ function SnowCanvas({ dark }) {
     };
     window.addEventListener('resize', onResize);
     return () => { cancelAnimationFrame(animRef.current); window.removeEventListener('resize', onResize); };
-  }, [dark]);
+  }, []);
   return <canvas ref={canvasRef} style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', opacity:0.5 }} />;
-}
-
-function RealtimeClock() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
-  const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-  const mons = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-  return (
-    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-      <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:8, padding:'5px 10px', fontSize:11, color:'var(--muted2)', display:'inline-flex', alignItems:'center', gap:5 }} className="hide-mobile">
-        <Calendar size={13}/> <b style={{ color:'var(--accent2)' }}>{days[now.getDay()]}, {String(now.getDate()).padStart(2,'0')} {mons[now.getMonth()]} {now.getFullYear()}</b>
-      </div>
-      <div className="hide-mobile" style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:8, padding:'5px 10px', fontSize:13, fontFamily:'monospace', fontWeight:700, color:'var(--accent)', minWidth:78, textAlign:'center' }}>
-        {String(now.getHours()).padStart(2,'0')}:{String(now.getMinutes()).padStart(2,'0')}:{String(now.getSeconds()).padStart(2,'0')}
-      </div>
-    </div>
-  );
-}
-
-function ThemeToggle({ dark, onToggle }) {
-  return (
-    <div onClick={onToggle} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', userSelect:'none' }}>
-      <span style={{ display:'inline-flex' }}>{dark ? <Moon size={14}/> : <Sun size={14}/>}</span>
-      <div style={{ width:40, height:22, borderRadius:11, background: dark ? '#3A8FE0' : '#E8C030', position:'relative', transition:'background .3s', border:'1px solid rgba(255,255,255,.15)', flexShrink:0 }}>
-        <div style={{ position:'absolute', top:2, left: dark ? 20 : 2, width:16, height:16, borderRadius:'50%', background:'#fff', boxShadow:'0 1px 4px rgba(0,0,0,.3)', transition:'left .25s cubic-bezier(.22,.9,.25,1)' }}/>
-      </div>
-      <span style={{ fontSize:11, fontWeight:600, color:'var(--muted2)', minWidth:28 }} className="hide-mobile">{dark ? 'Dark' : 'Light'}</span>
-    </div>
-  );
 }
 
 function NotifPanel({ open, onClose }) {
@@ -412,34 +383,13 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
   const props    = usePage().props;
   const [confirmLogout, setConfirmLogout] = useState(false);
 
-  const [dark, setDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('akm-theme');
-      return saved ? saved === 'dark' : true;
-    }
-    return true;
-  });
-
-  function toggleTheme() {
-    const next = !dark;
-    setDark(next);
-    localStorage.setItem('akm-theme', next ? 'dark' : 'light');
-  }
-
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
 
   // Close sidebar when navigating on mobile
   useEffect(() => { setSidebarOpen(false); }, [url]);
 
-  const CSS_VARS = dark ? `
-    --bg:#0C0F14; --bg2:#121620; --bg3:#181E2A; --card:#161C28;
-    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.15);
-    --text:#E8ECF5; --muted:#6B7494; --muted2:#8A90A8;
-    --accent:#E8A020; --accent2:#F5C050;
-    --green:#22C97A; --red:#E04545; --blue:#3A8FE0;
-    --sidebar-bg:#121620; --topbar-bg:#0C0F14;
-  ` : `
+  const CSS_VARS = `
     --bg:#EEF1F8; --bg2:#FFFFFF; --bg3:#E2E7F0; --card:#FFFFFF;
     --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.18);
     --text:#1A1D2E; --muted:#7A80A0; --muted2:#4A5070;
@@ -623,7 +573,6 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
         .project-dropdown-mobile { display: none; }
         @media (max-width: 768px), (max-height: 500px) and (orientation: landscape) {
           .project-dropdown-mobile { display: block !important; }
-          .theme-toggle-desktop { display: none !important; }
         }
       `}</style>
 
@@ -638,7 +587,7 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
         type="danger"
       />
 
-      <SnowCanvas dark={dark} />
+      <SnowCanvas />
 
       {/* ── DESKTOP SIDEBAR ───────────────────────────── */}
       <aside className="sidebar-desktop" style={{ width:220, flexShrink:0, background:'var(--sidebar-bg)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', position:'fixed', top:0, left:0, bottom:0, zIndex:50 }}>
@@ -674,12 +623,8 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
             </div>
           </div>
 
-          {/* Right: clock + toggle + notif */}
+          {/* Right: project + notif */}
           <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-            <RealtimeClock />
-            <div className="theme-toggle-desktop">
-              <ThemeToggle dark={dark} onToggle={toggleTheme} />
-            </div>
             <ProjectDropdown authUser={authUser} />
             <div className="icon-btn" onClick={()=>setNotifOpen(!notifOpen)}>
               <Bell size={18}/>

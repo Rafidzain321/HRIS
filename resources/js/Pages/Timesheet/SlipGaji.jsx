@@ -404,7 +404,7 @@ export default function SlipGaji({
   const [loadingPdf,setLoadingPdf]=useState(false);
   const slipRef=useRef(null);
 
-  const [isDark]=useState(()=>typeof window!=='undefined'&&localStorage.getItem('akm-theme')!=='light');
+  const isDark=false;
   const currentYear = new Date().getFullYear();
   const tahunList = Array.from({length: currentYear - 2024 + 6}, (_, i) => 2024 + i);
   const inpStyle={padding:'7px 11px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:12.5,fontFamily:"'Outfit',sans-serif"};

@@ -340,17 +340,7 @@ function EditableCell({ employeeId, tahun, bulan, hari, value, isSunday, isHolid
 }
 
 function useIsDark() {
-    const [isDark, setIsDark] = useState(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('akm-theme') !== 'light';
-        return true;
-    });
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setIsDark(localStorage.getItem('akm-theme') !== 'light');
-        }, 300);
-        return () => clearInterval(interval);
-    }, []);
-    return isDark;
+    return false;
 }
 
 // ── MODAL TAMBAH ANGGOTA (multi-select) ───────────────────────
