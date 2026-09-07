@@ -76,8 +76,25 @@ class DashboardController extends Controller
             ->selectRaw('(SELECT nama_jabatan FROM positions WHERE positions.id = employees.position_id) as jabatan, COUNT(*) as total')
             ->groupBy('position_id')
             ->orderByDesc('total')
-            ->limit(10)
             ->get();
+
+        // ── Masa Kerja (Length of Service) — dikelompokkan dari tanggal_masuk ──
+        $masaKerjaBuckets = [
+            '< 1 thn'   => 0,
+            '1-3 thn'   => 0,
+            '3-5 thn'   => 0,
+            '5-10 thn'  => 0,
+            '10+ thn'   => 0,
+        ];
+        $pf(Employee::aktif())->whereNotNull('tanggal_masuk')->pluck('tanggal_masuk')->each(function ($tgl) use (&$masaKerjaBuckets, $today) {
+            $thn = Carbon::parse($tgl)->diffInYears($today);
+            if ($thn < 1) $masaKerjaBuckets['< 1 thn']++;
+            elseif ($thn < 3) $masaKerjaBuckets['1-3 thn']++;
+            elseif ($thn < 5) $masaKerjaBuckets['3-5 thn']++;
+            elseif ($thn < 10) $masaKerjaBuckets['5-10 thn']++;
+            else $masaKerjaBuckets['10+ thn']++;
+        });
+        $masa_kerja_stats = collect($masaKerjaBuckets)->map(fn ($total, $label) => ['label' => $label, 'total' => $total])->values();
 
         // ── Ambil semua: warning (30 hari ke depan) + expired (90 hari ke belakang) ──
         $in90ago = $today->copy()->subDays(90);
@@ -154,6 +171,36 @@ class DashboardController extends Controller
                 'sudah_56'      => $e->tanggal_lahir ? $e->tanggal_lahir->lte($pensiunDate56) : false,
                 'dokumen_label' => 'Pensiun 56 Thn',
             ]);
+
+        // ── KONTRAK (PKWT) & PROBATION yang mau/sudah berakhir ─────
+        $contractProbationEmployees = $pf(Employee::aktif())
+            ->where(fn ($q) => $q
+                ->whereBetween('end_pkwt', [$in90ago, $in30])
+                ->orWhereBetween('tanggal_akhir_probation', [$in90ago, $in30])
+            )
+            ->with('position')->get();
+
+        $contract_probation_alerts = collect();
+        foreach ($contractProbationEmployees as $e) {
+            $sisaKontrak   = $e->end_pkwt ? (int) $today->diffInDays($e->end_pkwt, false) : null;
+            $sisaProbation = $e->tanggal_akhir_probation ? (int) $today->diffInDays($e->tanggal_akhir_probation, false) : null;
+
+            if ($sisaKontrak !== null && $sisaKontrak >= -90 && $sisaKontrak <= 30) {
+                $contract_probation_alerts->push([
+                    'id' => $e->id, 'id_badge' => $e->id_badge, 'nama' => $e->nama_lengkap,
+                    'jabatan' => $e->position?->nama_jabatan ?? '-',
+                    'tipe' => 'Kontrak', 'tanggal_fmt' => $e->end_pkwt->format('d M Y'), 'sisa_hari' => $sisaKontrak,
+                ]);
+            }
+            if ($sisaProbation !== null && $sisaProbation >= -90 && $sisaProbation <= 30) {
+                $contract_probation_alerts->push([
+                    'id' => $e->id, 'id_badge' => $e->id_badge, 'nama' => $e->nama_lengkap,
+                    'jabatan' => $e->position?->nama_jabatan ?? '-',
+                    'tipe' => 'Probation', 'tanggal_fmt' => $e->tanggal_akhir_probation->format('d M Y'), 'sisa_hari' => $sisaProbation,
+                ]);
+            }
+        }
+        $contract_probation_alerts = $contract_probation_alerts->sortBy('sisa_hari')->values();
 
         // ═══════════════════════════════════════════════════════════
         // CHART DATA — Filter by project berdasarkan hak akses user
@@ -262,8 +309,10 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard/Index', [
             'stats'              => $stats,
             'jabatan_stats'      => $jabatan_stats,
+            'masa_kerja_stats'   => $masa_kerja_stats,
             'alert_employees'    => $alert_employees,
             'pensiun_employees'  => $pensiun_employees,
+            'contract_probation_alerts' => $contract_probation_alerts,
             'active_project_id'  => $activeProjectId,
             'project_info'       => $projectInfo,
             'karyawanPerProject' => $karyawanPerProject,

@@ -1,11 +1,12 @@
 // resources/js/Pages/Kpi/Index.jsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
   Target, Plus, Trash2, Pencil, X, TriangleAlert, Loader2,
-  Users, BarChart3, Search, RefreshCw, ChevronRight,
+  Users, BarChart3, Search, RefreshCw, ChevronRight, ChevronDown,
 } from 'lucide-react';
 
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content; }
@@ -17,13 +18,6 @@ const inp = {
   fontFamily: "'Outfit',sans-serif", outline: 'none', width: '100%', boxSizing: 'border-box',
 };
 
-const CYCLE_OPTIONS = [
-  { key: 'custom', label: 'Custom' },
-  { key: 'monthly', label: 'Monthly' },
-  { key: 'quarterly', label: 'Quarterly' },
-  { key: 'half_yearly', label: 'Half-yearly' },
-  { key: 'yearly', label: 'Yearly' },
-];
 const STATUS_META = {
   not_updated: { label: 'Not updated', color: '#8A8F98', bg: 'rgba(138,143,152,.12)' },
   on_track:    { label: 'On track',    color: '#22C97A', bg: 'rgba(34,201,122,.12)' },
@@ -36,6 +30,14 @@ function fmtVal(v, satuan) {
   if (satuan === 'rupiah') return 'Rp' + n.toLocaleString('id-ID');
   if (satuan === 'percentage') return n + '%';
   return n.toLocaleString('id-ID');
+}
+
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+function fmtDate(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return dateStr;
+  return `${d.getDate()} ${MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 // Susun daftar karyawan jadi berjenjang (atasan -> bawahan) buat tampilan sidebar/pilih goal owner.
@@ -107,61 +109,161 @@ function ProgressModal({ goal, onClose, onSaved }) {
   );
 }
 
-// ── KARTU GOAL ───────────────────────────────────────────────
-function GoalCard({ goal, isViewer, onEdit, onUpdateProgress, onDelete }) {
-  const meta = STATUS_META[goal.status];
-  const cycleLabel = CYCLE_OPTIONS.find(c => c.key === goal.siklus)?.label || goal.siklus;
+// ── AVATAR INISIAL (warna konsisten per nama) ───────────────
+const AVATAR_COLORS = ['#22C97A','#3A8FE0','#E04545','#E8A020','#9B59B6','#1ABC9C','#E06A20','#5C6BC0'];
+function avatarColor(nama) {
+  let hash = 0;
+  for (const c of (nama || '')) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+function OwnerAvatar({ nama, size = 30 }) {
+  const initials = (nama || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   return (
-    <div style={{ ...card, padding: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>{goal.nama_goal}</div>
-          {goal.deskripsi && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{goal.deskripsi}</div>}
-          <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: 'var(--bg3)', color: 'var(--muted2)', fontWeight: 600 }}>{cycleLabel}</span>
-            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: 'var(--bg3)', color: 'var(--muted2)' }}>{goal.tanggal_mulai} → {goal.tanggal_selesai}</span>
-            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: meta.bg, color: meta.color, fontWeight: 700 }}>{meta.label}</span>
-          </div>
-        </div>
-        {!isViewer && (
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-            <button onClick={() => onEdit(goal)} title="Edit" style={{ padding: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted2)', cursor: 'pointer', display: 'flex' }}><Pencil size={12} /></button>
-            <button onClick={() => onDelete(goal)} title="Hapus" style={{ padding: 6, borderRadius: 6, border: '1px solid rgba(224,69,69,.2)', background: 'rgba(224,69,69,.08)', color: '#E04545', cursor: 'pointer', display: 'flex' }}><Trash2 size={12} /></button>
-          </div>
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ flex: 1, height: 8, borderRadius: 99, background: 'var(--bg3)', overflow: 'hidden' }}>
-          <div style={{ width: `${goal.progress_percent}%`, height: '100%', background: meta.color, borderRadius: 99, transition: 'width .3s' }} />
-        </div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: meta.color, whiteSpace: 'nowrap', width: 42, textAlign: 'right' }}>{goal.progress_percent}%</div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-        <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{fmtVal(goal.baseline, goal.satuan)} → {fmtVal(goal.progress_sekarang, goal.satuan)} → {fmtVal(goal.target, goal.satuan)} <span style={{ marginLeft: 8, color: 'var(--muted2)' }}>Bobot {goal.bobot}%</span></div>
-        {!isViewer && (
-          <button onClick={() => onUpdateProgress(goal)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, background: 'rgba(58,143,224,.1)', color: 'var(--blue)', border: '1px solid rgba(58,143,224,.25)', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 4 }}><RefreshCw size={11} /> Update Progress</button>
-        )}
-      </div>
-      {goal.catatan && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 6, fontStyle: 'italic' }}>"{goal.catatan}" — {goal.diperbarui_oleh}</div>}
+    <div style={{ width: size, height: size, borderRadius: '50%', background: avatarColor(nama), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.36, fontWeight: 700, flexShrink: 0 }}>
+      {initials}
     </div>
   );
 }
 
-// ── TAB GOALS ────────────────────────────────────────────────
-function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh }) {
-  const [selectedId, setSelectedId] = useState(employees[0]?.id ?? null);
+// ── DROPDOWN FILTER KARYAWAN (hierarki atasan-bawahan) ──────
+function EmployeeFilterDropdown({ employees, goals, valueId, onChange }) {
+  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [progressModal, setProgressModal] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
-
-  const showPicker = employees.length > 1;
   const searchLow = search.trim().toLowerCase();
-  const filteredEmployees = searchLow
+  const list = searchLow
     ? employees.filter(e => e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow))
     : buildHierarchy(employees);
 
-  const selected = employees.find(e => e.id === selectedId) || employees[0];
-  const myGoals = goals.filter(g => g.employee_id === selected?.id);
+  const selected = employees.find(e => e.id === valueId);
+  const label = selected ? selected.nama_lengkap : 'Semua Karyawan';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)',
+        color: 'var(--text)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Outfit',sans-serif",
+        display: 'flex', alignItems: 'center', gap: 8, minWidth: 200, justifyContent: 'space-between',
+      }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        <ChevronDown size={14} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 60 }} onClick={() => setOpen(false)} />
+          <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 70, width: 'max(100%, 280px)', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, boxShadow: '0 12px 36px rgba(0,0,0,.35)', padding: 10 }}>
+            <div style={{ position: 'relative', marginBottom: 8 }}>
+              <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} autoFocus />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 340, overflowY: 'auto' }}>
+              <div onClick={() => { onChange(null); setOpen(false); }}
+                style={{ padding: '7px 9px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, background: !valueId ? 'rgba(232,160,32,.12)' : 'transparent', color: !valueId ? 'var(--accent)' : 'var(--text)' }}>
+                Semua Karyawan
+              </div>
+              {list.map(e => {
+                const jml = goals.filter(g => g.employee_id === e.id).length;
+                const active = e.id === valueId;
+                const depth = e.depth || 0;
+                return (
+                  <div key={e.id} onClick={() => { onChange(e.id); setOpen(false); }}
+                    style={{ padding: '7px 9px', paddingLeft: 9 + depth * 16, borderRadius: 7, cursor: 'pointer', background: active ? 'rgba(232,160,32,.12)' : 'transparent', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {depth > 0 && <ChevronRight size={11} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>{e.nama_lengkap}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{e.jabatan} · {jml} goal</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── DROPDOWN AKSI PER BARIS (portal ke document.body supaya tidak kepotong
+// batas overflow:hidden tabel) ───────────────────────────────
+function GoalActionsMenu({ goal, onEdit, onUpdateProgress, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
+  const item = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none', background: 'none', fontSize: 12, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", textAlign: 'left', color: 'var(--text)' };
+  const MENU_WIDTH = 170;
+
+  function toggle() {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: Math.max(8, r.right - MENU_WIDTH) });
+    }
+    setOpen(o => !o);
+  }
+
+  return (
+    <>
+      <button ref={btnRef} onClick={toggle} style={{
+        padding: '6px 12px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--card)',
+        color: 'var(--text)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Outfit',sans-serif",
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        Aksi <ChevronDown size={12} />
+      </button>
+      {open && createPortal(
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 200 }} onClick={() => setOpen(false)} />
+          <div style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 210, width: MENU_WIDTH, background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 9, boxShadow: '0 12px 32px rgba(0,0,0,.35)', overflow: 'hidden' }}>
+            <button style={item} onClick={() => { setOpen(false); onUpdateProgress(goal); }}><RefreshCw size={13} /> Update Progress</button>
+            <button style={item} onClick={() => { setOpen(false); onEdit(goal); }}><Pencil size={13} /> Edit</button>
+            <button style={{ ...item, color: '#E04545' }} onClick={() => { setOpen(false); onDelete(goal); }}><Trash2 size={13} /> Hapus</button>
+          </div>
+        </>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── TAB GOALS (tabel, mirip Mekari Talenta) ─────────────────
+function isGoalClosed(g) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  return g.status === 'completed' || g.tanggal_selesai < todayIso;
+}
+
+function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh }) {
+  const [filterId, setFilterId] = useState(null);
+  const [search, setSearch] = useState('');
+  const [periodTab, setPeriodTab] = useState('ongoing');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [progressModal, setProgressModal] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const employeesById = {};
+  employees.forEach(e => { employeesById[e.id] = e; });
+
+  const ongoingGoals = goals.filter(g => !isGoalClosed(g));
+  const closedGoals  = goals.filter(g => isGoalClosed(g));
+  const periodGoals  = periodTab === 'ongoing' ? ongoingGoals : closedGoals;
+
+  const searchLow = search.trim().toLowerCase();
+  const rows = periodGoals
+    .filter(g => !filterId || g.employee_id === filterId)
+    .filter(g => !statusFilter || g.status === statusFilter)
+    .filter(g => {
+      if (!searchLow) return true;
+      const owner = employeesById[g.employee_id];
+      return g.nama_goal.toLowerCase().includes(searchLow)
+        || (owner?.nama_lengkap || '').toLowerCase().includes(searchLow)
+        || (owner?.jabatan || '').toLowerCase().includes(searchLow);
+    });
+
+  const showFilter = employees.length > 1;
+  const addHref = filterId ? `/kpi/goals/create?employee_id=${filterId}` : '/kpi/goals/create';
+
+  const periodTabs = [
+    { key: 'ongoing', label: 'Ongoing', count: ongoingGoals.length },
+    { key: 'closed', label: 'Selesai', count: closedGoals.length },
+  ];
 
   async function doDelete(goal) {
     await axios.delete(`/kpi/goals/${goal.id}`, { headers: { 'X-CSRF-TOKEN': csrf() } });
@@ -170,69 +272,104 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: showPicker ? '260px 1fr' : '1fr', gap: 16 }}>
+    <div>
       {progressModal && <ProgressModal goal={progressModal} onClose={() => setProgressModal(null)} onSaved={onRefresh} />}
       <ConfirmModal open={!!confirmDelete} onCancel={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && doDelete(confirmDelete)}
         title="Hapus Goal" message={confirmDelete ? <>Goal <b style={{ color: 'var(--text)' }}>{confirmDelete.nama_goal}</b> akan dihapus permanen.</> : ''}
         confirmLabel="Ya, Hapus" />
 
-      {showPicker && (
-        <div style={{ ...card, padding: 12, alignSelf: 'start' }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.06em' }}>{isSelfOnly ? 'Saya & Tim' : 'Karyawan HO'}</div>
-          <div style={{ position: 'relative', marginBottom: 10 }}>
-            <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
+      <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+        {periodTabs.map(t => (
+          <div key={t.key} onClick={() => setPeriodTab(t.key)} style={{
+            padding: '7px 4px', marginRight: 18, cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+            color: periodTab === t.key ? 'var(--accent)' : 'var(--muted)',
+            borderBottom: `2px solid ${periodTab === t.key ? 'var(--accent)' : 'transparent'}`,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            {t.label}
+            <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: periodTab === t.key ? 'rgba(232,160,32,.15)' : 'var(--bg3)', color: periodTab === t.key ? 'var(--accent)' : 'var(--muted2)' }}>{t.count}</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 470, overflowY: 'auto' }}>
-            {filteredEmployees.map(e => {
-              const jml = goals.filter(g => g.employee_id === e.id).length;
-              const active = e.id === selected?.id;
-              const depth = e.depth || 0;
-              return (
-                <div key={e.id} onClick={() => setSelectedId(e.id)}
-                  style={{ padding: '8px 10px', paddingLeft: 10 + depth * 16, borderRadius: 8, cursor: 'pointer', background: active ? 'rgba(232,160,32,.12)' : 'transparent', border: `1px solid ${active ? 'var(--accent)' : 'transparent'}`, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {depth > 0 && <ChevronRight size={11} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>{e.nama_lengkap}</div>
-                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8 }}>
-                      <span>{e.jabatan}</span><span>· {jml} goal</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {showFilter && <EmployeeFilterDropdown employees={employees} goals={goals} valueId={filterId} onChange={setFilterId} />}
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 140 }}>
+            <option value="">Semua Status</option>
+            {Object.entries(STATUS_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+          </select>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari goal / pemilik..." style={{ ...inp, paddingLeft: 30, width: 220 }} />
           </div>
         </div>
-      )}
-
-      <div>
-        {!selected ? (
-          <div style={{ ...card, padding: 20, color: 'var(--muted)', fontSize: 12.5 }}>Tidak ada karyawan.</div>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div>
-                <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 15, fontWeight: 700 }}>{selected.nama_lengkap}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{selected.jabatan}</div>
-              </div>
-              {!isViewer && (
-                <button onClick={() => router.visit(`/kpi/goals/create?employee_id=${selected.id}`)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Tambah Goal</button>
-              )}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {myGoals.length === 0 && (
-                <div style={{ ...card, padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 12.5 }}>Belum ada goal.</div>
-              )}
-              {myGoals.map(g => (
-                <GoalCard key={g.id} goal={g} isViewer={isViewer}
-                  onEdit={goal => router.visit(`/kpi/goals/${goal.id}/edit`)}
-                  onUpdateProgress={setProgressModal}
-                  onDelete={setConfirmDelete} />
-              ))}
-            </div>
-          </>
+        {!isViewer && (
+          <button onClick={() => router.visit(addHref)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Tambah Goal</button>
         )}
+      </div>
+
+      <div style={{ ...card, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg3)' }}>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)', minWidth: 220 }}>Goal</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)', minWidth: 180 }}>Pemilik</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)', minWidth: 180 }}>Progress</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Status</th>
+                {!isViewer && <th style={{ padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }} />}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && (
+                <tr><td colSpan={isViewer ? 4 : 5} style={{ padding: 28, textAlign: 'center', color: 'var(--muted)' }}>Belum ada goal.</td></tr>
+              )}
+              {rows.map(g => {
+                const owner = employeesById[g.employee_id];
+                const meta = STATUS_META[g.status];
+                return (
+                  <tr key={g.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
+                      <div style={{ fontWeight: 600 }}>{g.nama_goal}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 3 }}>{fmtDate(g.tanggal_mulai)} – {fmtDate(g.tanggal_selesai)}</div>
+                    </td>
+                    <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <OwnerAvatar nama={owner?.nama_lengkap} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{owner?.nama_lengkap || '—'}</div>
+                          <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{owner?.jabatan || '-'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 7, borderRadius: 99, background: 'var(--bg3)', overflow: 'hidden', minWidth: 70 }}>
+                          <div style={{ width: `${g.progress_percent}%`, height: '100%', background: meta.color, borderRadius: 99, transition: 'width .3s' }} />
+                        </div>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, color: meta.color, width: 38, textAlign: 'right', flexShrink: 0 }}>{g.progress_percent}%</div>
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>{fmtVal(g.progress_sekarang, g.satuan)} / {fmtVal(g.target, g.satuan)} <span style={{ marginLeft: 6 }}>· Bobot {g.bobot}%</span></div>
+                    </td>
+                    <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: meta.bg, color: meta.color, whiteSpace: 'nowrap' }}>{meta.label}</span>
+                    </td>
+                    {!isViewer && (
+                      <td style={{ padding: '12px 14px', verticalAlign: 'top', textAlign: 'right' }}>
+                        <GoalActionsMenu goal={g}
+                          onEdit={goal => router.visit(`/kpi/goals/${goal.id}/edit`)}
+                          onUpdateProgress={setProgressModal}
+                          onDelete={setConfirmDelete} />
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

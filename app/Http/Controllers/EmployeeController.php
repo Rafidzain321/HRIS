@@ -195,6 +195,7 @@ class EmployeeController extends Controller
             'tempat_lahir' => 'nullable|string|max:100',
             'tanggal_lahir' => 'nullable|date',
             'tanggal_masuk' => 'nullable|date',
+            'tanggal_akhir_probation' => 'nullable|date',
             'alamat' => 'nullable|string',
             'agama' => 'nullable|string|max:50',
             'position_id' => 'nullable|exists:positions,id',
@@ -267,6 +268,7 @@ class EmployeeController extends Controller
             'employee' => array_merge($employee->toArray(), [
                 'tanggal_lahir' => $employee->tanggal_lahir?->format('Y-m-d'),
                 'tanggal_masuk' => $employee->tanggal_masuk?->format('Y-m-d'),
+                'tanggal_akhir_probation' => $employee->tanggal_akhir_probation?->format('Y-m-d'),
                 'tanggal_hi' => $employee->tanggal_hi?->format('Y-m-d'),
                 'expire_badge' => $employee->expire_badge?->format('Y-m-d'),
                 'exp_kp' => $employee->exp_kp?->format('Y-m-d'),
@@ -363,6 +365,7 @@ class EmployeeController extends Controller
             'end_pkwt' => 'nullable|date',
             'position_id' => 'nullable|exists:positions,id',
             'tanggal_masuk' => 'nullable|date',
+            'tanggal_akhir_probation' => 'nullable|date',
             'agama' => 'nullable|string|max:50',
             'tgl_mcu' => 'nullable|date',
             'derajat_kesehatan' => 'nullable|string|max:20',

@@ -6,7 +6,7 @@ import {
   LayoutDashboard, User, Shield, Stethoscope, CreditCard, HardHat,
   ClipboardList, Car, Truck, Calendar, Receipt, Wallet, BookOpen, Bell,
   Settings, X, Loader2, CheckCircle2, XCircle, TriangleAlert,
-  Trash2, LogOut, Menu, Eye, Building2, Check, Target,
+  Trash2, LogOut, Menu, Eye, Building2, Check, Target, CalendarDays,
 } from 'lucide-react';
 
 const NAV = [
@@ -27,6 +27,7 @@ const NAV = [
   { key: 'data-gaji',  icon: Wallet, label: 'Data Gaji',     href: '/timesheet/data-gaji' },
   { key: 'training',   icon: BookOpen, label: 'Training',      href: '/training' },
   { key: 'kpi',        icon: Target, label: 'KPI',           href: '/kpi' },
+  { key: 'cuti',       icon: CalendarDays, label: 'Cuti Tahunan', href: '/cuti' },
   { section: 'Sistem' },
   { key: 'notifications', icon: Bell, label: 'Notifikasi', href: '/notifications' },
   { key: 'pengaturan', icon: Settings, label: 'Pengaturan',   href: '/pengaturan' },
@@ -660,7 +661,7 @@ function SidebarContent({ url, authUser, onLogout }) {
   const HO_HIDDEN_KEYS = ['sim', 'mcu', 'badge', 'ppe', 'ccpm', 'driver', 'equipment', 'timesheet', 'training'];
   // Kebalikannya: KPI cuma dipakai untuk Head Office, jadi sembunyikan menunya
   // kalau project yang lagi difilter/aktif BUKAN HO (mis. admin lagi lihat project Giam).
-  const NON_HO_HIDDEN_KEYS = ['kpi'];
+  const NON_HO_HIDDEN_KEYS = ['kpi', 'cuti'];
   const restrictPayroll = authUser?.can?.restrict_payroll;
   const PAYROLL_KEYS = ['slip-gaji', 'data-gaji'];
   // Menu 'pengaturan' sengaja tidak dicek lewat permission matriks (tetap kelihatan untuk semua,

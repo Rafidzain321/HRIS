@@ -570,6 +570,7 @@ class PayrollController extends Controller
                     'u_basic'               => $slip['u_basic'] ?? 0,
                     'u_kerja'               => $slip['u_kerja'] ?? 0,
                     'gaji_kotor'            => $slip['gaji_kotor'],
+                    'pph21'                 => $slip['pph21'] ?? 0,
                     'potongan_jht'          => $slip['potongan_jht'],
                     'potongan_pensiun'      => $slip['potongan_pensiun'],
                     'potongan_kes'          => $slip['potongan_kes'],
@@ -801,7 +802,7 @@ class PayrollController extends Controller
             'ttt_custom','potongan_custom','jml_jam_lembur','total_jam_ot_15x','total_jam_ot_2x',
             'upah_lembur','l_sabtu','l_libur','lembur_biasa','total_lembur_flat',
             'uang_hadir','h_kerja','h_sabtu','h_minggu_libur',
-            'gaji_kotor','potongan_jht','potongan_pensiun','potongan_kes',
+            'gaji_kotor','pph21','potongan_jht','potongan_pensiun','potongan_kes',
             'potongan_alpa','potongan_insentif','pot_tabung_oksigen','kekurangan_bulan_lalu','gaji_bersih',
             'izin','sakit','alpa','cuti','stb',
             'no_bpjs_tk','no_bpjs_kes',
@@ -1488,6 +1489,7 @@ class PayrollController extends Controller
             'uang_hadir'          => $uangHadir,
             'h_kerja'             => $hKerja,
             'gaji_kotor'          => round($gajiKotor, 2),
+            'pph21'               => \App\Support\Pph21Ter::hitung($gajiKotor, $emp->ptkp),
             'potongan_jht'        => $potonganJht,
             'potongan_pensiun'    => $potonganPensiun,
             'potongan_kes'        => $potonganKes,
@@ -1684,6 +1686,7 @@ class PayrollController extends Controller
             'tunj_kehadiran'       => $tunjKehadiran,
             'tunj_pulsa'           => $tunjPulsa,
             'gaji_kotor'           => round($gajiKotor, 2),
+            'pph21'                => \App\Support\Pph21Ter::hitung($gajiKotor, $emp->ptkp),
             'potongan_jht'         => $potonganJht,
             'potongan_pensiun'     => $potonganPensiun,
             'potongan_kes'         => $potonganKes,
@@ -1758,6 +1761,7 @@ class PayrollController extends Controller
             'uang_hadir'            => 0,
             'h_kerja'               => 0,
             'gaji_kotor'            => 0,
+            'pph21'                 => 0,
             'potongan_jht'          => 0,
             'potongan_pensiun'      => 0,
             'potongan_kes'          => 0,
@@ -1816,6 +1820,7 @@ class PayrollController extends Controller
             $slip['potongan_kes']     = $potonganKes;
             $slip['gaji_kotor']       = $gajiKotor;
             $slip['gaji_bersih']      = $gajiBersih;
+            $slip['pph21']            = \App\Support\Pph21Ter::hitung($gajiKotor, $slip['ptkp'] ?? null);
 
             return $slip;
         }
@@ -1892,6 +1897,7 @@ class PayrollController extends Controller
         $slip['potongan_kes']     = $potonganKes;
         $slip['gaji_kotor']       = $gajiKotor;
         $slip['gaji_bersih']      = $gajiBersih;
+        $slip['pph21']            = \App\Support\Pph21Ter::hitung($gajiKotor, $slip['ptkp'] ?? null);
         // Simpan persentase yang benar-benar dipakai — supaya tampilan (Excel/print) selalu
         // menampilkan angka yang sesuai dengan konfigurasi project & periode ini, bukan asumsi tetap 2/1/1.
         $slip['pct_jht']     = $pctJht;

@@ -87,6 +87,36 @@ export function KaryawanPerProjectChart({ data = [] }) {
     );
 }
 
+export function LengthOfServiceChart({ data = [] }) {
+    return (
+        <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={data} margin={{ top: 10, right: 16, left: -12, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
+                <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10.5, fill: '#8A90A8' }}
+                    axisLine={{ stroke: 'var(--border2)' }}
+                    tickLine={false}
+                />
+                <YAxis
+                    tick={{ fontSize: 11, fill: '#8A90A8' }}
+                    axisLine={{ stroke: 'var(--border2)' }}
+                    tickLine={false}
+                    allowDecimals={false}
+                />
+                <Tooltip
+                    trigger="item"
+                    contentStyle={tooltipStyle}
+                    cursor={false}
+                    formatter={(value) => [`${value} karyawan`, 'Total']}
+                    labelFormatter={(label) => `Masa kerja: ${label}`}
+                />
+                <Bar dataKey="total" fill="#3A8FE0" radius={[6, 6, 0, 0]} maxBarSize={44} />
+            </BarChart>
+        </ResponsiveContainer>
+    );
+}
+
 export function PengeluaranGajiChart({ data = [], projectKeys = [], isMultiProject = false }) {
     // Single project mode → 1 bar warna kuning per bulan (dataKey="total")
     // Multi project mode → stacked bar per project (dataKey=nama project)

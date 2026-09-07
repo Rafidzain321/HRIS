@@ -3,6 +3,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeKpiController;
+use App\Http\Controllers\EmployeeLeaveController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\EmployeeTransferController;
 use App\Http\Controllers\McuController;
@@ -192,6 +193,11 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/kpi/goals/{goal}', [EmployeeKpiController::class, 'updateGoal'])->middleware('menu:kpi,view')->name('kpi.goals.update');
     Route::put('/kpi/goals/{goal}/progress', [EmployeeKpiController::class, 'updateProgress'])->middleware('menu:kpi,view')->name('kpi.goals.progress');
     Route::delete('/kpi/goals/{goal}', [EmployeeKpiController::class, 'destroyGoal'])->middleware('menu:kpi,view')->name('kpi.goals.destroy');
+
+    // ── Cuti Tahunan (khusus karyawan Head Office, HR yang input) ──
+    Route::get('/cuti', [EmployeeLeaveController::class, 'index'])->middleware('menu:cuti,view')->name('cuti');
+    Route::post('/cuti', [EmployeeLeaveController::class, 'store'])->middleware('menu:cuti,edit')->name('cuti.store');
+    Route::delete('/cuti/{leave}', [EmployeeLeaveController::class, 'destroy'])->middleware('menu:cuti,edit')->name('cuti.destroy');
 
     Route::get('/employees/{employee}/trainings', [TrainingController::class, 'forEmployee'])->middleware('menu:training,view');
     Route::post('/employees/{employee}/trainings', [TrainingController::class, 'store'])->middleware('menu:training,edit');

@@ -19,5 +19,6 @@ return [
     'data-gaji'     => ['label' => 'Data Gaji',              'edit' => true],
     'training'      => ['label' => 'Training',               'edit' => true],
     'kpi'           => ['label' => 'KPI',                    'edit' => true],
+    'cuti'          => ['label' => 'Cuti Tahunan',           'edit' => true],
     'notifications' => ['label' => 'Notifikasi',             'edit' => false],
 ];

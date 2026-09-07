@@ -26,13 +26,15 @@ class EmployeeKpiController extends Controller
         return Employee::where('id', $employeeId)->where('atasan_id', $user->employee_id)->exists();
     }
 
-    // Null = lihat semua (HR/super-admin). Selain itu, dikembalikan daftar ID: diri sendiri +
-    // seluruh bawahan langsung — dipakai buat mempersempit index()/summary() jadi "dashboard
-    // tim saya" untuk akun self-input (manajer tanpa bawahan otomatis cuma lihat dirinya sendiri).
+    // Null = lihat semua (HR/super-admin, atau GM & Direktur lewat permission "view-all-kpi" —
+    // khusus lihat, BUKAN boleh edit KPI orang lain, itu tetap cuma HR lewat canEditKpiFor()).
+    // Selain itu, dikembalikan daftar ID: diri sendiri + seluruh bawahan langsung — dipakai buat
+    // mempersempit index()/summary() jadi "dashboard tim saya" untuk akun self-input (manajer
+    // tanpa bawahan otomatis cuma lihat dirinya sendiri).
     private function scopedEmployeeIds(): ?array
     {
         $user = auth()->user();
-        if (!$user || $user->hasRole('super-admin') || $user->can('edit-kpi')) {
+        if (!$user || $user->hasRole('super-admin') || $user->can('edit-kpi') || $user->can('view-all-kpi')) {
             return null;
         }
         if (!$user->employee_id) return [];
@@ -142,7 +144,7 @@ class EmployeeKpiController extends Controller
             'employee_id'      => 'required|exists:employees,id',
             'nama_goal'        => 'required|string|max:255',
             'deskripsi'        => 'nullable|string|max:1000',
-            'siklus'           => 'required|in:custom,monthly,quarterly,half_yearly,yearly',
+            'siklus'           => 'required|in:custom,monthly,half_yearly,yearly',
             'tanggal_mulai'    => 'required|date',
             'tanggal_selesai'  => 'required|date|after_or_equal:tanggal_mulai',
             'satuan'           => 'required|in:percentage,number,rupiah',
@@ -176,7 +178,7 @@ class EmployeeKpiController extends Controller
         $data = $request->validate([
             'nama_goal'        => 'required|string|max:255',
             'deskripsi'        => 'nullable|string|max:1000',
-            'siklus'           => 'required|in:custom,monthly,quarterly,half_yearly,yearly',
+            'siklus'           => 'required|in:custom,monthly,half_yearly,yearly',
             'tanggal_mulai'    => 'required|date',
             'tanggal_selesai'  => 'required|date|after_or_equal:tanggal_mulai',
             'satuan'           => 'required|in:percentage,number,rupiah',

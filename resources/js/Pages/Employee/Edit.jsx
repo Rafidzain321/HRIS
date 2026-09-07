@@ -396,6 +396,7 @@ export default function EmployeeEdit({ employee, positions = [], project_info = 
     tempat_lahir:         employee.tempat_lahir          || '',
     tanggal_lahir:        employee.tanggal_lahir         || '',
     tanggal_masuk:        employee.tanggal_masuk         || '',
+    tanggal_akhir_probation: employee.tanggal_akhir_probation || '',
     position_id:          employee.position_id           || '',
     alamat:               employee.alamat               || '',
     agama:                employee.agama                || '',
@@ -557,6 +558,9 @@ export default function EmployeeEdit({ employee, positions = [], project_info = 
               </Field>
               <Field label="Tanggal Masuk / Bergabung">
                 <input type="date" style={inputStyle} value={data.tanggal_masuk} onChange={e=>setData('tanggal_masuk',e.target.value)} />
+              </Field>
+              <Field label="Tanggal Akhir Probation (opsional)">
+                <input type="date" style={inputStyle} value={data.tanggal_akhir_probation} onChange={e=>setData('tanggal_akhir_probation',e.target.value)} />
               </Field>
               <Field label="Jabatan">
                 <select style={selectStyle} value={data.position_id} onChange={e=>setData('position_id',e.target.value)}>

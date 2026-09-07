@@ -96,6 +96,7 @@ function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
   const potAlpa     = num(slip.potongan_alpa);
   const potInsentif = num(slip.potongan_insentif);
   const potOksigen  = num(slip.pot_tabung_oksigen);
+  const pph21       = num(slip.pph21); // info saja (ditanggung perusahaan) — sengaja TIDAK ikut totalPot
   const totalPot    = potJht + potPensiun + potKes + potAlpa + potInsentif + potOksigen;
   const gajiBersih  = num(slip.gaji_bersih);
 
@@ -304,6 +305,11 @@ function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:'8.5pt',fontWeight:'bold',borderTop:'1px solid #bbb',marginTop:3,paddingTop:3}}>
                   <span>NETTO DITERIMA</span><span>{rpC(gajiBersih)}</span>
                 </div>
+                {pph21>0 && (
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'6.5pt',color:'#888',fontStyle:'italic',marginTop:2}}>
+                    <span>Estimasi PPh 21 bulan ini (ditanggung perusahaan, TER {slip.ptkp||'—'})</span><span>{rpC(pph21)}</span>
+                  </div>
+                )}
               </div>
             </td>
           </tr>
@@ -595,6 +601,11 @@ export default function SlipGaji({
                     <div style={{fontFamily:'Syne,sans-serif',fontSize:18,fontWeight:700,color:'#22C97A'}}>{rp(slipFinal.gaji_bersih)}</div>
                   </div>
                 </div>
+                {(slipFinal.pph21||0)>0 && (
+                  <div style={{marginTop:8,padding:'8px 12px',borderRadius:8,background:'var(--bg3)',border:'1px solid var(--border)',fontSize:10.5,color:'var(--muted)',fontStyle:'italic'}}>
+                    Estimasi PPh 21 bulan ini (TER, PTKP {slipFinal.ptkp||'—'}): <b style={{color:'var(--muted2)'}}>{rp(slipFinal.pph21)}</b> — ditanggung perusahaan, tidak mengurangi gaji bersih di atas.
+                  </div>
+                )}
                 <div className="stat-grid-5" style={{marginTop:12,display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:5}}>
                   {[{l:'Hadir',v:slipFinal.h_kerja,bg:'rgba(34,201,122,.1)',c:'#22C97A'},{l:'Izin',v:slipFinal.izin,bg:'rgba(58,143,224,.1)',c:'var(--blue)'},{l:'Sakit',v:slipFinal.sakit,bg:'rgba(232,160,32,.1)',c:'var(--accent)'},{l:'Alpa',v:slipFinal.alpa,bg:'rgba(224,69,69,.1)',c:'#E04545'},{l:'Cuti',v:slipFinal.cuti,bg:'rgba(34,201,122,.08)',c:'#22C97A'}].map((s,i)=>(
                     <div key={i} style={{textAlign:'center',padding:'6px 4px',borderRadius:8,background:s.bg,border:`1px solid ${s.c}30`}}>

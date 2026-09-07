@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router } from '@inertiajs/react';
-import { KaryawanPerProjectChart, PengeluaranGajiChart } from '@/Components/DashboardCharts';
+import { KaryawanPerProjectChart, PengeluaranGajiChart, LengthOfServiceChart } from '@/Components/DashboardCharts';
 import {
   TriangleAlert, X, User, Building2, Briefcase, CreditCard, Stethoscope, Siren,
-  CheckCircle2, BarChart3, Users, ClipboardList,
+  CheckCircle2, BarChart3, Users, ClipboardList, FileClock,
 } from 'lucide-react';
 
 const avatarColors = ['#3A8FE0','#22C97A','#E8A020','#E04545','#9B59B6','#E06A20','#3ABCDE','#C97A22'];
@@ -36,10 +36,14 @@ function getSisaUrgent(e) {
   return Math.min(...candidates);
 }
 
+const JABATAN_COLORS = ['#3A8FE0','#22C97A','#E8A020','#9B59B6','#E04545','#3ABCDE','#8A90A8'];
+
 export default function Dashboard({
   stats={},
   alert_employees=[],
   jabatan_stats=[],
+  masa_kerja_stats=[],
+  contract_probation_alerts=[],
   karyawanPerProject=[],
   pengeluaranGaji=[],
   projectKeys=[],
@@ -58,7 +62,13 @@ export default function Dashboard({
     badgeWarn:  stats.badge_warning  || 0,
   };
 
-  const jabatanMax = jabatan_stats[0]?.total || 1;
+  const jabatanTotal = jabatan_stats.reduce((acc, j) => acc + (j.total || 0), 0) || 1;
+  const jabatanTop = jabatan_stats.slice(0, 6);
+  const jabatanSisa = jabatan_stats.slice(6).reduce((acc, j) => acc + (j.total || 0), 0);
+  const jabatanSegments = [
+    ...jabatanTop.map((j, i) => ({ label: j.jabatan || '—', total: j.total, color: JABATAN_COLORS[i % JABATAN_COLORS.length] })),
+    ...(jabatanSisa > 0 ? [{ label: 'Lainnya', total: jabatanSisa, color: '#4A5070' }] : []),
+  ];
 
   const filteredAlerts = alert_employees
     .filter(e => getSisaUrgent(e) < 9999)
@@ -285,24 +295,44 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* ROW: JABATAN + PENGELUARAN GAJI */}
+      {/* ROW: JABATAN (compact) + MASA KERJA + PENGELUARAN GAJI */}
       <div className="dash-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,alignItems:'stretch'}}>
-        <div className="panel" style={{display:'flex',flexDirection:'column'}}>
-          <div className="panel-head" style={{flexShrink:0}}>
-            <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13}/> Komposisi Jabatan</div>
-            <a href="/employees" style={{fontSize:11.5,color:'#E8A020',textDecoration:'none'}}>Detail →</a>
-          </div>
-          <div style={{display:'flex',flexDirection:'column',justifyContent:'center',gap:9,padding:'14px 16px',flex:1}}>
-            {jabatan_stats.slice(0,10).map((j,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',gap:10}}>
-                <div style={{fontSize:12,width:160,flexShrink:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:'var(--text)'}}>{j.jabatan||'—'}</div>
-                <div style={{flex:1,height:8,background:'rgba(255,255,255,.06)',borderRadius:99,overflow:'hidden'}}>
-                  <div style={{height:'100%',borderRadius:99,background:'linear-gradient(90deg,#E8A020,#F5C050)',width:`${Math.round((j.total/jabatanMax)*100)}%`,transition:'width 1.4s'}}/>
-                </div>
-                <div style={{fontSize:11.5,fontWeight:600,color:'#8A90A8',width:28,textAlign:'right',flexShrink:0}}>{j.total}</div>
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          {/* ── Komposisi Jabatan — compact: 1 stacked bar + legend list ── */}
+          <div className="panel">
+            <div className="panel-head">
+              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13}/> Komposisi Jabatan</div>
+              <a href="/employees" style={{fontSize:11.5,color:'#E8A020',textDecoration:'none'}}>Detail →</a>
+            </div>
+            <div style={{padding:'14px 16px'}}>
+              <div style={{display:'flex',height:10,borderRadius:99,overflow:'hidden',marginBottom:6}}>
+                {jabatanSegments.map((s,i)=>(
+                  <div key={i} title={`${s.label}: ${s.total}`} style={{width:`${(s.total/jabatanTotal)*100}%`,background:s.color,transition:'width 1.2s'}}/>
+                ))}
               </div>
-            ))}
-            {jabatan_stats.length===0&&<div style={{color:'#6B7494',fontSize:12}}>Belum ada data jabatan</div>}
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#6B7494',marginBottom:12}}>
+                <span>0%</span><span>Total {jabatanTotal}</span><span>100%</span>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {jabatanSegments.map((s,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{width:9,height:9,borderRadius:3,background:s.color,flexShrink:0}}/>
+                    <span style={{fontSize:12,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.label}</span>
+                    <span style={{fontSize:11.5,fontWeight:600,color:'#8A90A8'}}>{s.total}</span>
+                    <span style={{fontSize:10.5,color:'#6B7494',width:38,textAlign:'right'}}>{((s.total/jabatanTotal)*100).toFixed(1)}%</span>
+                  </div>
+                ))}
+                {jabatan_stats.length===0&&<div style={{color:'#6B7494',fontSize:12}}>Belum ada data jabatan</div>}
+              </div>
+            </div>
+          </div>
+
+          {/* ── PANEL BARU: Masa Kerja (Length of Service) ── */}
+          <div className="panel">
+            <div className="panel-head"><div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><BarChart3 size={13}/> Masa Kerja</div></div>
+            <div style={{padding:'10px 8px 14px'}}>
+              <LengthOfServiceChart data={masa_kerja_stats} />
+            </div>
           </div>
         </div>
 
@@ -323,6 +353,68 @@ export default function Dashboard({
                 isMultiProject={isMultiProject}
             />
           </div>
+        </div>
+      </div>
+
+      {/* ── PANEL BARU: Contract & Probation Reminder ── */}
+      <div className="panel" style={{marginTop:16}}>
+        <div className="panel-head">
+          <div className="panel-title">
+            <FileClock size={13} style={{verticalAlign:-2}}/> Contract & Probation
+            <span style={{marginLeft:6,background:'rgba(232,160,32,.15)',color:'#E8A020',fontSize:10,fontWeight:700,borderRadius:99,padding:'1px 7px',display:'inline-block'}}>
+              {contract_probation_alerts.length}
+            </span>
+          </div>
+        </div>
+        <div className="table-wrap" style={{overflowX:'auto',maxHeight:420,overflowY:'auto'}}>
+          <table className="kar-table" style={{minWidth:560}}>
+            <thead style={{position:'sticky',top:0,zIndex:2,background:'var(--card)'}}>
+              <tr>
+                <th style={{padding:'10px 16px'}}>Karyawan</th>
+                <th style={{padding:'10px 8px'}}>Jabatan</th>
+                <th style={{padding:'10px 8px'}}>Status</th>
+                <th style={{padding:'10px 8px',textAlign:'center'}}>Sisa Hari</th>
+                <th style={{padding:'10px 8px'}}>Tgl Berakhir</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contract_probation_alerts.map((c,i)=>{
+                const isOver = c.sisa_hari < 0;
+                return (
+                  <tr key={i}
+                    style={{...(isOver?{background:'rgba(224,69,69,.04)'}:{}),cursor:'pointer'}}
+                    onMouseEnter={ev=>Array.from(ev.currentTarget.cells).forEach(cell=>cell.style.background=isOver?'rgba(224,69,69,.08)':'rgba(232,160,32,.04)')}
+                    onMouseLeave={ev=>Array.from(ev.currentTarget.cells).forEach(cell=>cell.style.background='')}
+                    onClick={()=>router.visit(`/employees?highlight=${c.id}`)}>
+                    <td style={{padding:'10px 16px'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:9}}>
+                        <div style={{width:30,height:30,borderRadius:7,background:getAvColor(c.id_badge),display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff',flexShrink:0}}>
+                          {getAv(c.nama)}
+                        </div>
+                        <div>
+                          <div style={{fontSize:12.5,fontWeight:600}}>{c.nama}</div>
+                          <div style={{fontSize:10.5,color:'#6B7494'}}>{c.id_badge}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{padding:'10px 8px',fontSize:12,color:'var(--muted2)'}}>{c.jabatan}</td>
+                    <td style={{padding:'10px 8px'}}>
+                      <span className={c.tipe==='Kontrak' ? 'pill pill-blue' : 'pill pill-orange'}>{c.tipe}</span>
+                    </td>
+                    <td style={{padding:'10px 8px',textAlign:'center'}}>
+                      <span style={{fontSize:13,fontWeight:700,color:isOver?'#E04545':c.sisa_hari<=7?'#E04545':'var(--accent)'}}>
+                        {c.sisa_hari===0?'Hari ini!':c.sisa_hari>0?`${c.sisa_hari} hari lagi`:`${Math.abs(c.sisa_hari)} hr lalu`}
+                      </span>
+                    </td>
+                    <td style={{padding:'10px 8px',fontSize:12,color:isOver?'#E04545':'var(--muted2)',whiteSpace:'nowrap'}}>{c.tanggal_fmt}</td>
+                  </tr>
+                );
+              })}
+              {contract_probation_alerts.length===0&&(
+                <tr><td colSpan={5} style={{padding:'24px 16px',textAlign:'center',color:'#6B7494'}}><CheckCircle2 size={13} style={{verticalAlign:-2}}/> Tidak ada kontrak/probation yang mau berakhir</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
