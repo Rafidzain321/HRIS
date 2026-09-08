@@ -77,7 +77,7 @@ const TTT_LABELS = {
   kompensasi_kontrak:'Komp. Kontrak', insentif:'Insentif', com_day:'Com Day',
 };
 
-function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
+export function SlipCetak({ slip, bulan_nama, tahun, ttd }) {
   if (!slip) return null;
   const num = (v) => Number(v) || 0;  // Cast semua nilai jadi number, cegah string concat bug
   const rpC = (n) => 'Rp ' + Math.round(num(n)).toLocaleString('id-ID');

@@ -497,6 +497,8 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
           /* Dashboard: Alert+Compliance dan Jabatan+Pensiun jadi 1 kolom */
           .dash-grid-2 { grid-template-columns: 1fr !important; }
           .dash-grid-2 > * { min-width: 0 !important; }
+          .dash-grid-3 { grid-template-columns: 1fr !important; }
+          .dash-grid-3 > * { min-width: 0 !important; }
 
           /* TabPanduan (Data Gaji): sidebar nav jadi row horizontal-scroll */
           .panduan-layout { flex-direction: column !important; height: auto !important; }

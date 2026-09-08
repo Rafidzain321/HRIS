@@ -295,44 +295,42 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* ROW: JABATAN (compact) + MASA KERJA + PENGELUARAN GAJI */}
-      <div className="dash-grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,alignItems:'stretch'}}>
-        <div style={{display:'flex',flexDirection:'column',gap:16}}>
-          {/* ── Komposisi Jabatan — compact: 1 stacked bar + legend list ── */}
-          <div className="panel">
-            <div className="panel-head">
-              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13}/> Komposisi Jabatan</div>
-              <a href="/employees" style={{fontSize:11.5,color:'#E8A020',textDecoration:'none'}}>Detail →</a>
+      {/* ROW: JABATAN (compact) + MASA KERJA + PENGELUARAN GAJI — 3 kolom sejajar, biar ga ada kolom yang kosong melompong */}
+      <div className="dash-grid-3" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1.4fr',gap:16,alignItems:'start'}}>
+        {/* ── Komposisi Jabatan — compact: 1 stacked bar + legend list ── */}
+        <div className="panel">
+          <div className="panel-head">
+            <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13}/> Komposisi Jabatan</div>
+            <a href="/employees" style={{fontSize:11.5,color:'#E8A020',textDecoration:'none'}}>Detail →</a>
+          </div>
+          <div style={{padding:'18px 20px'}}>
+            <div style={{display:'flex',height:14,borderRadius:99,overflow:'hidden',marginBottom:8}}>
+              {jabatanSegments.map((s,i)=>(
+                <div key={i} title={`${s.label}: ${s.total}`} style={{width:`${(s.total/jabatanTotal)*100}%`,background:s.color,transition:'width 1.2s'}}/>
+              ))}
             </div>
-            <div style={{padding:'14px 16px'}}>
-              <div style={{display:'flex',height:10,borderRadius:99,overflow:'hidden',marginBottom:6}}>
-                {jabatanSegments.map((s,i)=>(
-                  <div key={i} title={`${s.label}: ${s.total}`} style={{width:`${(s.total/jabatanTotal)*100}%`,background:s.color,transition:'width 1.2s'}}/>
-                ))}
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#6B7494',marginBottom:12}}>
-                <span>0%</span><span>Total {jabatanTotal}</span><span>100%</span>
-              </div>
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                {jabatanSegments.map((s,i)=>(
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{width:9,height:9,borderRadius:3,background:s.color,flexShrink:0}}/>
-                    <span style={{fontSize:12,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.label}</span>
-                    <span style={{fontSize:11.5,fontWeight:600,color:'#8A90A8'}}>{s.total}</span>
-                    <span style={{fontSize:10.5,color:'#6B7494',width:38,textAlign:'right'}}>{((s.total/jabatanTotal)*100).toFixed(1)}%</span>
-                  </div>
-                ))}
-                {jabatan_stats.length===0&&<div style={{color:'#6B7494',fontSize:12}}>Belum ada data jabatan</div>}
-              </div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#6B7494',marginBottom:16}}>
+              <span>0%</span><span>Total {jabatanTotal}</span><span>100%</span>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:13}}>
+              {jabatanSegments.map((s,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'center',gap:9}}>
+                  <span style={{width:10,height:10,borderRadius:3,background:s.color,flexShrink:0}}/>
+                  <span style={{fontSize:13,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.label}</span>
+                  <span style={{fontSize:12.5,fontWeight:600,color:'#8A90A8'}}>{s.total}</span>
+                  <span style={{fontSize:11,color:'#6B7494',width:42,textAlign:'right'}}>{((s.total/jabatanTotal)*100).toFixed(1)}%</span>
+                </div>
+              ))}
+              {jabatan_stats.length===0&&<div style={{color:'#6B7494',fontSize:12}}>Belum ada data jabatan</div>}
             </div>
           </div>
+        </div>
 
-          {/* ── PANEL BARU: Masa Kerja (Length of Service) ── */}
-          <div className="panel">
-            <div className="panel-head"><div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><BarChart3 size={13}/> Masa Kerja</div></div>
-            <div style={{padding:'10px 8px 14px'}}>
-              <LengthOfServiceChart data={masa_kerja_stats} />
-            </div>
+        {/* ── PANEL BARU: Masa Kerja (Length of Service) ── */}
+        <div className="panel">
+          <div className="panel-head"><div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><BarChart3 size={13}/> Masa Kerja</div></div>
+          <div style={{padding:'10px 8px 14px'}}>
+            <LengthOfServiceChart data={masa_kerja_stats} />
           </div>
         </div>
 

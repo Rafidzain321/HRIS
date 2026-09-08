@@ -12,21 +12,11 @@ class SlipGajiExportController extends Controller
     // gaji, sama dengan yang dipakai halaman Data Gaji & Slip Gaji.
     public function print(Request $request, $payrollId, PayrollController $payrollController)
     {
-        $payroll  = EmployeePayroll::with(['employee.position', 'employee.project'])->findOrFail($payrollId);
-        $employee = $payroll->employee;
-        $slip     = $payrollController->getSlipData($payroll->employee_id, $payroll->tahun, $payroll->bulan);
+        $payroll = EmployeePayroll::findOrFail($payrollId);
+        $slip    = $payrollController->getSlipData($payroll->employee_id, $payroll->tahun, $payroll->bulan);
 
         return Inertia::render('SlipGaji/Print', [
-            'slip'     => $slip,
-            'employee' => [
-                'id_badge'       => $employee->id_badge,
-                'nama_lengkap'   => $employee->nama_lengkap,
-                'jabatan'        => $employee->position?->nama_jabatan ?? '-',
-                'project_nama'   => $employee->project?->nama,
-                'no_rekening'    => $employee->no_rekening,
-                'ptkp'           => $employee->ptkp,
-                'tanggal_masuk'  => $employee->tanggal_masuk?->format('d M Y'),
-            ],
+            'slip'    => $slip,
             'periode' => [
                 'tahun' => $payroll->tahun,
                 'bulan' => $payroll->bulan,

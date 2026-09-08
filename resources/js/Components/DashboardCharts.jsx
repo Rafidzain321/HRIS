@@ -53,7 +53,7 @@ function StackedTooltip({ active, payload, label }) {
 export function KaryawanPerProjectChart({ data = [] }) {
     return (
         <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={data} margin={{ top: 10, right: 16, left: -12, bottom: 5 }}>
+            <BarChart data={data} margin={{ top: 10, right: 16, left: -12, bottom: 5 }} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
                 <XAxis
                     dataKey="project"
@@ -74,7 +74,7 @@ export function KaryawanPerProjectChart({ data = [] }) {
                     formatter={(value) => [`${value} karyawan`, 'Total']}
                     labelFormatter={(label) => `Project: ${label}`}
                 />
-                <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={50}>
+                <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={110}>
                     {data.map((entry, i) => (
                         <Cell
                             key={`cell-${i}`}
@@ -89,8 +89,8 @@ export function KaryawanPerProjectChart({ data = [] }) {
 
 export function LengthOfServiceChart({ data = [] }) {
     return (
-        <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={data} margin={{ top: 10, right: 16, left: -12, bottom: 5 }}>
+        <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data} margin={{ top: 10, right: 16, left: -12, bottom: 5 }} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
                 <XAxis
                     dataKey="label"
@@ -111,7 +111,7 @@ export function LengthOfServiceChart({ data = [] }) {
                     formatter={(value) => [`${value} karyawan`, 'Total']}
                     labelFormatter={(label) => `Masa kerja: ${label}`}
                 />
-                <Bar dataKey="total" fill="#3A8FE0" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                <Bar dataKey="total" fill="#3A8FE0" radius={[6, 6, 0, 0]} maxBarSize={90} />
             </BarChart>
         </ResponsiveContainer>
     );
