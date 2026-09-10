@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EmployeeGoal extends Model
 {
     protected $fillable = [
-        'employee_id', 'nama_goal', 'deskripsi', 'siklus',
+        'employee_id', 'reviewer_id', 'nama_goal', 'deskripsi', 'siklus',
         'tanggal_mulai', 'tanggal_selesai', 'satuan',
         'baseline', 'target', 'progress_sekarang', 'bobot',
         'catatan', 'diperbarui_oleh', 'aktif',
@@ -27,6 +27,13 @@ class EmployeeGoal extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    // Penanggung jawab update progress goal ini — bisa ditugaskan bebas (tidak harus atasan
+    // langsung), dipilih saat goal dibuat/diedit. Dipakai buat badge "pending review" manajer.
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'reviewer_id');
     }
 
     // Persentase capaian dari baseline ke target, dibatasi 0-100 — dipakai buat progress bar

@@ -43,4 +43,27 @@ class EmployeeLeave extends Model
         }
         return $hari;
     }
+
+    // Total hari kerja cuti seorang karyawan yang jatuh di bulan tertentu — dipakai fitur
+    // Kehadiran (Attendance) supaya nilai "Cuti" selalu diambil dari sini, bukan diketik ulang.
+    // Satu catatan cuti bisa melewati batas bulan (mis. 29 Des - 3 Jan), jadi dipotong dulu ke
+    // rentang bulan yang diminta sebelum dihitung hari kerjanya.
+    public static function hariCutiDalamBulan(int $employeeId, int $tahun, int $bulan): int
+    {
+        $awalBulan   = Carbon::create($tahun, $bulan, 1)->startOfMonth();
+        $akhirBulan  = $awalBulan->copy()->endOfMonth();
+
+        $leaves = static::where('employee_id', $employeeId)
+            ->where('tanggal_mulai', '<=', $akhirBulan)
+            ->where('tanggal_selesai', '>=', $awalBulan)
+            ->get(['tanggal_mulai', 'tanggal_selesai']);
+
+        $total = 0;
+        foreach ($leaves as $leave) {
+            $mulai   = $leave->tanggal_mulai->max($awalBulan);
+            $selesai = $leave->tanggal_selesai->min($akhirBulan);
+            $total  += static::hitungHariKerja($mulai->toDateString(), $selesai->toDateString());
+        }
+        return $total;
+    }
 }

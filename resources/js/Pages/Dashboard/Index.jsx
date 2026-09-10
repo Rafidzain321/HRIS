@@ -296,14 +296,14 @@ export default function Dashboard({
       </div>
 
       {/* ROW: JABATAN (compact) + MASA KERJA + PENGELUARAN GAJI — 3 kolom sejajar, biar ga ada kolom yang kosong melompong */}
-      <div className="dash-grid-3" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1.4fr',gap:16,alignItems:'start'}}>
+      <div className="dash-grid-3" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1.4fr',gap:16,alignItems:'stretch'}}>
         {/* ── Komposisi Jabatan — compact: 1 stacked bar + legend list ── */}
-        <div className="panel">
+        <div className="panel" style={{display:'flex',flexDirection:'column'}}>
           <div className="panel-head">
             <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><ClipboardList size={13}/> Komposisi Jabatan</div>
             <a href="/employees" style={{fontSize:11.5,color:'#E8A020',textDecoration:'none'}}>Detail →</a>
           </div>
-          <div style={{padding:'18px 20px'}}>
+          <div style={{padding:'18px 20px',flex:1,display:'flex',flexDirection:'column',justifyContent:'center'}}>
             <div style={{display:'flex',height:14,borderRadius:99,overflow:'hidden',marginBottom:8}}>
               {jabatanSegments.map((s,i)=>(
                 <div key={i} title={`${s.label}: ${s.total}`} style={{width:`${(s.total/jabatanTotal)*100}%`,background:s.color,transition:'width 1.2s'}}/>
@@ -327,15 +327,15 @@ export default function Dashboard({
         </div>
 
         {/* ── PANEL BARU: Masa Kerja (Length of Service) ── */}
-        <div className="panel">
+        <div className="panel" style={{display:'flex',flexDirection:'column'}}>
           <div className="panel-head"><div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><BarChart3 size={13}/> Masa Kerja</div></div>
-          <div style={{padding:'10px 8px 14px'}}>
-            <LengthOfServiceChart data={masa_kerja_stats} />
+          <div style={{padding:'10px 8px 14px',flex:1,minHeight:0}}>
+            <LengthOfServiceChart data={masa_kerja_stats} height="100%" />
           </div>
         </div>
 
         {/* ── PANEL BARU: Pengeluaran Gaji 12 Bulan ── */}
-        <div className="panel">
+        <div className="panel" style={{display:'flex',flexDirection:'column'}}>
           <div className="panel-head">
             <div className="panel-title">
               Pengeluaran Gaji 12 Bulan Terakhir
@@ -344,11 +344,12 @@ export default function Dashboard({
               </span>
             </div>
           </div>
-          <div style={{padding:'10px 8px 14px'}}>
+          <div style={{padding:'10px 8px 14px',flex:1,minHeight:0}}>
             <PengeluaranGajiChart
                 data={pengeluaranGaji}
                 projectKeys={projectKeys}
                 isMultiProject={isMultiProject}
+                height="100%"
             />
           </div>
         </div>

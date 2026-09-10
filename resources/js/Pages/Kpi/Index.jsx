@@ -1,5 +1,5 @@
 // resources/js/Pages/Kpi/Index.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { usePage, router } from '@inertiajs/react';
@@ -89,7 +89,7 @@ function ProgressModal({ goal, onClose, onSaved }) {
             <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>Baseline {fmtVal(goal.baseline, goal.satuan)} → Target {fmtVal(goal.target, goal.satuan)}</div>
             <div>
               <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Progress Sekarang</label>
-              <input type="number" style={inp} value={progress} onChange={e => setProgress(e.target.value)} autoFocus />
+              <input type="number" min="0" style={inp} value={progress} onChange={e => setProgress(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} autoFocus />
             </div>
             <div>
               <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Catatan (opsional)</label>
@@ -230,16 +230,41 @@ function isGoalClosed(g) {
   return g.status === 'completed' || g.tanggal_selesai < todayIso;
 }
 
-function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh }) {
+function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, openProgressId }) {
   const [filterId, setFilterId] = useState(null);
   const [search, setSearch] = useState('');
   const [periodTab, setPeriodTab] = useState('ongoing');
   const [statusFilter, setStatusFilter] = useState('');
+  const [reviewerFilter, setReviewerFilter] = useState('');
   const [progressModal, setProgressModal] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
+  // Datang dari klik notifikasi bell (goal yang perlu direview) — langsung buka modal update progress-nya.
+  useEffect(() => {
+    if (!openProgressId) return;
+    const goal = goals.find(g => String(g.id) === String(openProgressId));
+    if (!goal) return;
+    setPeriodTab(isGoalClosed(goal) ? 'closed' : 'ongoing');
+    setProgressModal(goal);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('open_progress');
+    window.history.replaceState({}, '', url);
+  }, [openProgressId]);
+
   const employeesById = {};
   employees.forEach(e => { employeesById[e.id] = e; });
+
+  // Daftar reviewer yang benar-benar sedang ditugaskan (bukan semua karyawan) — buat filter
+  // "siapa ditugaskan review apa" dari sisi HR.
+  const reviewerOptions = [];
+  const seenReviewer = new Set();
+  goals.forEach(g => {
+    if (g.reviewer_id && !seenReviewer.has(g.reviewer_id)) {
+      seenReviewer.add(g.reviewer_id);
+      reviewerOptions.push({ id: g.reviewer_id, nama: g.reviewer_nama || `#${g.reviewer_id}` });
+    }
+  });
+  reviewerOptions.sort((a, b) => a.nama.localeCompare(b.nama));
 
   const ongoingGoals = goals.filter(g => !isGoalClosed(g));
   const closedGoals  = goals.filter(g => isGoalClosed(g));
@@ -249,6 +274,7 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh }) {
   const rows = periodGoals
     .filter(g => !filterId || g.employee_id === filterId)
     .filter(g => !statusFilter || g.status === statusFilter)
+    .filter(g => !reviewerFilter || String(g.reviewer_id) === String(reviewerFilter))
     .filter(g => {
       if (!searchLow) return true;
       const owner = employeesById[g.employee_id];
@@ -300,6 +326,12 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh }) {
             <option value="">Semua Status</option>
             {Object.entries(STATUS_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
           </select>
+          {reviewerOptions.length > 0 && (
+            <select value={reviewerFilter} onChange={e => setReviewerFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 160 }}>
+              <option value="">Semua Reviewer</option>
+              {reviewerOptions.map(r => <option key={r.id} value={r.id}>Direview: {r.nama}</option>)}
+            </select>
+          )}
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari goal / pemilik..." style={{ ...inp, paddingLeft: 30, width: 220 }} />
@@ -334,6 +366,11 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh }) {
                     <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
                       <div style={{ fontWeight: 600 }}>{g.nama_goal}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 3 }}>{fmtDate(g.tanggal_mulai)} – {fmtDate(g.tanggal_selesai)}</div>
+                      {g.reviewer_nama && (
+                        <div style={{ fontSize: 10, color: 'var(--blue)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <RefreshCw size={9} /> Reviewer: {g.reviewer_nama}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -468,6 +505,7 @@ export default function KpiIndex({ employees = [], goals = [], is_self_only = fa
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [activeTab, setActiveTab] = useState('goals');
   const [summaryRows, setSummaryRows] = useState(null);
+  const openProgressId = new URLSearchParams(window.location.search).get('open_progress');
 
   function loadSummary() {
     setSummaryRows(null);
@@ -507,7 +545,7 @@ export default function KpiIndex({ employees = [], goals = [], is_self_only = fa
       </div>
 
       {activeTab === 'goals' && (
-        <TabGoals employees={employees} goals={goals} isViewer={isViewer} isSelfOnly={is_self_only} onRefresh={onRefresh} />
+        <TabGoals employees={employees} goals={goals} isViewer={isViewer} isSelfOnly={is_self_only} onRefresh={onRefresh} openProgressId={openProgressId} />
       )}
       {activeTab === 'dashboard' && (
         <TabDashboard rows={summaryRows || []} loading={summaryRows === null} />

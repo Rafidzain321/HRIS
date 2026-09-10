@@ -20,5 +20,6 @@ return [
     'training'      => ['label' => 'Training',               'edit' => true],
     'kpi'           => ['label' => 'KPI',                    'edit' => true],
     'cuti'          => ['label' => 'Cuti Tahunan',           'edit' => true],
+    'kehadiran'     => ['label' => 'Kehadiran',              'edit' => true],
     'notifications' => ['label' => 'Notifikasi',             'edit' => false],
 ];

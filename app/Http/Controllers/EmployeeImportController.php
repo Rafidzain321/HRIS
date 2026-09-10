@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\EmployeeHoDetail;
 use App\Models\Position;
@@ -244,6 +245,10 @@ class EmployeeImportController extends Controller
             }
         }
 
+        if ($results['imported'] > 0) {
+            ActivityLog::record('import', 'Data Karyawan', 'Import Excel', "Import karyawan: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
+        }
+
         return redirect()->back()->with('import_result', $results);
     }
 
@@ -387,6 +392,10 @@ class EmployeeImportController extends Controller
             } catch (\Exception $e) {
                 $results['errors'][] = "Baris {$rowNum}: " . self::friendlyError($e, $nama);
             }
+        }
+
+        if ($results['imported'] > 0) {
+            ActivityLog::record('import', 'Data Karyawan', 'Import Excel (HO)', "Import karyawan HO: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
         }
 
         return redirect()->back()->with('import_result', $results);

@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\ProjectPotonganItem;
 use Illuminate\Http\Request;
 
@@ -28,6 +29,7 @@ class PotonganConfigController extends Controller
         ]);
 
         $item->update($data);
+        ActivityLog::record('update', 'Konfigurasi Potongan', $item->label, "Update item potongan: {$item->label}");
         return response()->json(['ok' => true]);
     }
 
@@ -57,6 +59,8 @@ class PotonganConfigController extends Controller
             'is_default' => false,
         ]);
 
+        ActivityLog::record('create', 'Konfigurasi Potongan', $item->label, "Tambah item potongan: {$item->label}");
+
         return response()->json(['ok' => true, 'item' => $item]);
     }
 
@@ -67,7 +71,9 @@ class PotonganConfigController extends Controller
         if ($item->is_default) {
             return response()->json(['ok' => false, 'message' => 'Item default tidak bisa dihapus'], 422);
         }
+        $label = $item->label;
         $item->delete();
+        ActivityLog::record('delete', 'Konfigurasi Potongan', $label, "Hapus item potongan: {$label}");
         return response()->json(['ok' => true]);
     }
 
@@ -84,6 +90,8 @@ class PotonganConfigController extends Controller
         foreach ($request->ids as $urutan => $id) {
             ProjectPotonganItem::where('id', $id)->update(['urutan' => $urutan + 1]);
         }
+
+        ActivityLog::record('update', 'Konfigurasi Potongan', 'Urutan Item', 'Ubah urutan item potongan');
 
         return response()->json(['ok' => true]);
     }

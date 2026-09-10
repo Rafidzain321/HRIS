@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
+use App\Models\Employee;
 use App\Models\TimesheetMember;
 use Illuminate\Http\Request;
 
@@ -65,6 +67,9 @@ class TimesheetMemberController extends Controller
             'aktif'         => true,
         ]);
 
+        $nama = Employee::where('id_badge', $request->id_badge)->value('nama_lengkap') ?? $request->id_badge;
+        ActivityLog::record('create', 'Timesheet', $nama, "Tambah anggota timesheet: {$nama} ({$request->id_badge})");
+
         return back()->with('success', 'Anggota berhasil ditambahkan.');
     }
 
@@ -121,6 +126,10 @@ class TimesheetMemberController extends Controller
             $msg .= " ({$skipped} dilewati karena sudah ada)";
         }
 
+        if ($inserted > 0) {
+            ActivityLog::record('create', 'Timesheet', 'Tambah Massal', "{$inserted} anggota ditambahkan ke timesheet ({$skipped} dilewati)");
+        }
+
         return redirect()->route('timesheet')->with('success', $msg);
     }
 
@@ -137,12 +146,19 @@ class TimesheetMemberController extends Controller
 
         $member->update($request->only(['nama_override', 'urutan', 'aktif', 'tipe', 'sub_group', 'kelompok']));
 
+        $nama = $member->nama_override ?? $member->employee?->nama_lengkap ?? $member->id_badge;
+        ActivityLog::record('update', 'Timesheet', $nama, "Update anggota timesheet: {$nama}");
+
         return back()->with('success', 'Data diperbarui.');
     }
 
     public function destroy(TimesheetMember $member)
     {
+        $nama = $member->nama_override ?? $member->employee?->nama_lengkap ?? $member->id_badge;
         $member->delete();
+
+        ActivityLog::record('delete', 'Timesheet', $nama, "Hapus anggota timesheet: {$nama}");
+
         return back()->with('success', 'Anggota dihapus dari daftar timesheet.');
     }
 
@@ -157,6 +173,8 @@ class TimesheetMemberController extends Controller
         foreach ($request->input('members') as $row) {
             TimesheetMember::where('id', $row['id'])->update(['urutan' => $row['urutan']]);
         }
+
+        ActivityLog::record('update', 'Timesheet', 'Urutan Anggota', 'Ubah urutan anggota timesheet');
 
         return response()->json(['success' => true]);
     }
@@ -219,6 +237,10 @@ class TimesheetMemberController extends Controller
                 ]);
                 $count++;
             }
+        }
+
+        if ($count > 0) {
+            ActivityLog::record('import', 'Timesheet', 'Import Default', "{$count} anggota default diimport ke timesheet");
         }
 
         return back()->with('success', "{$count} anggota berhasil diimport.");

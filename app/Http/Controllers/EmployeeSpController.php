@@ -1,6 +1,8 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
+use App\Models\Employee;
 use App\Models\EmployeeSp;
 use App\Models\EmployeeTerminationLog;
 use Illuminate\Http\Request;
@@ -28,12 +30,20 @@ class EmployeeSpController extends Controller
             'dibuat_oleh' => auth()->user()->name ?? 'System',
         ]);
 
+        $nama = Employee::find($request->employee_id)?->nama_lengkap ?? '-';
+        ActivityLog::record('create', 'SP/Disiplin', $nama, "Catat {$request->tipe_sp}: {$request->alasan}");
+
         return back()->with('success', "{$request->tipe_sp} berhasil dicatat.");
     }
 
     public function destroySp(EmployeeSp $sp)
     {
+        $nama = $sp->employee?->nama_lengkap ?? '-';
+        $tipe = $sp->tipe_sp;
         $sp->delete();
+
+        ActivityLog::record('delete', 'SP/Disiplin', $nama, "Hapus catatan {$tipe}");
+
         return back()->with('success', 'Catatan SP dihapus.');
     }
 

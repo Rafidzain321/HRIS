@@ -46,7 +46,7 @@ function LevelPill({ level }) {
   );
 }
 
-function NotifTable({ items, emptyMsg, isPensiun }) {
+function NotifTable({ items, emptyMsg, isPensiun, hideBadge }) {
   if (!items || items.length === 0) {
     return (
       <div style={{padding:'48px 16px',textAlign:'center',color:'var(--muted)',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
@@ -58,7 +58,7 @@ function NotifTable({ items, emptyMsg, isPensiun }) {
   const warnings = items.filter(i => i.level === 'warning');
   const expireds = items.filter(i => i.level === 'expired');
 
-  const colSpanTotal = isPensiun ? 10 : 8;
+  const colSpanTotal = (isPensiun ? 10 : 8) - (hideBadge ? 1 : 0);
 
   const RowItem = ({ item, i, prefix }) => (
     <tr key={`${prefix}-${i}`}
@@ -66,7 +66,7 @@ function NotifTable({ items, emptyMsg, isPensiun }) {
       onMouseEnter={ev=>Array.from(ev.currentTarget.cells).forEach(c=>c.style.background=prefix==='e'?'rgba(224,69,69,.07)':'rgba(232,160,32,.04)')}
       onMouseLeave={ev=>Array.from(ev.currentTarget.cells).forEach(c=>c.style.background='')}>
       <td style={{fontWeight:500,paddingLeft:16}}>{item.nama}</td>
-      <td style={{fontFamily:'monospace',fontSize:11.5,color:'var(--accent)'}}>{item.badge}</td>
+      {!hideBadge && <td style={{fontFamily:'monospace',fontSize:11.5,color:'var(--accent)'}}>{item.badge}</td>}
       <td style={{fontSize:12,color:'var(--muted2)'}}>{item.jabatan}</td>
       <td>
         <span style={{
@@ -125,7 +125,7 @@ function NotifTable({ items, emptyMsg, isPensiun }) {
         <thead>
           <tr>
             <th style={{paddingLeft:16}}>Nama</th>
-            <th>Badge</th>
+            {!hideBadge && <th>Badge</th>}
             <th>Jabatan</th>
             <th>Dokumen</th>
             {isPensiun && <th style={{textAlign:'center'}}>Tgl Lahir</th>}
@@ -246,6 +246,7 @@ export default function NotificationsPage({ tabs = {}, summary = {}, project_inf
           items={tabs[activeTab] || []}
           emptyMsg={`Tidak ada notifikasi untuk ${TAB_CONFIG.find(t=>t.key===activeTab)?.label}`}
           isPensiun={activeTab === 'pensiun'}
+          hideBadge={isHo}
         />
       </div>
 

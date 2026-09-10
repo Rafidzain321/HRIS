@@ -897,6 +897,9 @@ class PayrollController extends Controller
             ['nominal' => $data['nominal'] ?? 0, 'urutan' => $urutan]
         );
 
+        $nama = Employee::find($employeeId)?->nama_lengkap ?? '-';
+        ActivityLog::record('update', 'Riwayat Gaji', $nama, "Update riwayat gaji \"{$data['label']}\" = " . ($data['nominal'] ?? 0));
+
         return response()->json(['ok' => true]);
     }
 

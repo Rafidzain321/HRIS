@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\Ppe;
 use Illuminate\Http\Request;
@@ -84,6 +85,7 @@ class PpeController extends Controller
             'catatan'         => 'nullable|string|max:500',
         ]);
         Ppe::updateOrCreate(['employee_id' => $employee->id], $data);
+        ActivityLog::record('update', 'PPE', $employee->nama_lengkap, "Update PPE: {$employee->nama_lengkap}");
         return back()->with('success', "PPE {$employee->nama_lengkap} berhasil diperbarui.");
     }
 

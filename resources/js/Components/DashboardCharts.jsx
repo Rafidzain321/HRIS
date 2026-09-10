@@ -87,9 +87,9 @@ export function KaryawanPerProjectChart({ data = [] }) {
     );
 }
 
-export function LengthOfServiceChart({ data = [] }) {
+export function LengthOfServiceChart({ data = [], height = 300 }) {
     return (
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={height}>
             <BarChart data={data} margin={{ top: 10, right: 16, left: -12, bottom: 5 }} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
                 <XAxis
@@ -117,13 +117,14 @@ export function LengthOfServiceChart({ data = [] }) {
     );
 }
 
-export function PengeluaranGajiChart({ data = [], projectKeys = [], isMultiProject = false }) {
+export function PengeluaranGajiChart({ data = [], projectKeys = [], isMultiProject = false, height }) {
     // Single project mode → 1 bar warna kuning per bulan (dataKey="total")
     // Multi project mode → stacked bar per project (dataKey=nama project)
     const stackMode = isMultiProject && projectKeys.length > 1;
+    const resolvedHeight = height ?? (stackMode ? 320 : 280);
 
     return (
-        <ResponsiveContainer width="100%" height={stackMode ? 320 : 280}>
+        <ResponsiveContainer width="100%" height={resolvedHeight}>
             <BarChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
                 <XAxis

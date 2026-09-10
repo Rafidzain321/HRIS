@@ -417,12 +417,9 @@ export default function SlipGaji({
 
   function navigate(t,b,empId){ router.get('/timesheet/slip-gaji',{tahun:t,bulan:b,employee_id:empId||''},{preserveState:false}); }
 
-  // Persentase BPJS & TTD sudah dihitung backend sesuai konfigurasi project (lihat PayrollController::getSlipData) —
-  // tidak perlu dihitung ulang di sini, supaya layar/PDF/Excel selalu sama dengan yang tersimpan.
   const slipFinal = slip;
   const bpjsPct = { jht: slip?.pct_jht ?? 2, pensiun: slip?.pct_pensiun ?? 1, kes: slip?.pct_kes ?? 1 };
 
-  // TTD — 2 slot dari konfigurasi project + kolom "Diterima Oleh" otomatis untuk karyawan yang dilihat.
   const ttdDisplay = [
     ...(slip?.ttd_list?.length ? slip.ttd_list : [
       {label:'Disetujui Oleh,',name:'H. Syahrul Akmal',jabatan:'Direktur Utama'},
@@ -497,10 +494,12 @@ export default function SlipGaji({
 
       {slipFinal && (<>
         <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
-          <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12.5,color:'var(--muted2)',fontFamily:"'Outfit',sans-serif",padding:'7px 14px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',userSelect:'none'}}>
-            <input type="checkbox" checked={showRincianJam} onChange={e=>setShowRincianJam(e.target.checked)} style={{cursor:'pointer',accentColor:'#E8A020',width:14,height:14}}/>
-            Rincian Jam
-          </label>
+          {slipFinal.tipe_project!=='ho' && (
+            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12.5,color:'var(--muted2)',fontFamily:"'Outfit',sans-serif",padding:'7px 14px',borderRadius:8,border:'1px solid var(--border)',background:'var(--card)',userSelect:'none'}}>
+              <input type="checkbox" checked={showRincianJam} onChange={e=>setShowRincianJam(e.target.checked)} style={{cursor:'pointer',accentColor:'#E8A020',width:14,height:14}}/>
+              Rincian Jam
+            </label>
+          )}
           <div style={{flex:1}}/>
           <button onClick={handleExcel} style={{padding:'8px 20px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Export Excel</button>
           <button onClick={handleDownloadPdf} disabled={loadingPdf} style={{padding:'8px 20px',borderRadius:8,border:'none',background:loadingPdf?'#666':'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loadingPdf?'wait':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loadingPdf?0.7:1}}>

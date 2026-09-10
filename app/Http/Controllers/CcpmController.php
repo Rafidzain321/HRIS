@@ -98,14 +98,7 @@ class CcpmController extends Controller
         $data['project_id'] = $this->activeProjectId() ?? auth()->user()->project_id;
 
         $ccpm = CcpmManpower::create($data);
-        ActivityLog::create([
-            'user_id'     => auth()->id(),
-            'action'      => 'create',
-            'module'      => 'CCPM',
-            'target_name' => $ccpm->name,
-            'description' => "Tambah manpower CCPM: {$ccpm->name}",
-            'ip_address'  => request()->ip(),
-        ]);
+        ActivityLog::record('create', 'CCPM', $ccpm->name, "Tambah manpower CCPM: {$ccpm->name}");
         return redirect()->route('ccpm')->with('success', "Manpower {$data['name']} berhasil ditambahkan.");
     }
 
@@ -131,14 +124,7 @@ class CcpmController extends Controller
         ]);
 
         $ccpm->update($data);
-        ActivityLog::create([
-            'user_id'     => auth()->id(),
-            'action'      => 'update',
-            'module'      => 'CCPM',
-            'target_name' => $ccpm->name,
-            'description' => "Edit manpower CCPM: {$ccpm->name}",
-            'ip_address'  => request()->ip(),
-        ]);
+        ActivityLog::record('update', 'CCPM', $ccpm->name, "Edit manpower CCPM: {$ccpm->name}");
         return redirect()->route('ccpm')->with('success', "Data {$ccpm->name} berhasil diperbarui.");
     }
 
@@ -150,14 +136,7 @@ class CcpmController extends Controller
 
         $nama = $ccpm->name;
         $ccpm->delete();
-        ActivityLog::create([
-            'user_id'     => auth()->id(),
-            'action'      => 'delete',
-            'module'      => 'CCPM',
-            'target_name' => $nama,
-            'description' => "Hapus manpower CCPM: {$nama}",
-            'ip_address'  => request()->ip(),
-        ]);
+        ActivityLog::record('delete', 'CCPM', $nama, "Hapus manpower CCPM: {$nama}");
         return redirect()->route('ccpm')->with('success', "$nama berhasil dihapus.");
     }
 }

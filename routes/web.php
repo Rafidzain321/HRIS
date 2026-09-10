@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeKpiController;
 use App\Http\Controllers\EmployeeLeaveController;
+use App\Http\Controllers\EmployeeAttendanceController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\EmployeeTransferController;
 use App\Http\Controllers\McuController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\TttConfigController;
 use App\Http\Controllers\PotonganConfigController;
 use App\Http\Controllers\BpjsConfigController;
 use App\Http\Controllers\TtdConfigController;
+use App\Http\Controllers\Pph21TerConfigController;
 use App\Http\Controllers\OvertimeCustomController;
 
 Route::middleware(['auth'])->group(function () {
@@ -93,7 +95,7 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/sim/{employee}', [SimController::class, 'update'])->middleware('menu:sim,edit')->name('sim.update');
     });
 
-    Route::get('/notifications/data', [NotificationController::class, 'data'])->middleware('menu:notifications,view')->name('notifications.data');
+    Route::get('/notifications/data', [NotificationController::class, 'data'])->name('notifications.data');
 
     Route::get('/ccpm', [CcpmController::class, 'index'])->middleware('menu:ccpm,view')->name('ccpm');
     Route::post('/ccpm', [CcpmController::class, 'store'])->middleware('menu:ccpm,edit')->name('ccpm.store');
@@ -177,16 +179,13 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pengaturan/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::put('/pengaturan/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::post('/pengaturan/projects/{project}/toggle', [ProjectController::class, 'toggleActive'])->name('projects.toggle');
+    Route::delete('/pengaturan/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
 
     Route::get('/training', [TrainingController::class, 'index'])->middleware('menu:training,view')->name('training');
 
     // ── KPI (khusus karyawan Head Office) ──────────────────
     Route::get('/kpi', [EmployeeKpiController::class, 'index'])->middleware('menu:kpi,view')->name('kpi');
     Route::get('/kpi/summary', [EmployeeKpiController::class, 'summary'])->middleware('menu:kpi,view')->name('kpi.summary');
-    // Gerbang route cuma "view" (harus bisa buka menu KPI) — pengecekan detail "boleh edit
-    // goal siapa" (HR semua orang, akun self-input cuma dirinya + tim langsungnya) ditangani di
-    // controller lewat canEditKpiFor(), supaya akun self-input (cuma punya izin view-kpi) tetap
-    // bisa lewat.
     Route::get('/kpi/goals/create', [EmployeeKpiController::class, 'create'])->middleware('menu:kpi,view')->name('kpi.goals.create');
     Route::get('/kpi/goals/{goal}/edit', [EmployeeKpiController::class, 'edit'])->middleware('menu:kpi,view')->name('kpi.goals.edit');
     Route::post('/kpi/goals', [EmployeeKpiController::class, 'storeGoal'])->middleware('menu:kpi,view')->name('kpi.goals.store');
@@ -198,6 +197,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/cuti', [EmployeeLeaveController::class, 'index'])->middleware('menu:cuti,view')->name('cuti');
     Route::post('/cuti', [EmployeeLeaveController::class, 'store'])->middleware('menu:cuti,edit')->name('cuti.store');
     Route::delete('/cuti/{leave}', [EmployeeLeaveController::class, 'destroy'])->middleware('menu:cuti,edit')->name('cuti.destroy');
+
+    // ── Kehadiran (rekap bulanan, khusus Head Office, HR yang input) ──
+    Route::get('/kehadiran', [EmployeeAttendanceController::class, 'index'])->middleware('menu:kehadiran,view')->name('kehadiran');
+    Route::post('/kehadiran', [EmployeeAttendanceController::class, 'store'])->middleware('menu:kehadiran,edit')->name('kehadiran.store');
+    Route::get('/kehadiran/semester', [EmployeeAttendanceController::class, 'semester'])->middleware('menu:kehadiran,view')->name('kehadiran.semester');
 
     Route::get('/employees/{employee}/trainings', [TrainingController::class, 'forEmployee'])->middleware('menu:training,view');
     Route::post('/employees/{employee}/trainings', [TrainingController::class, 'store'])->middleware('menu:training,edit');
@@ -242,6 +246,11 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/ttd-config', [TtdConfigController::class, 'store'])->middleware('menu:data-gaji,edit');
     Route::delete('/ttd-config/{item}', [TtdConfigController::class, 'destroy'])->middleware('menu:data-gaji,edit');
 
+    Route::get('/pph21-ter-config', [Pph21TerConfigController::class, 'index'])->middleware('menu:data-gaji,view')->name('pph21-ter-config');
+    Route::post('/pph21-ter-config', [Pph21TerConfigController::class, 'store'])->middleware('menu:data-gaji,edit');
+    Route::put('/pph21-ter-config/{bracket}', [Pph21TerConfigController::class, 'update'])->middleware('menu:data-gaji,edit');
+    Route::delete('/pph21-ter-config/{bracket}', [Pph21TerConfigController::class, 'destroy'])->middleware('menu:data-gaji,edit');
+
     Route::middleware(['payroll.access'])->group(function () {
         Route::get('/slip-gaji/{payrollId}/print', [SlipGajiExportController::class, 'print'])->middleware('menu:slip-gaji,view');
         Route::get('/slip-gaji/{payrollId}/export-excel', [SlipGajiExportController::class, 'exportExcel'])->middleware('menu:slip-gaji,view');
@@ -267,23 +276,26 @@ Route::middleware(['auth'])->group(function () {
 
         $refPath = parse_url($request->headers->get('referer') ?? '', PHP_URL_PATH) ?? '';
 
-        // Kalau halaman yang sedang dibuka terikat ke satu karyawan spesifik (form Edit,
-        // form Tambah, atau halaman detail karyawan), jangan kembali ke situ setelah pindah
-        // project — karyawan itu belum tentu ada di project yang baru dipilih. Berlaku untuk
-        // pindah ke project manapun, bukan cuma HO. Arahkan ke daftar Data Karyawan saja.
         if (preg_match('#^/employees/(create|\d+(/edit)?)$#', $refPath)) {
             return redirect('/employees');
         }
 
-        // Kalau pindah ke HO dan halaman yang sedang dibuka adalah menu yang memang
-        // tidak ada untuk HO (CCPM, Driver, Equipment, dll — lihat HO_HIDDEN_KEYS di
-        // AppLayout.jsx), jangan kembali ke halaman itu (datanya pasti kosong dan
-        // menunya sendiri sudah hilang dari sidebar) — arahkan ke Dashboard saja.
         if ($proj && strtoupper($proj->kode) === 'HO') {
             $hoHiddenPrefixes = ['/compliance/sim', '/compliance/mcu', '/compliance/badge', '/compliance/ppe', '/ccpm', '/driver', '/equipment', '/training'];
             $isHidden = collect($hoHiddenPrefixes)->contains(fn ($p) => str_starts_with($refPath, $p))
                 || (str_starts_with($refPath, '/timesheet') && !str_starts_with($refPath, '/timesheet/slip-gaji') && !str_starts_with($refPath, '/timesheet/data-gaji'));
             if ($isHidden) {
+                return redirect('/');
+            }
+        }
+
+        // Kebalikannya: pindah KELUAR dari HO ke project lapangan, sedangkan halaman yang
+        // sedang dibuka adalah menu khusus HO (KPI, Cuti Tahunan, Kehadiran — lihat
+        // NON_HO_HIDDEN_KEYS di AppLayout.jsx). Tanpa ini, halaman itu "nyangkut" tetap
+        // menampilkan data HO walau project aktif sudah pindah — arahkan ke Dashboard saja.
+        if ($proj && strtoupper($proj->kode) !== 'HO') {
+            $nonHoHiddenPrefixes = ['/kpi', '/cuti', '/kehadiran'];
+            if (collect($nonHoHiddenPrefixes)->contains(fn ($p) => str_starts_with($refPath, $p))) {
                 return redirect('/');
             }
         }

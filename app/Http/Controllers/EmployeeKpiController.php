@@ -26,6 +26,14 @@ class EmployeeKpiController extends Controller
         return Employee::where('id', $employeeId)->where('atasan_id', $user->employee_id)->exists();
     }
 
+    // Reviewer yang ditugaskan bebas (lihat kolom reviewer_id) boleh mengisi progress goal itu,
+    // di luar aturan atasan-bawahan biasa — dipakai khusus updateProgress().
+    private function isReviewerOf(EmployeeGoal $goal): bool
+    {
+        $user = auth()->user();
+        return $user && $user->employee_id && $goal->reviewer_id && (int) $user->employee_id === (int) $goal->reviewer_id;
+    }
+
     // Null = lihat semua (HR/super-admin, atau GM & Direktur lewat permission "view-all-kpi" —
     // khusus lihat, BUKAN boleh edit KPI orang lain, itu tetap cuma HR lewat canEditKpiFor()).
     // Selain itu, dikembalikan daftar ID: diri sendiri + seluruh bawahan langsung — dipakai buat
@@ -40,7 +48,12 @@ class EmployeeKpiController extends Controller
         if (!$user->employee_id) return [];
 
         $bawahanIds = Employee::where('atasan_id', $user->employee_id)->pluck('id')->toArray();
-        return [(int) $user->employee_id, ...$bawahanIds];
+        // Ditugaskan sebagai reviewer goal orang lain — orang itu ikut masuk cakupan supaya
+        // goal yang mau direview kelihatan, walau bukan bawahan langsung.
+        $reviewOwnerIds = EmployeeGoal::where('reviewer_id', $user->employee_id)->where('aktif', true)
+            ->pluck('employee_id')->toArray();
+
+        return array_values(array_unique([(int) $user->employee_id, ...$bawahanIds, ...$reviewOwnerIds]));
     }
 
     // Daftar karyawan yang boleh dilihat/dikelola user saat ini, termasuk atasan_id — dipakai
@@ -66,11 +79,33 @@ class EmployeeKpiController extends Controller
         return [$employees, $scopedIds !== null];
     }
 
+    // Daftar penuh karyawan HO (tanpa dibatasi cakupan atasan-bawahan) — dipakai khusus buat
+    // pemilihan "Reviewer / penanggung jawab update progress", supaya penugasannya bebas tidak
+    // kaku ke struktur hierarki (misal manajer boleh menunjuk HR atau manajer lain sebagai reviewer).
+    private function allEmployeesPayload()
+    {
+        $hoProjectId = Project::where('kode', 'ho')->value('id');
+
+        return Employee::aktif()
+            ->where('project_id', $hoProjectId)
+            ->with('position')
+            ->orderBy('nama_lengkap')
+            ->get(['id', 'nama_lengkap', 'position_id', 'atasan_id'])
+            ->map(fn ($e) => [
+                'id'           => $e->id,
+                'nama_lengkap' => $e->nama_lengkap,
+                'jabatan'      => $e->position?->nama_jabatan ?? '-',
+                'atasan_id'    => $e->atasan_id,
+            ]);
+    }
+
     private function serializeGoal(EmployeeGoal $g): array
     {
         return [
             'id'                => $g->id,
             'employee_id'       => $g->employee_id,
+            'reviewer_id'       => $g->reviewer_id,
+            'reviewer_nama'     => $g->reviewer?->nama_lengkap,
             'nama_goal'         => $g->nama_goal,
             'deskripsi'         => $g->deskripsi,
             'siklus'            => $g->siklus,
@@ -116,6 +151,7 @@ class EmployeeKpiController extends Controller
             'mode'         => 'add',
             'goal'         => null,
             'employees'    => $employees,
+            'all_employees'=> $this->allEmployeesPayload(),
             'is_self_only' => $isSelfOnly,
             'default_employee_id' => $request->get('employee_id'),
         ]);
@@ -134,6 +170,7 @@ class EmployeeKpiController extends Controller
             'mode'         => 'edit',
             'goal'         => $this->serializeGoal($goal),
             'employees'    => $employees,
+            'all_employees'=> $this->allEmployeesPayload(),
             'is_self_only' => $isSelfOnly,
         ]);
     }
@@ -142,6 +179,7 @@ class EmployeeKpiController extends Controller
     {
         $data = $request->validate([
             'employee_id'      => 'required|exists:employees,id',
+            'reviewer_id'      => 'nullable|exists:employees,id',
             'nama_goal'        => 'required|string|max:255',
             'deskripsi'        => 'nullable|string|max:1000',
             'siklus'           => 'required|in:custom,monthly,half_yearly,yearly',
@@ -176,6 +214,7 @@ class EmployeeKpiController extends Controller
         }
 
         $data = $request->validate([
+            'reviewer_id'      => 'nullable|exists:employees,id',
             'nama_goal'        => 'required|string|max:255',
             'deskripsi'        => 'nullable|string|max:1000',
             'siklus'           => 'required|in:custom,monthly,half_yearly,yearly',
@@ -198,12 +237,12 @@ class EmployeeKpiController extends Controller
     // tanpa perlu buka form edit lengkap.
     public function updateProgress(Request $request, EmployeeGoal $goal)
     {
-        if (!$this->canEditKpiFor($goal->employee_id)) {
+        if (!$this->canEditKpiFor($goal->employee_id) && !$this->isReviewerOf($goal)) {
             return response()->json(['ok' => false, 'message' => 'Kamu tidak memiliki akses untuk mengisi progress goal ini.'], 403);
         }
 
         $data = $request->validate([
-            'progress_sekarang' => 'required|numeric',
+            'progress_sekarang' => 'required|numeric|min:0',
             'catatan'           => 'nullable|string|max:1000',
         ]);
 
@@ -212,6 +251,8 @@ class EmployeeKpiController extends Controller
             'catatan'           => $data['catatan'] ?? $goal->catatan,
             'diperbarui_oleh'   => auth()->user()?->name,
         ]);
+
+        ActivityLog::record('update', 'KPI', $goal->employee->nama_lengkap ?? '-', "Update progress goal: {$goal->nama_goal} -> {$data['progress_sekarang']}");
 
         return response()->json(['ok' => true, 'goal' => $this->serializeGoal($goal->fresh())]);
     }
@@ -222,7 +263,11 @@ class EmployeeKpiController extends Controller
             return response()->json(['ok' => false, 'message' => 'Kamu tidak memiliki akses untuk menghapus goal ini.'], 403);
         }
 
+        $namaGoal = $goal->nama_goal;
+        $namaEmployee = $goal->employee->nama_lengkap ?? '-';
         $goal->delete();
+
+        ActivityLog::record('delete', 'KPI', $namaEmployee, "Hapus goal: {$namaGoal}");
 
         return response()->json(['ok' => true]);
     }

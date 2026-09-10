@@ -1,10 +1,3 @@
-// resources/js/Pages/Timesheet/subGroupOptions.js
-// Pilihan sub-group per project — dipakai bersama oleh Timesheet/Index.jsx dan Timesheet/DataGaji.jsx
-// supaya nama grup & urutan tab selalu sinkron di kedua halaman.
-//
-// `icon` = komponen lucide-react, dipakai di tempat yang bisa merender JSX (tab, badge, dsb).
-// `emoji` = tetap disediakan sebagai fallback teks polos, khusus untuk konteks yang benar-benar
-// tidak bisa merender komponen React seperti isi <option> pada dropdown HTML native.
 import { Construction, Hammer, Briefcase, Wrench, Building2, Tag } from 'lucide-react';
 
 export const SUB_GROUP_OPTIONS = {

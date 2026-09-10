@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\DriverDetail;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -115,7 +116,8 @@ class DriverController extends Controller
         // ── Set project_id otomatis ──
         $data['project_id'] = $this->activeProjectId() ?? auth()->user()->project_id;
 
-        DriverDetail::create($data);
+        $driver = DriverDetail::create($data);
+        ActivityLog::record('create', 'Driver', $driver->name, "Tambah driver: {$driver->name}");
         return redirect()->route('driver')->with('success', "Driver {$data['name']} berhasil ditambahkan.");
     }
 
@@ -143,6 +145,7 @@ class DriverController extends Controller
 
         $data = $this->castStringFields($data);
         $driver->update($data);
+        ActivityLog::record('update', 'Driver', $driver->name, "Update data driver: {$driver->name}");
         return redirect()->route('driver')->with('success', "Data {$driver->name} diperbarui.");
     }
 
@@ -154,6 +157,7 @@ class DriverController extends Controller
 
         $nama = $driver->name;
         $driver->delete();
+        ActivityLog::record('delete', 'Driver', $nama, "Hapus driver: {$nama}");
         return redirect()->route('driver')->with('success', "$nama dihapus.");
     }
 }

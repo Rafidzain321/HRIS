@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\ProjectTttItem;
 use Illuminate\Http\Request;
 
@@ -56,6 +57,7 @@ class TttConfigController extends Controller
         ]);
 
         $item->update($data);
+        ActivityLog::record('update', 'Konfigurasi TTT', $item->label, "Update item TTT: {$item->label}");
         return response()->json(['ok' => true]);
     }
 
@@ -85,6 +87,8 @@ class TttConfigController extends Controller
             'is_default' => false,
         ]);
 
+        ActivityLog::record('create', 'Konfigurasi TTT', $item->label, "Tambah item TTT: {$item->label}");
+
         return response()->json(['ok' => true, 'item' => $item]);
     }
 
@@ -95,7 +99,9 @@ class TttConfigController extends Controller
         if ($item->is_default) {
             return response()->json(['ok' => false, 'message' => 'Item default tidak bisa dihapus'], 422);
         }
+        $label = $item->label;
         $item->delete();
+        ActivityLog::record('delete', 'Konfigurasi TTT', $label, "Hapus item TTT: {$label}");
         return response()->json(['ok' => true]);
     }
 
@@ -112,6 +118,8 @@ class TttConfigController extends Controller
         foreach ($request->ids as $urutan => $id) {
             ProjectTttItem::where('id', $id)->update(['urutan' => $urutan + 1]);
         }
+
+        ActivityLog::record('update', 'Konfigurasi TTT', 'Urutan Item', 'Ubah urutan item TTT');
 
         return response()->json(['ok' => true]);
     }

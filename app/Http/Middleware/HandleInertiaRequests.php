@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Employee;
+use App\Models\EmployeeGoal;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -54,7 +56,29 @@ class HandleInertiaRequests extends Middleware
             }
         }
 
+        // Badge "pending review" KPI di sidebar — gabungan dari 2 sumber, keduanya cuma yang
+        // progress-nya belum pernah diisi sama sekali (masih = baseline):
+        //  1) goal yang menunjuk user ini sebagai reviewer yang ditugaskan bebas (reviewer_id)
+        //  2) goal milik bawahan langsungnya (atasan_id) — supaya manajer otomatis tahu ada
+        //     goal timnya yang belum diupdate, walau tidak ada penugasan reviewer eksplisit.
+        // Khusus akun self-input (bukan HR/super-admin/GM-Direktur — mereka sudah punya
+        // tab Dashboard KPI buat pantauan menyeluruh, badge personal begini kurang relevan).
+        $kpiPendingReview = 0;
+        if ($user && $user->employee_id && !$user->hasRole('super-admin') && !$user->can('edit-kpi') && !$user->can('view-all-kpi')) {
+            $bawahanIds = Employee::where('atasan_id', $user->employee_id)->pluck('id')->toArray();
+            $kpiPendingReview = EmployeeGoal::where('aktif', true)
+                ->whereColumn('progress_sekarang', 'baseline')
+                ->where(function ($q) use ($user, $bawahanIds) {
+                    $q->where('reviewer_id', $user->employee_id);
+                    if (!empty($bawahanIds)) {
+                        $q->orWhereIn('employee_id', $bawahanIds);
+                    }
+                })
+                ->count();
+        }
+
         return array_merge(parent::share($request), [
+            'kpi_pending_review' => $kpiPendingReview,
             'auth' => [
                 'user' => $user ? [
                     'id' => $user->id,

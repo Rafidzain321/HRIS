@@ -1,6 +1,8 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
+use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\OvertimeCustom;
 use App\Models\Timesheet;
@@ -113,6 +115,9 @@ class OvertimeCustomController extends Controller
                 'jumlah_hari'    => $request->jumlah_hari ?? 0,
             ]
         );
+
+        $nama = Employee::find($employeeId)?->nama_lengkap ?? '-';
+        ActivityLog::record('update', 'Lembur Custom', $nama, "Set tarif lembur {$request->kategori} {$request->bulan}/{$request->tahun}: {$request->tarif_per_hari}/hari");
 
         return response()->json(['ok' => true]);
     }

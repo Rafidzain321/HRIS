@@ -2383,7 +2383,7 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
   ];
 
   return (
-    <AppLayout title="Timesheet" subtitle="Data Gaji">
+    <AppLayout title={isHoProject ? 'Data Gaji' : 'Timesheet'} subtitle={isHoProject ? 'Head Office' : 'Data Gaji'}>
       {showTttModal && <TttConfigModal items={tttItems} onSave={handleSaveTtt} onClose={()=>setShowTttModal(false)}/>}
       {showBpjsTtdModal && <BpjsTtdConfigModal onSaved={()=>router.reload({only:['bpjs_pct','ttd_list']})} onClose={()=>setShowBpjsTtdModal(false)}/>}
 
@@ -2463,6 +2463,12 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
                 <span style={{fontSize:10,background:'rgba(232,160,32,.15)',color:'var(--accent)',padding:'1px 6px',borderRadius:99,fontWeight:700}}>
                   JHT {bpjsPct.jht}% P {bpjsPct.pensiun}% Kes {bpjsPct.kes}%
                 </span>
+              </button>
+              <button onClick={()=>router.visit('/pph21-ter-config')}
+                style={{padding:'5px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--card)',
+                  color:'var(--muted2)',fontSize:11.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
+                  display:'flex',alignItems:'center',gap:5}}>
+                PPh21 (TER)
               </button>
               <span style={{fontSize:10.5,color:'var(--muted)'}}>
                 Sel <span style={{background:'rgba(255,252,200,.6)',padding:'0 4px',borderRadius:3,border:'1px solid #E8C030'}}>kuning</span> = klik untuk edit

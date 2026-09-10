@@ -87,6 +87,7 @@ class PayrollExportController extends Controller
 
         $project   = $projectId ? Project::find($projectId) : null;
         $isMd      = $project?->tipe_gaji === 'md';
+        $isHo      = $project?->tipe_gaji === 'ho';
         $bulanNama = $this->bulanNamaList();
         $namaBulan = $bulanNama[$bulan] ?? '';
         $namaProj  = $project?->nama ?? 'Semua Project';
@@ -543,8 +544,12 @@ class PayrollExportController extends Controller
             ],
         ]);
 
-        // ── Build sheet TIMESHEET (Tahap 3) ──
-        $tsMap = $this->buildTimesheetSheet($wb, $rows, $tahun, $bulan, $namaBulan, $namaProj);
+        // ── Build sheet TIMESHEET (Tahap 3) — HO tidak pakai timesheet sama sekali, jadi
+        // dilewati; kolom Izin/Sakit/Alpa/Cuti di DATA GAJI tetap terisi angka biasa dari
+        // $rows (bukan formula link ke sheet yang tidak ada). ──
+        if (!$isHo) {
+            $tsMap = $this->buildTimesheetSheet($wb, $rows, $tahun, $bulan, $namaBulan, $namaProj);
+        }
 
         // ── Build sheet SLIP GAJI (Tahap 4) — template interaktif dgn dropdown ──
         $this->buildSlipGajiSheet(
@@ -552,21 +557,23 @@ class PayrollExportController extends Controller
         );
 
         // ── Update kolom di DATA GAJI supaya link ke sheet TIMESHEET ──
-        foreach ($rows as $idx => $row) {
-            $r = $startRow + $idx;
-            $badge = $row['id_badge'] ?? null;
-            if (!$badge || !isset($tsMap[$badge])) continue;
-            $ts = $tsMap[$badge];
+        if (!$isHo) {
+            foreach ($rows as $idx => $row) {
+                $r = $startRow + $idx;
+                $badge = $row['id_badge'] ?? null;
+                if (!$badge || !isset($tsMap[$badge])) continue;
+                $ts = $tsMap[$badge];
 
-            $mapCols = [
-                'izin'  => $ts['izin'],
-                'sakit' => $ts['sakit'],
-                'alpa'  => $ts['alpa'],
-                'cuti'  => $ts['cuti'],
-            ];
-            foreach ($mapCols as $key => $tsRef) {
-                if (isset($colLetter[$key])) {
-                    $sheet->setCellValue($colLetter[$key] . $r, "=TIMESHEET!{$tsRef}");
+                $mapCols = [
+                    'izin'  => $ts['izin'],
+                    'sakit' => $ts['sakit'],
+                    'alpa'  => $ts['alpa'],
+                    'cuti'  => $ts['cuti'],
+                ];
+                foreach ($mapCols as $key => $tsRef) {
+                    if (isset($colLetter[$key])) {
+                        $sheet->setCellValue($colLetter[$key] . $r, "=TIMESHEET!{$tsRef}");
+                    }
                 }
             }
         }

@@ -110,6 +110,7 @@ class EquipmentController extends Controller
         $data['project_id'] = $this->activeProjectId() ?? auth()->user()->project_id;
 
         Equipment::create($data);
+        ActivityLog::record('create', 'Equipment', $data['no_unit'], "Tambah unit equipment: {$data['no_unit']}");
         return redirect()->route('equipment')->with('success', "Unit {$data['no_unit']} berhasil ditambahkan.");
     }
 
@@ -149,6 +150,7 @@ class EquipmentController extends Controller
         ]);
 
         $equipment->update($data);
+        ActivityLog::record('update', 'Equipment', $equipment->no_unit, "Update unit equipment: {$equipment->no_unit}");
         return redirect()->route('equipment')->with('success', "Unit {$equipment->no_unit} berhasil diperbarui.");
     }
 
@@ -205,6 +207,8 @@ class EquipmentController extends Controller
         $equipment->operators()->where('is_active', true)->update(['is_active' => false]);
         $equipment->operators()->create(array_merge($data, ['is_active' => true]));
 
+        ActivityLog::record('create', 'Equipment', $data['operator_name'], "Tambah operator {$data['operator_name']} ke unit {$equipment->no_unit}");
+
         return redirect()->route('equipment')->with('success', "Operator {$data['operator_name']} berhasil ditambahkan ke unit {$equipment->no_unit}.");
     }
 
@@ -237,6 +241,8 @@ class EquipmentController extends Controller
             'is_active'     => true,
         ]);
 
+        ActivityLog::record('update', 'Equipment', $equipment->no_unit, "Ganti operator unit {$equipment->no_unit} ke {$employee->nama_lengkap}");
+
         return redirect()->route('equipment')->with('success',
             "Operator unit {$equipment->no_unit} berhasil diganti ke {$employee->nama_lengkap}."
         );
@@ -266,6 +272,7 @@ class EquipmentController extends Controller
         ]);
 
         $operator->update($data);
+        ActivityLog::record('update', 'Equipment', $operator->operator_name, "Update data operator: {$operator->operator_name}");
         return redirect()->route('equipment')->with('success', "Data operator {$operator->operator_name} berhasil diperbarui.");
     }
 

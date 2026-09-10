@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { usePage, router } from '@inertiajs/react';
 import {
-  CalendarDays, Plus, Trash2, X, TriangleAlert, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown,
+  CalendarDays, ClipboardCheck, Plus, Trash2, X, TriangleAlert, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown,
 } from 'lucide-react';
 
 const card = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12 };
@@ -188,6 +188,7 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
 export default function CutiIndex({ employees = [], leaves = [], holidays = [], tahun, jatah }) {
   const { auth } = usePage().props;
   const canEdit = (auth?.user?.permissions || []).includes('edit-cuti');
+  const canViewKehadiran = (auth?.user?.permissions || []).includes('view-kehadiran');
   const now = new Date();
 
   const [selectedId, setSelectedId] = useState(employees[0]?.id ?? null);
@@ -234,7 +235,18 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
   for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 2; y++) yearOptions.push(y);
 
   return (
-    <AppLayout title="Cuti Tahunan" subtitle="Head Office">
+    <AppLayout title="Cuti & Kehadiran" subtitle="Head Office">
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        <div style={{ padding: '7px 4px', marginRight: 18, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', borderBottom: '2px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
+          <CalendarDays size={13} /> Cuti Tahunan
+        </div>
+        {canViewKehadiran && (
+          <div onClick={() => router.visit('/kehadiran')} style={{ padding: '7px 4px', marginRight: 18, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', borderBottom: '2px solid transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ClipboardCheck size={13} /> Kehadiran
+          </div>
+        )}
+      </div>
+
       {showAdd && <AddLeaveModal employees={employees} defaultEmployeeId={selected?.id} onClose={() => setShowAdd(false)} />}
       <ConfirmModal open={!!confirmDelete} onCancel={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && doDelete(confirmDelete)}

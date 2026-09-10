@@ -920,6 +920,21 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                             style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:p.is_active?'rgba(224,69,69,.1)':'rgba(34,201,122,.1)',color:p.is_active?'#E04545':'#22C97A',border:`1px solid ${p.is_active?'rgba(224,69,69,.2)':'rgba(34,201,122,.2)'}`,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}>
                             {p.is_active?<CircleSlash size={12}/>:<CheckCircle2 size={12}/>}
                           </button>
+                          <button
+                            disabled={p.employees_count>0}
+                            title={p.employees_count>0?`Tidak bisa dihapus — masih ada ${p.employees_count} karyawan di project ini`:'Hapus project'}
+                            onClick={()=>p.employees_count===0&&setConfirmModal({
+                              title: 'Hapus Project',
+                              icon: <Trash2 size={24} color="#E04545"/>,
+                              message: <>Project <b style={{color:'var(--text)'}}>{p.nama}</b> akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.</>,
+                              confirmLabel: <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Trash2 size={14}/>Ya, Hapus</span>,
+                              confirmColor: '#E04545',
+                              confirmBg: 'rgba(224,69,69,.12)',
+                              onConfirm: () => router.delete(`/pengaturan/projects/${p.id}`,{preserveScroll:true}),
+                            })}
+                            style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:p.employees_count>0?'var(--bg3)':'rgba(224,69,69,.1)',color:p.employees_count>0?'var(--muted)':'#E04545',border:`1px solid ${p.employees_count>0?'var(--border)':'rgba(224,69,69,.2)'}`,cursor:p.employees_count>0?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}>
+                            <Trash2 size={12}/>
+                          </button>
                         </div>
                       </td>
                     </tr>

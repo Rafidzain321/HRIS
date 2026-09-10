@@ -66,7 +66,9 @@ class BpjsConfigController extends Controller
             return response()->json(['ok' => false, 'message' => 'Hanya versi terbaru yang bisa dihapus.'], 422);
         }
 
+        $berlakuMulai = $item->berlaku_mulai;
         $item->delete();
+        ActivityLog::record('delete', 'Konfigurasi BPJS', null, "Hapus konfigurasi BPJS mulai {$berlakuMulai}");
         return response()->json(['ok' => true]);
     }
 }

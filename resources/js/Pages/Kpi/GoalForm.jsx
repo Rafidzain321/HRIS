@@ -135,7 +135,7 @@ function buildHierarchy(employees) {
 
 // ── COMBOBOX GOAL OWNER (searchable, tetap tampilkan hierarki atasan-bawahan
 // di dalam daftar dropdown-nya) ─────────────────────────────
-function GoalOwnerField({ employees, hierarchy, value, onChange, disabled }) {
+function GoalOwnerField({ employees, hierarchy, value, onChange, disabled, placeholder = 'Pilih goal owner...', allowClear = false, clearLabel = '— Tidak ada —' }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const selected = employees.find(e => String(e.id) === String(value));
@@ -157,7 +157,7 @@ function GoalOwnerField({ employees, hierarchy, value, onChange, disabled }) {
     <div style={{ position: 'relative' }}>
       <button type="button" onClick={() => setOpen(o => !o)} style={{ ...inp, textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: selected ? 'var(--text)' : 'var(--muted)' }}>
-          {selected ? `${selected.nama_lengkap} — ${selected.jabatan}` : 'Pilih goal owner...'}
+          {selected ? `${selected.nama_lengkap} — ${selected.jabatan}` : placeholder}
         </span>
         <ChevronDown size={14} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
@@ -170,6 +170,12 @@ function GoalOwnerField({ employees, hierarchy, value, onChange, disabled }) {
               <input autoFocus type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
             </div>
             <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {allowClear && !searchLow && (
+                <div onClick={() => { onChange(null); setOpen(false); }}
+                  style={{ padding: '7px 9px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, color: !value ? 'var(--accent)' : 'var(--muted)', fontWeight: !value ? 600 : 500 }}>
+                  {clearLabel}
+                </div>
+              )}
               {list.length === 0 && <div style={{ padding: 10, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>Tidak ditemukan.</div>}
               {list.map(e => {
                 const active = String(e.id) === String(value);
@@ -196,11 +202,13 @@ function GoalOwnerField({ employees, hierarchy, value, onChange, disabled }) {
   );
 }
 
-export default function GoalForm({ mode, goal, employees = [], is_self_only = false, default_employee_id = null }) {
+export default function GoalForm({ mode, goal, employees = [], all_employees = [], is_self_only = false, default_employee_id = null }) {
   const hierarchy = useMemo(() => buildHierarchy(employees), [employees]);
+  const allHierarchy = useMemo(() => buildHierarchy(all_employees), [all_employees]);
 
   const { data, setData, post, put, processing, errors } = useForm({
     employee_id: goal?.employee_id ?? default_employee_id ?? employees[0]?.id ?? '',
+    reviewer_id: goal?.reviewer_id ?? null,
     nama_goal: goal?.nama_goal ?? '',
     deskripsi: goal?.deskripsi ?? '',
     siklus: goal?.siklus ?? 'custom',
@@ -263,6 +271,15 @@ export default function GoalForm({ mode, goal, employees = [], is_self_only = fa
                 selectedEmployee && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Goal owner: <b style={{ color: 'var(--text)' }}>{selectedEmployee.nama_lengkap}</b></div>
               )}
               {errors.employee_id && <div style={{ fontSize: 11.5, color: '#E04545', marginTop: 4 }}>{errors.employee_id}</div>}
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5, display: 'block', fontWeight: 600 }}>Reviewer / Penanggung Jawab Update Progress</label>
+              <GoalOwnerField employees={all_employees} hierarchy={allHierarchy} value={data.reviewer_id}
+                onChange={id => setData('reviewer_id', id)} placeholder="Tidak ditugaskan — pemilik goal update sendiri"
+                allowClear clearLabel="— Tidak ditugaskan (pemilik goal sendiri) —" />
+              <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 5 }}>Bebas ditugaskan ke siapa saja — HR, atasan, atau manajer lain — tidak harus atasan langsung. Orang ini akan boleh mengisi progress goal ini, dan goal-nya muncul sebagai "pending review" di sisi dia sampai diisi.</div>
+              {errors.reviewer_id && <div style={{ fontSize: 11.5, color: '#E04545', marginTop: 4 }}>{errors.reviewer_id}</div>}
             </div>
 
             <div>

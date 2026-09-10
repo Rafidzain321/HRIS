@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\EmployeeGoal;
 use Carbon\Carbon;
 use Inertia\Inertia;
 
@@ -28,6 +29,11 @@ class NotificationController extends Controller
         $today = Carbon::today();
         $in30  = $today->copy()->addDays(30);
         $items = collect();
+
+        // Data compliance (SIM/MCU/Badge/KP) memuat dokumen karyawan lain — cuma untuk role
+        // yang memang diberi akses menu Notifikasi (HR/GM/dst). Item KPI pribadi di bawah
+        // tetap tampil untuk siapa saja terlepas dari izin ini, karena itu to-do milik sendiri.
+        if (auth()->user()?->can('view-notifications')) {
 
         // SIM
         (clone $this->empQuery())
@@ -97,6 +103,38 @@ class NotificationController extends Controller
                 'href'    => '/compliance/badge?filter=' . ($e->exp_kp < $today ? 'expired' : 'warning') . '&tab=kp',
             ]));
 
+        }
+
+        // KPI — goal yang perlu direview / diupdate progress-nya oleh user yang sedang login
+        // (penugasan reviewer eksplisit, atau goal bawahan langsung yang belum diupdate).
+        // Logika sama persis dengan badge sidebar KPI di HandleInertiaRequests.
+        $user = auth()->user();
+        if ($user && $user->employee_id && !$user->hasRole('super-admin') && !$user->can('edit-kpi') && !$user->can('view-all-kpi')) {
+            $bawahanIds = Employee::where('atasan_id', $user->employee_id)->pluck('id')->toArray();
+            EmployeeGoal::with('employee.position')
+                ->where('aktif', true)
+                ->whereColumn('progress_sekarang', 'baseline')
+                ->where(function ($q) use ($user, $bawahanIds) {
+                    $q->where('reviewer_id', $user->employee_id);
+                    if (!empty($bawahanIds)) { $q->orWhereIn('employee_id', $bawahanIds); }
+                })
+                ->limit(20)->get()
+                ->each(function ($g) use ($today, $items) {
+                    $selesai = $g->tanggal_selesai;
+                    $items->push([
+                        'id'      => $g->id,
+                        'type'    => 'kpi',
+                        'level'   => $selesai && $selesai < $today ? 'expired' : 'warning',
+                        'nama'    => $g->employee?->nama_lengkap ?? '-',
+                        'jabatan' => $g->employee?->position?->nama_jabatan ?? '-',
+                        'label'   => 'Goal: ' . $g->nama_goal,
+                        'date'    => $selesai?->format('d M Y'),
+                        'days'    => $selesai ? $today->diffInDays($selesai, false) : 0,
+                        'href'    => '/kpi?open_progress=' . $g->id,
+                    ]);
+                });
+        }
+
         $sorted  = $this->sortItems($items);
         $summary = [
             'total'   => $sorted->count(),
@@ -107,6 +145,7 @@ class NotificationController extends Controller
                 'mcu'   => $sorted->where('type', 'mcu')->count(),
                 'badge' => $sorted->where('type', 'badge')->count(),
                 'kp'    => $sorted->where('type', 'kp')->count(),
+                'kpi'   => $sorted->where('type', 'kpi')->count(),
             ],
         ];
         return response()->json(['items' => $sorted, 'summary' => $summary]);

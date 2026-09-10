@@ -192,14 +192,7 @@ class BulkImportController extends Controller
         }
 
         if ($results['imported'] > 0) {
-            ActivityLog::create([
-                'user_id'     => auth()->id(),
-                'action'      => 'import',
-                'module'      => 'CCPM',
-                'target_name' => "Import Excel",
-                'description' => "Import CCPM: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . " error",
-                'ip_address'  => request()->ip(),
-            ]);
+            ActivityLog::record('import', 'CCPM', 'Import Excel', "Import CCPM: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
         }
         return redirect()->back()->with('import_result', $results);
     }
@@ -281,14 +274,7 @@ class BulkImportController extends Controller
         }
 
         if ($results['imported'] > 0) {
-            ActivityLog::create([
-                'user_id'     => auth()->id(),
-                'action'      => 'import',
-                'module'      => 'Driver',
-                'target_name' => "Import Excel",
-                'description' => "Import Driver: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . " error",
-                'ip_address'  => request()->ip(),
-            ]);
+            ActivityLog::record('import', 'Driver', 'Import Excel', "Import Driver: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
         }
         return redirect()->back()->with('import_result', $results);
     }
@@ -368,14 +354,7 @@ class BulkImportController extends Controller
         }
 
         if ($results['imported'] > 0) {
-            ActivityLog::create([
-                'user_id'     => auth()->id(),
-                'action'      => 'import',
-                'module'      => 'Training',
-                'target_name' => "Import Excel",
-                'description' => "Import Training: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . " error",
-                'ip_address'  => request()->ip(),
-            ]);
+            ActivityLog::record('import', 'Training', 'Import Excel', "Import Training: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
         }
         return redirect()->back()->with('import_result', $results);
     }
@@ -568,14 +547,7 @@ class BulkImportController extends Controller
         }
 
         if ($results['unit']['imported'] > 0 || $results['operator']['imported'] > 0) {
-            ActivityLog::create([
-                'user_id'     => auth()->id(),
-                'action'      => 'import',
-                'module'      => 'Equipment',
-                'target_name' => "Import Excel",
-                'description' => "Import Equipment — Unit: {$results['unit']['imported']} berhasil, Operator: {$results['operator']['imported']} berhasil",
-                'ip_address'  => request()->ip(),
-            ]);
+            ActivityLog::record('import', 'Equipment', 'Import Excel', "Import Equipment — Unit: {$results['unit']['imported']} berhasil, Operator: {$results['operator']['imported']} berhasil");
         }
 
         return redirect()->back()->with('import_result', [

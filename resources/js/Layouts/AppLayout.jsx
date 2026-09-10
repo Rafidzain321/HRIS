@@ -27,7 +27,7 @@ const NAV = [
   { key: 'data-gaji',  icon: Wallet, label: 'Data Gaji',     href: '/timesheet/data-gaji' },
   { key: 'training',   icon: BookOpen, label: 'Training',      href: '/training' },
   { key: 'kpi',        icon: Target, label: 'KPI',           href: '/kpi' },
-  { key: 'cuti',       icon: CalendarDays, label: 'Cuti Tahunan', href: '/cuti' },
+  { key: 'cuti',       icon: CalendarDays, label: 'Cuti & Kehadiran', href: '/cuti' },
   { section: 'Sistem' },
   { key: 'notifications', icon: Bell, label: 'Notifikasi', href: '/notifications' },
   { key: 'pengaturan', icon: Settings, label: 'Pengaturan',   href: '/pengaturan' },
@@ -102,8 +102,8 @@ function NotifPanel({ open, onClose }) {
     }, 60000);
     return () => clearInterval(interval);
   }, [open]);
-  const typeIcon  = { sim:Car, mcu:Stethoscope, badge:CreditCard, kp:ClipboardList };
-  const typeColor = { sim:'#3A8FE0', mcu:'#E06A20', badge:'#E8A020', kp:'#22C97A' };
+  const typeIcon  = { sim:Car, mcu:Stethoscope, badge:CreditCard, kp:ClipboardList, kpi:Target };
+  const typeColor = { sim:'#3A8FE0', mcu:'#E06A20', badge:'#E8A020', kp:'#22C97A', kpi:'#9B59B6' };
   if (!open) return null;
   return (
     <>
@@ -111,7 +111,7 @@ function NotifPanel({ open, onClose }) {
       <div style={{ position:'fixed', top:58, right:12, width:'min(380px, calc(100vw - 24px)', maxHeight:'70vh', zIndex:200, background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:14, boxShadow:'0 20px 60px rgba(0,0,0,.4)', display:'flex', flexDirection:'column', animation:'fadeUp .2s both' }}>
         <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
           <div style={{ fontWeight:600, fontSize:13, display:'flex', alignItems:'center', gap:6 }}>
-            <Bell size={14}/> Notifikasi Compliance
+            <Bell size={14}/> Notifikasi
             {data?.summary?.total > 0 && <span style={{ marginLeft:6, background:'var(--red)', color:'#fff', fontSize:9.5, fontWeight:700, borderRadius:99, padding:'1px 6px' }}>{data.summary.total}</span>}
           </div>
           <div onClick={onClose} style={{ cursor:'pointer', color:'var(--muted)', padding:'2px 6px', display:'flex' }}><X size={16}/></div>
@@ -120,7 +120,7 @@ function NotifPanel({ open, onClose }) {
           {loading ? (
             <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> Memuat...</div>
           ) : !data?.items?.length ? (
-            <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><CheckCircle2 size={14} color="#22C97A"/> Tidak ada compliance alert</div>
+            <div style={{ padding:20, textAlign:'center', color:'var(--muted)', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><CheckCircle2 size={14} color="#22C97A"/> Tidak ada notifikasi</div>
           ) : data.items.map((item, i) => (
             <a key={i} href={item.href} onClick={e=>{
                 e.preventDefault();
@@ -400,6 +400,7 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
   `;
 
   const authUser = props.auth?.user;
+  const kpiPendingReview = props.kpi_pending_review || 0;
 
   return (
     <div style={{ display:'flex', minHeight:'100vh', background:'var(--bg)', color:'var(--text)', fontFamily:"'Outfit',sans-serif" }}>
@@ -631,7 +632,13 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
             <ProjectDropdown authUser={authUser} />
             <div className="icon-btn" onClick={()=>setNotifOpen(!notifOpen)}>
               <Bell size={18}/>
-              <div style={{ position:'absolute', top:6, right:6, width:7, height:7, borderRadius:'50%', background:'var(--red)', animation:'blink 1.5s infinite' }}/>
+              {kpiPendingReview > 0 ? (
+                <div style={{ position:'absolute', top:2, right:2, minWidth:15, height:15, padding:'0 3px', borderRadius:99, background:'var(--red)', color:'#fff', fontSize:9.5, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>
+                  {kpiPendingReview}
+                </div>
+              ) : (
+                <div style={{ position:'absolute', top:6, right:6, width:7, height:7, borderRadius:'50%', background:'var(--red)', animation:'blink 1.5s infinite' }}/>
+              )}
             </div>
           </div>
         </div>
@@ -649,7 +656,7 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
 
 // ── Sidebar content (shared desktop & mobile) ──────────────
 function SidebarContent({ url, authUser, onLogout }) {
-  const { projects, active_project_id: activeProjectId } = usePage().props;
+  const { projects, active_project_id: activeProjectId, kpi_pending_review: kpiPendingReview = 0 } = usePage().props;
   const permissions = authUser?.permissions || [];
   const userProject = authUser?.project;
   const isSuperAdmin = authUser?.can?.is_super_admin;
@@ -668,7 +675,9 @@ function SidebarContent({ url, authUser, onLogout }) {
   const PAYROLL_KEYS = ['slip-gaji', 'data-gaji'];
   // Menu 'pengaturan' sengaja tidak dicek lewat permission matriks (tetap kelihatan untuk semua,
   // aksesnya sendiri sudah digerbang lewat hasRole('super-admin') di controller-nya).
-  const canViewMenu = (key) => key === 'pengaturan' || permissions.includes(`view-${key}`);
+  // 'cuti' sekarang menu gabungan Cuti Tahunan + Kehadiran (dua tab di satu halaman) — tampilkan
+  // kalau user punya izin salah satunya, biar yang cuma dikasih akses Kehadiran saja tetap kelihatan menunya.
+  const canViewMenu = (key) => key === 'pengaturan' || (key === 'cuti' ? (permissions.includes('view-cuti') || permissions.includes('view-kehadiran')) : permissions.includes(`view-${key}`));
   const filteredNav = (isHoProject
       ? NAV.filter(item => !item.key || !HO_HIDDEN_KEYS.includes(item.key))
       : NAV.filter(item => !item.key || !NON_HO_HIDDEN_KEYS.includes(item.key)))
@@ -679,6 +688,15 @@ function SidebarContent({ url, authUser, onLogout }) {
     if (!item.section) return true;
     const next = filteredNav[i + 1];
     return next && !next.section;
+  }).map(item => {
+    // Badge KPI: goal yang ditugaskan ke user ini sebagai reviewer & belum pernah diisi progress-nya.
+    if (item.key === 'kpi' && kpiPendingReview > 0) return { ...item, badge: kpiPendingReview };
+    // Menu gabungan Cuti & Kehadiran — kalau user cuma dikasih izin Kehadiran (tanpa Cuti Tahunan),
+    // arahkan langsung ke /kehadiran biar tidak kena 403 di /cuti.
+    if (item.key === 'cuti' && !permissions.includes('view-cuti') && permissions.includes('view-kehadiran')) {
+      return { ...item, href: '/kehadiran' };
+    }
+    return item;
   });
 
   return (
@@ -809,7 +827,7 @@ function SidebarContent({ url, authUser, onLogout }) {
               className={`nav-item ${url===item.href||(item.href!=='/'&&url.startsWith(item.href))?'active':''}`}>
               <span style={{width:18,display:'flex',justifyContent:'center',flexShrink:0}}><item.icon size={15}/></span>
               {item.label}
-              {item.badge && <span style={{marginLeft:'auto',background:'var(--blue)',color:'#fff',fontSize:9.5,fontWeight:700,borderRadius:99,padding:'1px 6px'}}>{item.badge}</span>}
+              {item.badge && <span style={{marginLeft:'auto',background:'var(--red)',color:'#fff',fontSize:9.5,fontWeight:700,borderRadius:99,padding:'1px 6px'}}>{item.badge}</span>}
             </Link>
           );
         })}

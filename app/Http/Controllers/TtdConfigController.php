@@ -47,6 +47,7 @@ class TtdConfigController extends Controller
         if ($this->isViewer()) return response()->json(['ok' => false], 403);
 
         $item->delete();
+        ActivityLog::record('delete', 'Konfigurasi TTD', null, 'Reset tanda tangan slip gaji project ke default');
         return response()->json(['ok' => true]);
     }
 }

@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Employee;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -86,6 +87,7 @@ class SimController extends Controller
             'rfid'            => 'nullable|string|max:50',
         ]);
         $employee->update($data);
+        ActivityLog::record('update', 'SIM', $employee->nama_lengkap, "Update SIM: {$employee->nama_lengkap}");
         return back()->with('success', "SIM {$employee->nama_lengkap} berhasil diperbarui.");
     }
 }

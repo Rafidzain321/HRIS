@@ -20,7 +20,7 @@ const STATUS_CONFIG = {
 function StatusPill({ status }) {
   const c = STATUS_CONFIG[status] || STATUS_CONFIG.lifetime;
   return (
-    <span style={{ background:c.bg, color:c.color, padding:'2px 9px', borderRadius:99, fontSize:10.5, fontWeight:600 }}>
+    <span style={{ background:c.bg, color:c.color, padding:'2px 9px', borderRadius:99, fontSize:10.5, fontWeight:600, whiteSpace:'nowrap', display:'inline-block' }}>
       {c.label}
     </span>
   );
@@ -387,7 +387,7 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
         </div>
 
         <div style={{ overflowX:'auto' }}>
-          <table className="kar-table" style={{ minWidth:900 }}>
+          <table className="kar-table" style={{ minWidth:980 }}>
             <thead>
               <tr>
                 <th style={{ paddingLeft:16 }}>NIK</th>
@@ -401,6 +401,7 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
                 <th style={{ textAlign:'center' }}>Expired</th>
                 <th style={{ textAlign:'center' }}>Sisa</th>
                 <th style={{ textAlign:'center' }}>Ket.</th>
+                <th style={{ textAlign:'center' }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -456,7 +457,7 @@ export default function TrainingIndex({ trainings=[], types=[], filters={}, stat
                 </tr>
               ))}
               {trainings.length === 0 && (
-                <tr><td colSpan={11} style={{ padding:32, textAlign:'center', color:'var(--muted)' }}>Tidak ada data training</td></tr>
+                <tr><td colSpan={12} style={{ padding:32, textAlign:'center', color:'var(--muted)' }}>Tidak ada data training</td></tr>
               )}
             </tbody>
           </table>
