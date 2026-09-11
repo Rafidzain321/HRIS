@@ -230,7 +230,7 @@ function isGoalClosed(g) {
   return g.status === 'completed' || g.tanggal_selesai < todayIso;
 }
 
-function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, openProgressId }) {
+function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight }) {
   const [filterId, setFilterId] = useState(null);
   const [search, setSearch] = useState('');
   const [periodTab, setPeriodTab] = useState('ongoing');
@@ -239,17 +239,30 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, openProgr
   const [progressModal, setProgressModal] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // Datang dari klik notifikasi bell (goal yang perlu direview) — langsung buka modal update progress-nya.
+  // Datang dari klik notifikasi bell (goal yang perlu direview) — jangan langsung buka modal,
+  // cukup pindah ke tab yang sesuai lalu sorot barisnya biar user lihat dulu konteksnya.
   useEffect(() => {
-    if (!openProgressId) return;
-    const goal = goals.find(g => String(g.id) === String(openProgressId));
-    if (!goal) return;
-    setPeriodTab(isGoalClosed(goal) ? 'closed' : 'ongoing');
-    setProgressModal(goal);
-    const url = new URL(window.location.href);
-    url.searchParams.delete('open_progress');
-    window.history.replaceState({}, '', url);
-  }, [openProgressId]);
+    if (!highlight) return;
+    const goal = goals.find(g => String(g.id) === String(highlight));
+    if (goal) setPeriodTab(isGoalClosed(goal) ? 'closed' : 'ongoing');
+
+    const timer = setTimeout(() => {
+      const row = document.querySelector(`tr[data-id="${highlight}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.style.transition = 'background 0.3s';
+        row.style.background = 'rgba(232,160,32,.35)';
+        setTimeout(() => {
+          row.style.background = 'rgba(232,160,32,.15)';
+          setTimeout(() => { row.style.background = ''; }, 2500);
+        }, 600);
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('highlight');
+      window.history.replaceState({}, '', url);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [highlight]);
 
   const employeesById = {};
   employees.forEach(e => { employeesById[e.id] = e; });
@@ -362,7 +375,7 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, openProgr
                 const owner = employeesById[g.employee_id];
                 const meta = STATUS_META[g.status];
                 return (
-                  <tr key={g.id} style={{ borderTop: '1px solid var(--border)' }}>
+                  <tr key={g.id} data-id={g.id} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
                       <div style={{ fontWeight: 600 }}>{g.nama_goal}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 3 }}>{fmtDate(g.tanggal_mulai)} – {fmtDate(g.tanggal_selesai)}</div>
@@ -500,12 +513,11 @@ function TabDashboard({ rows, loading }) {
 }
 
 // ── MAIN ────────────────────────────────────────────────────
-export default function KpiIndex({ employees = [], goals = [], is_self_only = false }) {
+export default function KpiIndex({ employees = [], goals = [], is_self_only = false, highlight = null }) {
   const { auth } = usePage().props;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [activeTab, setActiveTab] = useState('goals');
   const [summaryRows, setSummaryRows] = useState(null);
-  const openProgressId = new URLSearchParams(window.location.search).get('open_progress');
 
   function loadSummary() {
     setSummaryRows(null);
@@ -545,7 +557,7 @@ export default function KpiIndex({ employees = [], goals = [], is_self_only = fa
       </div>
 
       {activeTab === 'goals' && (
-        <TabGoals employees={employees} goals={goals} isViewer={isViewer} isSelfOnly={is_self_only} onRefresh={onRefresh} openProgressId={openProgressId} />
+        <TabGoals employees={employees} goals={goals} isViewer={isViewer} isSelfOnly={is_self_only} onRefresh={onRefresh} highlight={highlight} />
       )}
       {activeTab === 'dashboard' && (
         <TabDashboard rows={summaryRows || []} loading={summaryRows === null} />

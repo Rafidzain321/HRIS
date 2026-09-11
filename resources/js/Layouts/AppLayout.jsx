@@ -134,11 +134,13 @@ function NotifPanel({ open, onClose }) {
               <span style={{ flexShrink:0, display:'flex' }}>{(() => { const Ic = typeIcon[item.type] || TriangleAlert; return <Ic size={18} color={typeColor[item.type]||'var(--accent)'}/>; })()}</span>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.nama}</div>
-                <div style={{ fontSize:10.5, color:'var(--muted2)', marginTop:1 }}>{item.jabatan}</div>
+                <div style={{ fontSize:10.5, color:'var(--muted2)', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.type==='kpi' ? item.goal_nama : item.jabatan}</div>
               </div>
               <div style={{ flexShrink:0, textAlign:'right' }}>
                 <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:99, background: item.level==='expired'?'rgba(224,69,69,.15)':'rgba(232,160,32,.15)', color: item.level==='expired'?'var(--red)':'var(--accent)' }}>
-                  {item.label} {item.level==='expired'?'Expired':'<30hr'}
+                  {item.type==='kpi'
+                    ? (item.level==='expired' ? 'Lewat Tenggat' : 'Belum diupdate')
+                    : `${item.label} ${item.level==='expired'?'Expired':'<30hr'}`}
                 </span>
                 <div style={{ fontSize:9.5, color:'var(--muted)', marginTop:3 }}>{item.date}</div>
               </div>

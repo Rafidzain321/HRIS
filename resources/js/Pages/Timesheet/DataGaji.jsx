@@ -1416,18 +1416,10 @@ function TabelFlat({ data, activeTTT, onEdit, onScheduleSave, isDark, projectKod
   );
 }
 
-// ── TABEL HO — kantor pusat: tanpa timesheet, tanpa lembur sama sekali ──
-// Dipisah per unit (HO-1/HO-2, sama seperti 2 sheet terpisah di Excel sumbernya) karena
-// masing-masing unit punya riwayat gaji dengan nama kolom sendiri-sendiri. Setiap blok unit
-// nampilin: identitas -> riwayat gaji 2018-2026 apa adanya (read-only, arsip) -> kolom Gaji
-// [periode aktif] yang BISA diedit -> Gaji Kotor/BPJS/Gaji Bersih (masih dihitung otomatis,
-// dipertahankan karena tetap dipakai buat proses payroll bulan berjalan).
 const PTKP_OPTIONS = ['TK/0','TK/1','TK/2','TK/3','K/0','K/1','K/2','K/3'];
 const STATUS_KARYAWAN_OPTIONS = ['PKWTT','PKWT','OWNER','Umum'];
-// Sama persis dengan daftar bank di halaman Edit Karyawan (resources/js/Pages/Employee/Edit.jsx)
 const BANK_OPTIONS = ['BCA','Mandiri','BRI','BNI','BSI','CIMB Niaga','Danamon','Permata','BTN','Mega','Bank Riau Kepri'];
 
-// 'd-m-Y' (format tampilan backend) <-> 'Y-m-d' (format input type=date)
 function toIsoDate(ddmmyyyy) {
   if (!ddmmyyyy) return '';
   const parts = ddmmyyyy.split('-');
@@ -2271,9 +2263,6 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
     });
   }
 
-  // Field induk karyawan (tanggal masuk, status karyawan HO, PTKP, no rekening, bank) — disimpan
-  // ke tabel employees / employee_ho_details lewat endpoint terpisah, BUKAN snapshot payroll per
-  // bulan, supaya nyambung juga ke halaman Edit Karyawan (bukan cuma kelihatan di Data Gaji).
   const infoSaveTimerRef=useRef({});
   function scheduleInfoSave(empId,field,val){
     updateTextField(empId,field,val);
@@ -2525,7 +2514,6 @@ export default function DataGaji({ tahun, bulan, bulan_nama, bulan_list, rows=[]
           projectIds={(() => {
             const u = auth?.user;
             if (!u) return [];
-            // Super-admin & viewer lihat semua project (termasuk HO) — bukan cuma yang tidak punya project_id.
             if (u.can?.is_super_admin || u.can?.is_viewer) return [1,2,3,4,5,6];
             if (u.project_ids && u.project_ids.length > 0) return u.project_ids;
             if (u.project_id) return [u.project_id];

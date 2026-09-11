@@ -122,15 +122,18 @@ class NotificationController extends Controller
                 ->each(function ($g) use ($today, $items) {
                     $selesai = $g->tanggal_selesai;
                     $items->push([
-                        'id'      => $g->id,
-                        'type'    => 'kpi',
-                        'level'   => $selesai && $selesai < $today ? 'expired' : 'warning',
-                        'nama'    => $g->employee?->nama_lengkap ?? '-',
-                        'jabatan' => $g->employee?->position?->nama_jabatan ?? '-',
-                        'label'   => 'Goal: ' . $g->nama_goal,
-                        'date'    => $selesai?->format('d M Y'),
-                        'days'    => $selesai ? $today->diffInDays($selesai, false) : 0,
-                        'href'    => '/kpi?open_progress=' . $g->id,
+                        'id'        => $g->id,
+                        'type'      => 'kpi',
+                        'level'     => $selesai && $selesai < $today ? 'expired' : 'warning',
+                        'nama'      => $g->employee?->nama_lengkap ?? '-',
+                        'jabatan'   => $g->employee?->position?->nama_jabatan ?? '-',
+                        'label'     => 'KPI',
+                        'goal_nama' => $g->nama_goal,
+                        'date'      => $selesai?->format('d M Y'),
+                        'days'      => $selesai ? $today->diffInDays($selesai, false) : 0,
+                        // Klik cuma antar ke halaman KPI & sorot baris goal-nya (bukan langsung
+                        // buka modal update progress) — biar user lihat dulu konteksnya.
+                        'href'      => '/kpi',
                     ]);
                 });
         }

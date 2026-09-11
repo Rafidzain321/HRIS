@@ -289,10 +289,6 @@ Route::middleware(['auth'])->group(function () {
             }
         }
 
-        // Kebalikannya: pindah KELUAR dari HO ke project lapangan, sedangkan halaman yang
-        // sedang dibuka adalah menu khusus HO (KPI, Cuti Tahunan, Kehadiran — lihat
-        // NON_HO_HIDDEN_KEYS di AppLayout.jsx). Tanpa ini, halaman itu "nyangkut" tetap
-        // menampilkan data HO walau project aktif sudah pindah — arahkan ke Dashboard saja.
         if ($proj && strtoupper($proj->kode) !== 'HO') {
             $nonHoHiddenPrefixes = ['/kpi', '/cuti', '/kehadiran'];
             if (collect($nonHoHiddenPrefixes)->contains(fn ($p) => str_starts_with($refPath, $p))) {

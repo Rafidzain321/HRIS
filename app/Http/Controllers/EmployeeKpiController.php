@@ -138,6 +138,7 @@ class EmployeeKpiController extends Controller
             'employees'    => $employees,
             'goals'        => $goals,
             'is_self_only' => $isSelfOnly,
+            'highlight'    => $request->get('highlight'),
         ]);
     }
 
