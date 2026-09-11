@@ -320,7 +320,12 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
         {periodTabs.map(t => (
-          <div key={t.key} onClick={() => setPeriodTab(t.key)} style={{
+          <div key={t.key} onClick={() => {
+            setPeriodTab(t.key);
+            // Ongoing tidak mungkin punya goal berstatus Completed (itu pasti masuk Selesai) —
+            // reset biar tidak ada 2 filter yang saling meniadakan sekaligus.
+            if (t.key === 'ongoing' && statusFilter === 'completed') setStatusFilter('');
+          }} style={{
             padding: '7px 4px', marginRight: 18, cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
             color: periodTab === t.key ? 'var(--accent)' : 'var(--muted)',
             borderBottom: `2px solid ${periodTab === t.key ? 'var(--accent)' : 'transparent'}`,
@@ -337,7 +342,11 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight
           {showFilter && <EmployeeFilterDropdown employees={employees} goals={goals} valueId={filterId} onChange={setFilterId} />}
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 140 }}>
             <option value="">Semua Status</option>
-            {Object.entries(STATUS_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+            {Object.entries(STATUS_META)
+              // Di tab Ongoing, status Completed pasti tidak ada hasilnya (goal completed
+              // otomatis masuk tab Selesai) — jangan tawarkan kombinasi yang mustahil itu.
+              .filter(([key]) => !(periodTab === 'ongoing' && key === 'completed'))
+              .map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
           </select>
           {reviewerOptions.length > 0 && (
             <select value={reviewerFilter} onChange={e => setReviewerFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 160 }}>
