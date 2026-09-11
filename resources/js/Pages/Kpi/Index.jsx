@@ -191,11 +191,18 @@ function GoalActionsMenu({ goal, onEdit, onUpdateProgress, onDelete }) {
   const btnRef = useRef(null);
   const item = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none', background: 'none', fontSize: 12, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", textAlign: 'left', color: 'var(--text)' };
   const MENU_WIDTH = 170;
+  const MENU_HEIGHT = 116; // perkiraan tinggi 3 item menu (Update Progress, Edit, Hapus)
 
   function toggle() {
     if (!open && btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: Math.max(8, r.right - MENU_WIDTH) });
+      // Kalau ruang di bawah tombol tidak cukup buat 3 item menu (mis. baris paling bawah
+      // tabel), buka ke atas supaya Edit & Hapus tidak kepotong di luar viewport.
+      const openUpward = window.innerHeight - r.bottom < MENU_HEIGHT + 8;
+      setPos({
+        top: openUpward ? r.top - MENU_HEIGHT - 4 : r.bottom + 4,
+        left: Math.max(8, r.right - MENU_WIDTH),
+      });
     }
     setOpen(o => !o);
   }
