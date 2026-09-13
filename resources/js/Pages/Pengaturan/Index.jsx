@@ -573,7 +573,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     }
 
     return (
-      <AppLayout title="Profil Saya" subtitle="Akun">
+      <AppLayout title="Akun" subtitle="Saya">
         <style>{`
           /* Sembunyikan icon mata bawaan browser (Edge) supaya tidak dobel sama toggle custom */
           input[type="password"]::-ms-reveal { display: none !important; }
@@ -591,7 +591,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
         )}
         <div className="panel" style={{maxWidth:520}}>
           <div className="panel-head">
-            <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><User size={14}/> Profil Saya</div>
+            <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><User size={14}/> Profil</div>
           </div>
           <div style={{padding:'20px 24px'}}>
             <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>

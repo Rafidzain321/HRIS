@@ -4,7 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import { usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
-  CalendarDays, ClipboardCheck, Search, TriangleAlert, Loader2, BarChart3, Save,
+  CalendarDays, ClipboardCheck, Search, TriangleAlert, Loader2, BarChart3, Save, Download,
 } from 'lucide-react';
 
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content; }
@@ -198,7 +198,10 @@ export default function AttendanceIndex({ employees = [], tahun, bulan, days_in_
             </div>
           ))}
         </div>
-        <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{employees.length} karyawan HO</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{employees.length} karyawan HO</span>
+          <a href={`/cuti/export?tahun=${tahun}`} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}><Download size={14} /> Export Excel</a>
+        </div>
       </div>
 
       {activeTab === 'input' && (

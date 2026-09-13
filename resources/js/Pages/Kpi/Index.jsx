@@ -6,7 +6,7 @@ import { usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
   Target, Plus, Trash2, Pencil, X, TriangleAlert, Loader2,
-  Users, BarChart3, Search, RefreshCw, ChevronRight, ChevronDown,
+  Users, BarChart3, Search, RefreshCw, ChevronRight, ChevronDown, Download,
 } from 'lucide-react';
 
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content; }
@@ -366,9 +366,12 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari goal / pemilik..." style={{ ...inp, paddingLeft: 30, width: 220 }} />
           </div>
         </div>
-        {!isViewer && (
-          <button onClick={() => router.visit(addHref)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Tambah Goal</button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <a href="/kpi/export" style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}><Download size={14} /> Export Excel</a>
+          {!isViewer && (
+            <button onClick={() => router.visit(addHref)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Tambah Goal</button>
+          )}
+        </div>
       </div>
 
       <div style={{ ...card, overflow: 'hidden' }}>
@@ -462,33 +465,106 @@ function DonutChart({ counts, size = 120 }) {
   );
 }
 
-// ── TAB DASHBOARD ────────────────────────────────────────────
-function TabDashboard({ rows, loading }) {
-  const [search, setSearch] = useState('');
-  const searchLow = search.trim().toLowerCase();
-  const filtered = searchLow ? rows.filter(r => r.nama_lengkap.toLowerCase().includes(searchLow) || r.jabatan.toLowerCase().includes(searchLow)) : rows;
+// ── STAT TILE KECIL (dipakai di Goal Analytics) ─────────────
+function StatTile({ label, value, sub }) {
+  return (
+    <div style={{ flex: 1, minWidth: 130, background: 'var(--bg3)', borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 22, fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{label}</div>
+      {sub && <div style={{ fontSize: 10, color: 'var(--muted)' }}>{sub}</div>}
+    </div>
+  );
+}
 
-  const agg = rows.reduce((acc, r) => {
-    acc.not_updated += r.not_updated; acc.on_track += r.on_track; acc.off_track += r.off_track; acc.completed += r.completed;
+// ── TAB DASHBOARD (Goal Analytics ala Mekari Talenta) ───────
+function TabDashboard({ goals, employees }) {
+  const [periodFilter, setPeriodFilter] = useState('ongoing'); // all | ongoing | closed
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useState('');
+
+  const employeesById = {};
+  employees.forEach(e => { employeesById[e.id] = e; });
+
+  // Filter goal berdasarkan periode (Ongoing/Selesai) & rentang tanggal (overlap dengan
+  // tanggal_mulai–tanggal_selesai goal itu, bukan cuma tanggal_mulai-nya saja).
+  const filteredGoals = goals.filter(g => {
+    if (periodFilter === 'ongoing' && isGoalClosed(g)) return false;
+    if (periodFilter === 'closed' && !isGoalClosed(g)) return false;
+    if (dateFrom && g.tanggal_selesai < dateFrom) return false;
+    if (dateTo && g.tanggal_mulai > dateTo) return false;
+    return true;
+  });
+
+  const totalGoals = filteredGoals.length;
+  const avgProgress = totalGoals > 0 ? Math.round(filteredGoals.reduce((a, g) => a + g.progress_percent, 0) / totalGoals) : 0;
+  const totalKaryawan = new Set(filteredGoals.map(g => g.employee_id)).size;
+
+  const statusCounts = filteredGoals.reduce((acc, g) => {
+    acc[g.status] = (acc[g.status] || 0) + 1;
     return acc;
   }, { not_updated: 0, on_track: 0, off_track: 0, completed: 0 });
 
-  if (loading) return <div style={{ padding: 30, textAlign: 'center', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Loader2 size={14} style={{ animation: 'spin .8s linear infinite' }} /> Memuat...</div>;
+  // Rekap per karyawan (Total Bobot & Skor Akhir) — dihitung langsung dari goal yang sudah
+  // difilter, jadi ikut berubah kalau filter periode/tanggal di atas diubah.
+  const byEmployee = {};
+  filteredGoals.forEach(g => {
+    if (!byEmployee[g.employee_id]) byEmployee[g.employee_id] = [];
+    byEmployee[g.employee_id].push(g);
+  });
+  const summaryRows = Object.entries(byEmployee).map(([empId, gs]) => {
+    const e = employeesById[empId] ?? employeesById[Number(empId)];
+    const totalBobot = gs.reduce((a, g) => a + g.bobot, 0);
+    const skorAkhir = totalBobot > 0 ? Math.round(gs.reduce((a, g) => a + g.progress_percent * g.bobot / 100, 0) * 100) / 100 : null;
+    return { employee_id: empId, nama_lengkap: e?.nama_lengkap || '—', jabatan: e?.jabatan || '-', jml_goal: gs.length, total_bobot: totalBobot, skor_akhir: skorAkhir };
+  }).sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+
+  const searchLow = search.trim().toLowerCase();
+  const filteredRows = searchLow ? summaryRows.filter(r => r.nama_lengkap.toLowerCase().includes(searchLow) || r.jabatan.toLowerCase().includes(searchLow)) : summaryRows;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ ...card, padding: 18, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-        <DonutChart counts={agg} />
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          {Object.entries(STATUS_META).map(([key, meta]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 3, background: meta.color }} />
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'Syne,sans-serif' }}>{agg[key]}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{meta.label}</div>
-              </div>
-            </div>
-          ))}
+      <div style={{ ...card, padding: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><BarChart3 size={15} /> Goal Analytics</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <select value={periodFilter} onChange={e => setPeriodFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 130 }}>
+              <option value="all">Semua Periode</option>
+              <option value="ongoing">Ongoing</option>
+              <option value="closed">Selesai</option>
+            </select>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...inp, width: 'auto' }} />
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>s/d</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...inp, width: 'auto' }} />
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(''); setDateTo(''); }} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted2)', fontSize: 11.5, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Reset</button>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
+          <StatTile label="Total Individual Goals" value={totalGoals} />
+          <StatTile label="Rata-rata Progress" value={`${avgProgress}%`} />
+          <StatTile label="Karyawan Terlibat" value={totalKaryawan} />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+          <DonutChart counts={statusCounts} size={130} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Total goals: {totalGoals}</div>
+            {Object.entries(STATUS_META).map(([key, meta]) => {
+              const count = statusCounts[key] || 0;
+              const pct = totalGoals > 0 ? Math.round(count / totalGoals * 100) : 0;
+              return (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 3, background: meta.color, flexShrink: 0 }} />
+                  <div style={{ fontSize: 12.5, flex: 1 }}>{meta.label}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700 }}>{count}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', width: 40, textAlign: 'right' }}>{pct}%</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -509,8 +585,8 @@ function TabDashboard({ rows, loading }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada data.</td></tr>}
-            {filtered.map(r => (
+            {filteredRows.length === 0 && <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada data.</td></tr>}
+            {filteredRows.map(r => (
               <tr key={r.employee_id} style={{ borderTop: '1px solid var(--border)' }}>
                 <td style={{ padding: '9px 14px', fontWeight: 600 }}>{r.nama_lengkap}</td>
                 <td style={{ padding: '9px 14px', color: 'var(--muted2)' }}>{r.jabatan}</td>
@@ -532,19 +608,15 @@ function TabDashboard({ rows, loading }) {
 export default function KpiIndex({ employees = [], goals = [], is_self_only = false, highlight = null }) {
   const { auth } = usePage().props;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
-  const [activeTab, setActiveTab] = useState('goals');
-  const [summaryRows, setSummaryRows] = useState(null);
-
-  function loadSummary() {
-    setSummaryRows(null);
-    axios.get('/kpi/summary').then(r => setSummaryRows(r.data.rows)).catch(() => setSummaryRows([]));
-  }
+  // Default langsung ke Dashboard biar begitu buka menu KPI langsung kelihatan gambaran
+  // besarnya — kecuali datang dari notifikasi bell (highlight goal tertentu), itu harus ke tab Goals.
+  const [activeTab, setActiveTab] = useState(highlight ? 'goals' : 'dashboard');
 
   function onRefresh() { router.reload({ only: ['goals'] }); }
 
   const tabs = [
-    { key: 'goals', label: 'Goals', icon: Target },
     { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+    { key: 'goals', label: 'Goals', icon: Target },
   ];
 
   return (
@@ -552,7 +624,7 @@ export default function KpiIndex({ employees = [], goals = [], is_self_only = fa
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           {tabs.map(t => (
-            <div key={t.key} onClick={() => { setActiveTab(t.key); if (t.key === 'dashboard' && summaryRows === null) loadSummary(); }}
+            <div key={t.key} onClick={() => setActiveTab(t.key)}
               style={{
                 padding: '9px 18px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600,
                 background: activeTab === t.key ? 'linear-gradient(135deg,#E8A020,#A06010)' : 'var(--card)',
@@ -576,7 +648,7 @@ export default function KpiIndex({ employees = [], goals = [], is_self_only = fa
         <TabGoals employees={employees} goals={goals} isViewer={isViewer} isSelfOnly={is_self_only} onRefresh={onRefresh} highlight={highlight} />
       )}
       {activeTab === 'dashboard' && (
-        <TabDashboard rows={summaryRows || []} loading={summaryRows === null} />
+        <TabDashboard goals={goals} employees={employees} />
       )}
     </AppLayout>
   );

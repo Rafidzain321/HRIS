@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { usePage, router } from '@inertiajs/react';
 import {
-  CalendarDays, ClipboardCheck, Plus, Trash2, X, TriangleAlert, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown,
+  CalendarDays, ClipboardCheck, Plus, Trash2, X, TriangleAlert, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown, Download,
 } from 'lucide-react';
 
 const card = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12 };
@@ -268,9 +268,12 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
           </select>
           <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Jatah {jatah} hari kerja / tahun / karyawan</span>
         </div>
-        {canEdit && (
-          <button onClick={() => setShowAdd(true)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Catat Cuti</button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <a href={`/cuti/export?tahun=${tahun}`} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}><Download size={14} /> Export Excel</a>
+          {canEdit && (
+            <button onClick={() => setShowAdd(true)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Catat Cuti</button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>

@@ -186,6 +186,7 @@ Route::middleware(['auth'])->group(function () {
     // ── KPI (khusus karyawan Head Office) ──────────────────
     Route::get('/kpi', [EmployeeKpiController::class, 'index'])->middleware('menu:kpi,view')->name('kpi');
     Route::get('/kpi/summary', [EmployeeKpiController::class, 'summary'])->middleware('menu:kpi,view')->name('kpi.summary');
+    Route::get('/kpi/export', [EmployeeKpiController::class, 'export'])->middleware('menu:kpi,view')->name('kpi.export');
     Route::get('/kpi/goals/create', [EmployeeKpiController::class, 'create'])->middleware('menu:kpi,view')->name('kpi.goals.create');
     Route::get('/kpi/goals/{goal}/edit', [EmployeeKpiController::class, 'edit'])->middleware('menu:kpi,view')->name('kpi.goals.edit');
     Route::post('/kpi/goals', [EmployeeKpiController::class, 'storeGoal'])->middleware('menu:kpi,view')->name('kpi.goals.store');
@@ -195,6 +196,7 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Cuti Tahunan (khusus karyawan Head Office, HR yang input) ──
     Route::get('/cuti', [EmployeeLeaveController::class, 'index'])->middleware('menu:cuti,view')->name('cuti');
+    Route::get('/cuti/export', [EmployeeLeaveController::class, 'export'])->middleware('menu:cuti,view')->name('cuti.export');
     Route::post('/cuti', [EmployeeLeaveController::class, 'store'])->middleware('menu:cuti,edit')->name('cuti.store');
     Route::delete('/cuti/{leave}', [EmployeeLeaveController::class, 'destroy'])->middleware('menu:cuti,edit')->name('cuti.destroy');
 
