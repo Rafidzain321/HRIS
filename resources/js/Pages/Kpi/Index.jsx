@@ -136,7 +136,8 @@ function OwnerAvatar({ nama, size = 30 }) {
 }
 
 // ── DROPDOWN FILTER KARYAWAN (hierarki atasan-bawahan) ──────
-function EmployeeFilterDropdown({ employees, goals, valueId, onChange }) {
+// ── TOMBOL EXPORT EXCEL (semua karyawan / satu karyawan tertentu) ──
+function ExportMenu({ employees }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const searchLow = search.trim().toLowerCase();
@@ -144,47 +145,39 @@ function EmployeeFilterDropdown({ employees, goals, valueId, onChange }) {
     ? employees.filter(e => e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow))
     : buildHierarchy(employees);
 
-  const selected = employees.find(e => e.id === valueId);
-  const label = selected ? selected.nama_lengkap : 'Semua Karyawan';
-
   return (
     <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)',
-        color: 'var(--text)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Outfit',sans-serif",
-        display: 'flex', alignItems: 'center', gap: 8, minWidth: 200, justifyContent: 'space-between',
-      }}>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-        <ChevronDown size={14} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      <button onClick={() => setOpen(o => !o)} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Download size={14} /> Export Excel <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
       {open && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 60 }} onClick={() => setOpen(false)} />
-          <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 70, width: 'max(100%, 280px)', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, boxShadow: '0 12px 36px rgba(0,0,0,.35)', padding: 10 }}>
-            <div style={{ position: 'relative', marginBottom: 8 }}>
-              <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} autoFocus />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 340, overflowY: 'auto' }}>
-              <div onClick={() => { onChange(null); setOpen(false); }}
-                style={{ padding: '7px 9px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, background: !valueId ? 'rgba(232,160,32,.12)' : 'transparent', color: !valueId ? 'var(--accent)' : 'var(--text)' }}>
-                Semua Karyawan
+          <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 70, width: 280, background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, boxShadow: '0 12px 36px rgba(0,0,0,.35)', overflow: 'hidden' }}>
+            <a href="/kpi/export" onClick={() => setOpen(false)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', fontSize: 12.5, fontWeight: 700, color: 'var(--text)', textDecoration: 'none', borderBottom: '1px solid var(--border)' }}>
+              <Users size={13} /> Semua Karyawan
+            </a>
+            <div style={{ padding: 8 }}>
+              <div style={{ position: 'relative', marginBottom: 6 }}>
+                <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={12} /></span>
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Atau cari karyawan tertentu..." style={{ ...inp, paddingLeft: 28, fontSize: 12 }} autoFocus />
               </div>
-              {list.map(e => {
-                const jml = goals.filter(g => g.employee_id === e.id).length;
-                const active = e.id === valueId;
-                const depth = e.depth || 0;
-                return (
-                  <div key={e.id} onClick={() => { onChange(e.id); setOpen(false); }}
-                    style={{ padding: '7px 9px', paddingLeft: 9 + depth * 16, borderRadius: 7, cursor: 'pointer', background: active ? 'rgba(232,160,32,.12)' : 'transparent', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {depth > 0 && <ChevronRight size={11} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>{e.nama_lengkap}</div>
-                      <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{e.jabatan} · {jml} goal</div>
-                    </div>
-                  </div>
-                );
-              })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 260, overflowY: 'auto' }}>
+                {list.length === 0 && <div style={{ padding: 10, fontSize: 11.5, color: 'var(--muted)', textAlign: 'center' }}>Tidak ditemukan.</div>}
+                {list.map(e => {
+                  const depth = e.depth || 0;
+                  return (
+                    <a key={e.id} href={`/kpi/export?employee_id=${e.id}`} onClick={() => setOpen(false)}
+                      style={{ display: 'block', padding: '6px 8px', paddingLeft: 8 + depth * 14, borderRadius: 6, textDecoration: 'none', color: 'var(--text)' }}
+                      onMouseEnter={ev => ev.currentTarget.style.background = 'rgba(232,160,32,.08)'}
+                      onMouseLeave={ev => ev.currentTarget.style.background = ''}>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{e.nama_lengkap}</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>{e.jabatan}</div>
+                    </a>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </>
@@ -248,7 +241,6 @@ function isGoalClosed(g) {
 }
 
 function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight }) {
-  const [filterId, setFilterId] = useState(null);
   const [search, setSearch] = useState('');
   const [periodTab, setPeriodTab] = useState('ongoing');
   const [statusFilter, setStatusFilter] = useState('');
@@ -296,25 +288,29 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight
   });
   reviewerOptions.sort((a, b) => a.nama.localeCompare(b.nama));
 
-  const ongoingGoals = goals.filter(g => !isGoalClosed(g));
-  const closedGoals  = goals.filter(g => isGoalClosed(g));
-  const periodGoals  = periodTab === 'ongoing' ? ongoingGoals : closedGoals;
-
+  // Filter karyawan/status/reviewer/pencarian diterapkan dulu ke SEMUA goal (belum dipotong
+  // periode) — supaya angka di tab Ongoing/Selesai ikut menyesuaikan filter yang aktif,
+  // bukan selalu menampilkan total keseluruhan tanpa filter.
   const searchLow = search.trim().toLowerCase();
-  const rows = periodGoals
-    .filter(g => !filterId || g.employee_id === filterId)
-    .filter(g => !statusFilter || g.status === statusFilter)
-    .filter(g => !reviewerFilter || String(g.reviewer_id) === String(reviewerFilter))
-    .filter(g => {
-      if (!searchLow) return true;
+  const matchesFilters = g => {
+    if (statusFilter && g.status !== statusFilter) return false;
+    if (reviewerFilter && String(g.reviewer_id) !== String(reviewerFilter)) return false;
+    if (searchLow) {
       const owner = employeesById[g.employee_id];
-      return g.nama_goal.toLowerCase().includes(searchLow)
+      const match = g.nama_goal.toLowerCase().includes(searchLow)
         || (owner?.nama_lengkap || '').toLowerCase().includes(searchLow)
         || (owner?.jabatan || '').toLowerCase().includes(searchLow);
-    });
+      if (!match) return false;
+    }
+    return true;
+  };
 
-  const showFilter = employees.length > 1;
-  const addHref = filterId ? `/kpi/goals/create?employee_id=${filterId}` : '/kpi/goals/create';
+  const filteredGoalsAll = goals.filter(matchesFilters);
+  const ongoingGoals = filteredGoalsAll.filter(g => !isGoalClosed(g));
+  const closedGoals  = filteredGoalsAll.filter(g => isGoalClosed(g));
+  const rows = periodTab === 'ongoing' ? ongoingGoals : closedGoals;
+
+  const addHref = '/kpi/goals/create';
 
   const periodTabs = [
     { key: 'ongoing', label: 'Ongoing', count: ongoingGoals.length },
@@ -356,7 +352,6 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {showFilter && <EmployeeFilterDropdown employees={employees} goals={goals} valueId={filterId} onChange={setFilterId} />}
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 140 }}>
             <option value="">Semua Status</option>
             {Object.entries(STATUS_META)
@@ -377,7 +372,7 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <a href="/kpi/export" style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}><Download size={14} /> Export Excel</a>
+          <ExportMenu employees={employees} />
           {!isViewer && (
             <button onClick={() => router.visit(addHref)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Tambah Goal</button>
           )}

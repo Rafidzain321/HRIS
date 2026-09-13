@@ -156,9 +156,14 @@ class EmployeeKpiController extends Controller
     {
         $hoProjectId = Project::where('kode', 'ho')->value('id');
         $scopedIds   = $this->scopedEmployeeIds();
+        $onlyEmployeeId = $request->get('employee_id');
 
         $employeesModel = Employee::aktif()->where('project_id', $hoProjectId)
             ->when($scopedIds !== null, fn ($q) => $q->whereIn('id', $scopedIds))
+            // Export satu karyawan tertentu (dipilih dari menu Export Excel) — tetap disaring
+            // lewat cakupan akses di atas, jadi tidak bisa dipakai buat mengintip karyawan
+            // di luar cakupan cuma dengan menebak-nebak employee_id di url.
+            ->when($onlyEmployeeId, fn ($q) => $q->where('id', $onlyEmployeeId))
             ->with(['position', 'goals' => fn ($q) => $q->where('aktif', true)])
             ->orderBy('nama_lengkap')->get();
 
@@ -271,12 +276,16 @@ class EmployeeKpiController extends Controller
 
         $wb->setActiveSheetIndex(0);
 
+        $namaFile = $onlyEmployeeId && $employeesModel->first()
+            ? 'KPI_' . str_replace(' ', '_', $employeesModel->first()->nama_lengkap) . '_' . now()->format('Ymd_His') . '.xlsx'
+            : 'KPI_' . now()->format('Ymd_His') . '.xlsx';
+
         $writer = new Xlsx($wb);
         return response()->stream(function () use ($writer) {
             $writer->save('php://output');
         }, 200, [
             'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="KPI_' . now()->format('Ymd_His') . '.xlsx"',
+            'Content-Disposition' => 'attachment; filename="' . $namaFile . '"',
             'Cache-Control'       => 'max-age=0',
         ]);
     }
