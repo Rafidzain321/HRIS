@@ -186,18 +186,21 @@ class EmployeeKpiController extends Controller
 
         // ── SHEET 1: RINGKASAN (nilai akhir per karyawan — sama dengan tab Dashboard) ──
         $sheet1 = $wb->getActiveSheet()->setTitle('Ringkasan');
-        $this->kpiExportTitle($sheet1, 'RINGKASAN KPI KARYAWAN — PT. ANDALAS KARYA MULIA (HEAD OFFICE)', 'I', $employeesModel->count());
+        $this->kpiExportTitle($sheet1, 'RINGKASAN KPI KARYAWAN — PT. ANDALAS KARYA MULIA (HEAD OFFICE)', 'J', $employeesModel->count());
         $headers1 = [
             'A' => ['No.', 4], 'B' => ['Nama Karyawan', 26], 'C' => ['Jabatan', 24],
             'D' => ['Jml Goal', 10], 'E' => ['Total Bobot %', 12], 'F' => ['Nilai Akhir', 12],
-            'G' => ['Not Updated', 12], 'H' => ['On Track / Off Track', 18], 'I' => ['Completed', 11],
+            'G' => ['Predikat', 14],
+            'H' => ['Not Updated', 12], 'I' => ['On Track / Off Track', 18], 'J' => ['Completed', 11],
         ];
         $this->kpiExportHeaderRow($sheet1, $headers1, 4);
+        $predikatColor = ['Baik Sekali' => 'BBDEFB', 'Baik' => 'C8E6C9', 'Cukup' => 'FFE0B2', 'Kurang' => 'FFCDD2'];
         foreach ($employeesModel as $idx => $e) {
             $row        = 5 + $idx;
             $goalsOwned = $e->goals;
             $totalBobot = $goalsOwned->sum('bobot');
             $skorAkhir  = $totalBobot > 0 ? round($goalsOwned->sum(fn ($g) => $g->progress_percent * $g->bobot / 100), 2) : null;
+            $predikat   = $this->kpiPredikatLabel($skorAkhir);
             $this->kpiExportRow($sheet1, $row, $idx, [
                 'A' => $idx + 1,
                 'B' => strtoupper($e->nama_lengkap),
@@ -205,12 +208,16 @@ class EmployeeKpiController extends Controller
                 'D' => $goalsOwned->count(),
                 'E' => $totalBobot,
                 'F' => $skorAkhir ?? '—',
-                'G' => $goalsOwned->filter(fn ($g) => $g->status === 'not_updated')->count(),
-                'H' => $goalsOwned->filter(fn ($g) => $g->status === 'on_track')->count() . ' / ' . $goalsOwned->filter(fn ($g) => $g->status === 'off_track')->count(),
-                'I' => $goalsOwned->filter(fn ($g) => $g->status === 'completed')->count(),
-            ], ['A', 'D', 'E', 'F', 'G', 'H', 'I']);
+                'G' => $predikat ?? '—',
+                'H' => $goalsOwned->filter(fn ($g) => $g->status === 'not_updated')->count(),
+                'I' => $goalsOwned->filter(fn ($g) => $g->status === 'on_track')->count() . ' / ' . $goalsOwned->filter(fn ($g) => $g->status === 'off_track')->count(),
+                'J' => $goalsOwned->filter(fn ($g) => $g->status === 'completed')->count(),
+            ], ['A', 'D', 'E', 'F', 'G', 'H', 'I', 'J']);
+            if ($predikat) {
+                $sheet1->getStyle('G' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($predikatColor[$predikat] ?? 'FFFFFF');
+            }
         }
-        $sheet1->setAutoFilter('A4:I4');
+        $sheet1->setAutoFilter('A4:J4');
         $sheet1->freezePane('B5');
         $sheet1->setShowGridlines(false);
 
@@ -275,6 +282,18 @@ class EmployeeKpiController extends Controller
     }
 
     // ── Helper kecil khusus export KPI (judul, header, baris) ──
+    // Ubah Skor Akhir (0-100) jadi kesimpulan/predikat — pola penilaian KPI standar:
+    // >=100 Baik Sekali, 75-99 Baik, 45-74 Cukup, <45 Kurang. Sama persis dengan frontend
+    // (lihat getPredikat() di Kpi/Index.jsx) supaya angka & kesimpulannya konsisten.
+    private function kpiPredikatLabel(?float $skorAkhir): ?string
+    {
+        if ($skorAkhir === null) return null;
+        if ($skorAkhir >= 100) return 'Baik Sekali';
+        if ($skorAkhir >= 75) return 'Baik';
+        if ($skorAkhir >= 45) return 'Cukup';
+        return 'Kurang';
+    }
+
     private function kpiExportTitle($sheet, string $title, string $lastCol, int $count): void
     {
         $sheet->mergeCells("A1:{$lastCol}1");

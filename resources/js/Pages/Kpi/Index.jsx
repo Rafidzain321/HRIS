@@ -6,7 +6,7 @@ import { usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
   Target, Plus, Trash2, Pencil, X, TriangleAlert, Loader2,
-  Users, BarChart3, Search, RefreshCw, ChevronRight, ChevronDown, Download,
+  Users, BarChart3, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Download,
 } from 'lucide-react';
 
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content; }
@@ -24,6 +24,16 @@ const STATUS_META = {
   off_track:   { label: 'Off track',   color: '#E04545', bg: 'rgba(224,69,69,.12)' },
   completed:   { label: 'Completed',   color: '#3A8FE0', bg: 'rgba(58,143,224,.12)' },
 };
+
+// Ubah Skor Akhir (angka 0-100) jadi kesimpulan/predikat — sama seperti pola penilaian KPI
+// pada umumnya (>=100 Baik Sekali, 75-99 Baik, 45-74 Cukup, <45 Kurang).
+function getPredikat(skorAkhir) {
+  if (skorAkhir === null || skorAkhir === undefined) return null;
+  if (skorAkhir >= 100) return { label: 'Baik Sekali', color: '#3A8FE0', bg: 'rgba(58,143,224,.12)' };
+  if (skorAkhir >= 75)  return { label: 'Baik',         color: '#22C97A', bg: 'rgba(34,201,122,.12)' };
+  if (skorAkhir >= 45)  return { label: 'Cukup',        color: '#E8A020', bg: 'rgba(232,160,32,.12)' };
+  return { label: 'Kurang', color: '#E04545', bg: 'rgba(224,69,69,.12)' };
+}
 
 function fmtVal(v, satuan) {
   const n = Number(v) || 0;
@@ -468,7 +478,7 @@ function DonutChart({ counts, size = 120 }) {
 // ── STAT TILE KECIL (dipakai di Goal Analytics) ─────────────
 function StatTile({ label, value, sub }) {
   return (
-    <div style={{ flex: 1, minWidth: 130, background: 'var(--bg3)', borderRadius: 10, padding: '12px 14px' }}>
+    <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
       <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 22, fontWeight: 700 }}>{value}</div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{label}</div>
       {sub && <div style={{ fontSize: 10, color: 'var(--muted)' }}>{sub}</div>}
@@ -482,6 +492,8 @@ function TabDashboard({ goals, employees }) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10); // 5 | 10 | 25 | 50 | 'all'
 
   const employeesById = {};
   employees.forEach(e => { employeesById[e.id] = e; });
@@ -522,35 +534,115 @@ function TabDashboard({ goals, employees }) {
   const searchLow = search.trim().toLowerCase();
   const filteredRows = searchLow ? summaryRows.filter(r => r.nama_lengkap.toLowerCase().includes(searchLow) || r.jabatan.toLowerCase().includes(searchLow)) : summaryRows;
 
+  const totalRows   = filteredRows.length;
+  const totalPages  = perPage === 'all' ? 1 : Math.max(1, Math.ceil(totalRows / perPage));
+  const pageSafe    = Math.min(page, totalPages);
+  const pagedRows   = perPage === 'all' ? filteredRows : filteredRows.slice((pageSafe - 1) * perPage, pageSafe * perPage);
+  const rangeStart  = totalRows === 0 ? 0 : (pageSafe - 1) * (perPage === 'all' ? totalRows : perPage) + 1;
+  const rangeEnd    = perPage === 'all' ? totalRows : Math.min(pageSafe * perPage, totalRows);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ ...card, padding: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-          <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><BarChart3 size={15} /> Goal Analytics</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <select value={periodFilter} onChange={e => setPeriodFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 130 }}>
-              <option value="all">Semua Periode</option>
-              <option value="ongoing">Ongoing</option>
-              <option value="closed">Selesai</option>
+    <div className="kpi-dash-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, alignItems: 'start' }}>
+      {/* ── KIRI: tabel goals per karyawan ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', maxWidth: 320, flex: 1 }}>
+            <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
+            <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Tampilkan</span>
+            <select value={perPage} onChange={e => { setPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setPage(1); }} style={{ ...inp, width: 'auto' }}>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value="all">Semua</option>
             </select>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...inp, width: 'auto' }} />
-            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>s/d</span>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...inp, width: 'auto' }} />
-            {(dateFrom || dateTo) && (
-              <button onClick={() => { setDateFrom(''); setDateTo(''); }} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted2)', fontSize: 11.5, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Reset</button>
-            )}
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
+        <div style={{ ...card, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ background: 'var(--bg3)' }}>
+                  <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Karyawan</th>
+                  <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Jabatan</th>
+                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Goals</th>
+                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Total Bobot</th>
+                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Skor Akhir</th>
+                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Predikat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedRows.length === 0 && <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada data.</td></tr>}
+                {pagedRows.map(r => {
+                  const predikat = getPredikat(r.skor_akhir);
+                  return (
+                    <tr key={r.employee_id} style={{ borderTop: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 14px', fontWeight: 600 }}>{r.nama_lengkap}</td>
+                      <td style={{ padding: '9px 14px', color: 'var(--muted2)' }}>{r.jabatan}</td>
+                      <td style={{ padding: '9px 14px', textAlign: 'center' }}>{r.jml_goal}</td>
+                      <td style={{ padding: '9px 14px', textAlign: 'center', color: r.total_bobot === 100 ? '#22C97A' : '#E04545' }}>{r.total_bobot}%</td>
+                      <td style={{ padding: '9px 14px', textAlign: 'center', fontWeight: 700, fontSize: 14 }}>
+                        {r.skor_akhir ?? <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted)' }}>Belum lengkap</span>}
+                      </td>
+                      <td style={{ padding: '9px 14px', textAlign: 'center' }}>
+                        {predikat
+                          ? <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: predikat.bg, color: predikat.color, whiteSpace: 'nowrap' }}>{predikat.label}</span>
+                          : <span style={{ fontSize: 11, color: 'var(--muted)' }}>—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {totalRows > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Menampilkan {rangeStart}–{rangeEnd} dari {totalRows} karyawan</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={pageSafe <= 1} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg3)', color: pageSafe <= 1 ? 'var(--muted)' : 'var(--text)', fontSize: 11.5, cursor: pageSafe <= 1 ? 'not-allowed' : 'pointer', fontFamily: "'Outfit',sans-serif" }}><ChevronLeft size={13} /></button>
+                <span style={{ fontSize: 11.5, color: 'var(--muted2)' }}>Halaman {pageSafe} / {totalPages}</span>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={pageSafe >= totalPages} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg3)', color: pageSafe >= totalPages ? 'var(--muted)' : 'var(--text)', fontSize: 11.5, cursor: pageSafe >= totalPages ? 'not-allowed' : 'pointer', fontFamily: "'Outfit',sans-serif" }}><ChevronRight size={13} /></button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── KANAN: Goal Analytics (sidebar) ── */}
+      <div style={{ ...card, padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+        <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><BarChart3 size={14} /> Goal Analytics</div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <select value={periodFilter} onChange={e => { setPeriodFilter(e.target.value); setPage(1); }} style={inp}>
+            <option value="all">Semua Periode</option>
+            <option value="ongoing">Ongoing</option>
+            <option value="closed">Selesai</option>
+          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 8px' }}>
+            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+              style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', color: 'var(--text)', fontSize: 12, fontFamily: "'Outfit',sans-serif", padding: '8px 0', outline: 'none' }} />
+            <span style={{ fontSize: 10.5, color: 'var(--muted)', flexShrink: 0 }}>s/d</span>
+            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }}
+              style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', color: 'var(--text)', fontSize: 12, fontFamily: "'Outfit',sans-serif", padding: '8px 0', outline: 'none' }} />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted2)', fontSize: 11, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", alignSelf: 'flex-start' }}>Reset tanggal</button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <StatTile label="Total Individual Goals" value={totalGoals} />
           <StatTile label="Rata-rata Progress" value={`${avgProgress}%`} />
           <StatTile label="Karyawan Terlibat" value={totalKaryawan} />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingTop: 4 }}>
           <DonutChart counts={statusCounts} size={130} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minWidth: 200 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
             <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Total goals: {totalGoals}</div>
             {Object.entries(STATUS_META).map(([key, meta]) => {
               const count = statusCounts[key] || 0;
@@ -558,47 +650,14 @@ function TabDashboard({ goals, employees }) {
               return (
                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 10, height: 10, borderRadius: 3, background: meta.color, flexShrink: 0 }} />
-                  <div style={{ fontSize: 12.5, flex: 1 }}>{meta.label}</div>
-                  <div style={{ fontSize: 12.5, fontWeight: 700 }}>{count}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', width: 40, textAlign: 'right' }}>{pct}%</div>
+                  <div style={{ fontSize: 12, flex: 1 }}>{meta.label}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{count}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--muted)', width: 36, textAlign: 'right' }}>{pct}%</div>
                 </div>
               );
             })}
           </div>
         </div>
-      </div>
-
-      <div style={{ position: 'relative', maxWidth: 320 }}>
-        <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
-        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
-      </div>
-
-      <div style={{ ...card, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead>
-            <tr style={{ background: 'var(--bg3)' }}>
-              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Karyawan</th>
-              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Jabatan</th>
-              <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Goals</th>
-              <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Total Bobot</th>
-              <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Skor Akhir</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.length === 0 && <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada data.</td></tr>}
-            {filteredRows.map(r => (
-              <tr key={r.employee_id} style={{ borderTop: '1px solid var(--border)' }}>
-                <td style={{ padding: '9px 14px', fontWeight: 600 }}>{r.nama_lengkap}</td>
-                <td style={{ padding: '9px 14px', color: 'var(--muted2)' }}>{r.jabatan}</td>
-                <td style={{ padding: '9px 14px', textAlign: 'center' }}>{r.jml_goal}</td>
-                <td style={{ padding: '9px 14px', textAlign: 'center', color: r.total_bobot === 100 ? '#22C97A' : '#E04545' }}>{r.total_bobot}%</td>
-                <td style={{ padding: '9px 14px', textAlign: 'center', fontWeight: 700, fontSize: 14 }}>
-                  {r.skor_akhir ?? <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted)' }}>Belum lengkap</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );
