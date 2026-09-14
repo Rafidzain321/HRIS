@@ -728,7 +728,11 @@ export default function EmployeeEdit({ employee, positions = [], project_info = 
                   <input style={inputStyle} value={data.ho_detail.lokasi_kerja} onChange={e=>setHo('lokasi_kerja',e.target.value)} />
                 </Field>
                 <Field label="Status Karyawan">
-                  <input style={inputStyle} value={data.ho_detail.status_karyawan} onChange={e=>setHo('status_karyawan',e.target.value)} placeholder="cth: PKWTT" />
+                  <select style={selectStyle} value={data.ho_detail.status_karyawan} onChange={e=>setHo('status_karyawan',e.target.value)}>
+                    <option value="">— Pilih —</option>
+                    <option value="PKWT">PKWT</option>
+                    <option value="PKWTT">PKWTT</option>
+                  </select>
                 </Field>
                 <Field label="No. KK">
                   <input style={inputStyle} value={data.ho_detail.no_kk} onChange={e=>setHo('no_kk',e.target.value)} />
@@ -754,7 +758,10 @@ export default function EmployeeEdit({ employee, positions = [], project_info = 
               </Section>
             )}
 
-            {/* PKWT */}
+            {/* PKWT — khusus HO, form ini cuma muncul kalau Status Karyawan-nya PKWT (bukan
+                PKWTT). Karyawan non-HO belum punya field Status Karyawan sama sekali, jadi
+                formnya tetap selalu tampil seperti sebelumnya buat mereka. */}
+            {(!isHo || data.ho_detail.status_karyawan === 'PKWT') && (
             <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><FileText size={12}/> PKWT</span>}>
               <Field label="Start PKWT">
                 <input type="date" style={inputStyle} value={data.start_pkwt} onChange={e=>setData('start_pkwt',e.target.value)} />
@@ -766,6 +773,7 @@ export default function EmployeeEdit({ employee, positions = [], project_info = 
                 <input style={inputStyle} value={data.no_contract} onChange={e=>setData('no_contract',e.target.value)} />
               </Field>
             </Section>
+            )}
 
             {/* BANK & BPJS */}
             <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><Landmark size={12}/> Bank & BPJS</span>}>

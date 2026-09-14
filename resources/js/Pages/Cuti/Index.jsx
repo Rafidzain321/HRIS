@@ -197,6 +197,8 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [holidayModal, setHolidayModal] = useState(null); // { iso, existing }
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10); // 10 | 25 | 50 | 'all'
 
   const holidaysByDate = {};
   holidays.forEach(h => { holidaysByDate[h.tanggal] = h; });
@@ -209,6 +211,13 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
 
   const searchLow = search.trim().toLowerCase();
   const filteredEmployees = employees.filter(e => !searchLow || e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow));
+
+  const totalEmployees = filteredEmployees.length;
+  const totalPages   = perPage === 'all' ? 1 : Math.max(1, Math.ceil(totalEmployees / perPage));
+  const pageSafe     = Math.min(page, totalPages);
+  const pagedEmployees = perPage === 'all' ? filteredEmployees : filteredEmployees.slice((pageSafe - 1) * perPage, pageSafe * perPage);
+  const rangeStart   = totalEmployees === 0 ? 0 : (pageSafe - 1) * (perPage === 'all' ? totalEmployees : perPage) + 1;
+  const rangeEnd     = perPage === 'all' ? totalEmployees : Math.min(pageSafe * perPage, totalEmployees);
 
   const selected = employees.find(e => e.id === selectedId) || employees[0];
   const selectedLeaves = leaves.filter(l => l.employee_id === selected?.id);
@@ -278,10 +287,20 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
         <div style={{ ...card, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ position: 'relative', maxWidth: 280 }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', maxWidth: 280, flex: 1 }}>
               <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
+              <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Tampilkan</span>
+              <select value={perPage} onChange={e => { setPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setPage(1); }} style={{ ...inp, width: 'auto' }}>
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value="all">Semua</option>
+              </select>
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -292,13 +311,14 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
                   <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Jabatan</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Terpakai</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Sisa</th>
+                  {canEdit && <th style={{ padding: '10px 14px' }} />}
                 </tr>
               </thead>
               <tbody>
-                {filteredEmployees.length === 0 && (
-                  <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada karyawan.</td></tr>
+                {pagedEmployees.length === 0 && (
+                  <tr><td colSpan={canEdit ? 5 : 4} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada karyawan.</td></tr>
                 )}
-                {filteredEmployees.map(e => {
+                {pagedEmployees.map(e => {
                   const terpakai = usageByEmployee[e.id] || 0;
                   const sisa = jatah - terpakai;
                   const active = e.id === selected?.id;
@@ -309,12 +329,30 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
                       <td style={{ padding: '10px 14px', color: 'var(--muted2)' }}>{e.jabatan}</td>
                       <td style={{ padding: '10px 14px', textAlign: 'center' }}>{terpakai} hari</td>
                       <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: sisaColor }}>{sisa} hari</td>
+                      {canEdit && (
+                        <td style={{ padding: '8px 14px', textAlign: 'right' }}>
+                          <button onClick={ev => { ev.stopPropagation(); setSelectedId(e.id); setShowAdd(true); }}
+                            style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(232,160,32,.3)', background: 'rgba(232,160,32,.08)', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            <Plus size={12} /> Catat Cuti
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          {totalEmployees > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Menampilkan {rangeStart}–{rangeEnd} dari {totalEmployees} karyawan</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={pageSafe <= 1} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg3)', color: pageSafe <= 1 ? 'var(--muted)' : 'var(--text)', fontSize: 11.5, cursor: pageSafe <= 1 ? 'not-allowed' : 'pointer', fontFamily: "'Outfit',sans-serif" }}><ChevronLeft size={13} /></button>
+                <span style={{ fontSize: 11.5, color: 'var(--muted2)' }}>Halaman {pageSafe} / {totalPages}</span>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={pageSafe >= totalPages} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg3)', color: pageSafe >= totalPages ? 'var(--muted)' : 'var(--text)', fontSize: 11.5, cursor: pageSafe >= totalPages ? 'not-allowed' : 'pointer', fontFamily: "'Outfit',sans-serif" }}><ChevronRight size={13} /></button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

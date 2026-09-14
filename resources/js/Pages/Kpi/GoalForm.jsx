@@ -1,5 +1,5 @@
 // resources/js/Pages/Kpi/GoalForm.jsx
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { Link, useForm } from '@inertiajs/react';
 import { Target, TriangleAlert, Loader2, ChevronRight, ChevronLeft, ChevronDown, ArrowLeft, Search, Calendar as CalendarIcon } from 'lucide-react';
@@ -119,30 +119,17 @@ function DatePicker({ value, onChange }) {
   );
 }
 
-// Susun daftar karyawan jadi berjenjang (atasan -> bawahan) buat tampilan pilih "Goal owner".
-function buildHierarchy(employees) {
-  const byId = {}; employees.forEach(e => { byId[e.id] = { ...e, children: [] }; });
-  const roots = [];
-  employees.forEach(e => {
-    if (e.atasan_id && byId[e.atasan_id]) byId[e.atasan_id].children.push(byId[e.id]);
-    else roots.push(byId[e.id]);
-  });
-  const flat = [];
-  function walk(node, depth) { flat.push({ ...node, depth }); node.children.forEach(c => walk(c, depth + 1)); }
-  roots.forEach(r => walk(r, 0));
-  return flat;
-}
-
-// ── COMBOBOX GOAL OWNER (searchable, tetap tampilkan hierarki atasan-bawahan
-// di dalam daftar dropdown-nya) ─────────────────────────────
-function GoalOwnerField({ employees, hierarchy, value, onChange, disabled, placeholder = 'Pilih goal owner...', allowClear = false, clearLabel = '— Tidak ada —' }) {
+// ── COMBOBOX GOAL OWNER (searchable, daftar rata tanpa indentasi — struktur
+// atasan-bawahan diatur terpisah di Pengaturan, bukan lewat tampilan berjenjang di sini) ──
+function GoalOwnerField({ employees, value, onChange, disabled, placeholder = 'Pilih goal owner...', allowClear = false, clearLabel = '— Tidak ada —' }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const selected = employees.find(e => String(e.id) === String(value));
   const searchLow = search.trim().toLowerCase();
-  const list = searchLow
-    ? employees.filter(e => e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow)).map(e => ({ ...e, depth: 0 }))
-    : hierarchy;
+  const list = (searchLow
+    ? employees.filter(e => e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow))
+    : employees
+  ).slice().sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
 
   if (disabled) {
     return (
@@ -182,15 +169,11 @@ function GoalOwnerField({ employees, hierarchy, value, onChange, disabled, place
                 return (
                   <div key={e.id} onClick={() => { onChange(e.id); setOpen(false); setSearch(''); }}
                     style={{
-                      padding: '7px 9px', paddingLeft: 9 + (e.depth || 0) * 16, borderRadius: 7, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '7px 9px', borderRadius: 7, cursor: 'pointer',
                       background: active ? 'rgba(232,160,32,.12)' : 'transparent',
                     }}>
-                    {e.depth > 0 && <ChevronRight size={11} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>{e.nama_lengkap}</div>
-                      <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{e.jabatan}</div>
-                    </div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>{e.nama_lengkap}</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{e.jabatan}</div>
                   </div>
                 );
               })}
@@ -203,8 +186,6 @@ function GoalOwnerField({ employees, hierarchy, value, onChange, disabled, place
 }
 
 export default function GoalForm({ mode, goal, employees = [], all_employees = [], is_self_only = false, default_employee_id = null }) {
-  const hierarchy = useMemo(() => buildHierarchy(employees), [employees]);
-  const allHierarchy = useMemo(() => buildHierarchy(all_employees), [all_employees]);
 
   const { data, setData, post, put, processing, errors } = useForm({
     employee_id: goal?.employee_id ?? default_employee_id ?? employees[0]?.id ?? '',
@@ -265,7 +246,7 @@ export default function GoalForm({ mode, goal, employees = [], all_employees = [
                 Goal Owner {is_self_only ? '(Saya & Tim)' : '(Karyawan HO)'}
               </label>
               {employees.length > 1 ? (
-                <GoalOwnerField employees={employees} hierarchy={hierarchy} value={data.employee_id}
+                <GoalOwnerField employees={employees} value={data.employee_id}
                   onChange={id => setData('employee_id', id)} disabled={mode === 'edit'} />
               ) : (
                 selectedEmployee && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Goal owner: <b style={{ color: 'var(--text)' }}>{selectedEmployee.nama_lengkap}</b></div>
@@ -275,7 +256,7 @@ export default function GoalForm({ mode, goal, employees = [], all_employees = [
 
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5, display: 'block', fontWeight: 600 }}>Reviewer / Penanggung Jawab Update Progress</label>
-              <GoalOwnerField employees={all_employees} hierarchy={allHierarchy} value={data.reviewer_id}
+              <GoalOwnerField employees={all_employees} value={data.reviewer_id}
                 onChange={id => setData('reviewer_id', id)} placeholder="Tidak ditugaskan — pemilik goal update sendiri"
                 allowClear clearLabel="— Tidak ditugaskan (pemilik goal sendiri) —" />
               <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 5 }}>Bebas ditugaskan ke siapa saja — HR, atasan, atau manajer lain — tidak harus atasan langsung. Orang ini akan boleh mengisi progress goal ini, dan goal-nya muncul sebagai "pending review" di sisi dia sampai diisi.</div>

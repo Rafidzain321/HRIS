@@ -194,6 +194,10 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/kpi/goals/{goal}/progress', [EmployeeKpiController::class, 'updateProgress'])->middleware('menu:kpi,view')->name('kpi.goals.progress');
     Route::delete('/kpi/goals/{goal}', [EmployeeKpiController::class, 'destroyGoal'])->middleware('menu:kpi,view')->name('kpi.goals.destroy');
 
+    // ── Struktur Organisasi (atasan-bawahan, dulu hardcoded lewat DB) ──
+    Route::get('/pengaturan/struktur-organisasi', [EmployeeKpiController::class, 'orgStructure'])->name('org-structure');
+    Route::put('/pengaturan/struktur-organisasi/{employee}', [EmployeeKpiController::class, 'updateAtasan'])->name('org-structure.update');
+
     // ── Cuti Tahunan (khusus karyawan Head Office, HR yang input) ──
     Route::get('/cuti', [EmployeeLeaveController::class, 'index'])->middleware('menu:cuti,view')->name('cuti');
     Route::get('/cuti/export', [EmployeeLeaveController::class, 'export'])->middleware('menu:cuti,view')->name('cuti.export');

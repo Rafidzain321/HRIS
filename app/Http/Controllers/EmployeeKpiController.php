@@ -519,4 +519,69 @@ class EmployeeKpiController extends Controller
 
         return response()->json(['rows' => $result]);
     }
+
+    // ── STRUKTUR ORGANISASI (atasan-bawahan) ─────────────────────
+    // Sebelumnya atasan_id cuma bisa diisi lewat seeder/DB langsung (hardcoded) — sekarang
+    // bisa diatur bebas dari sini oleh HR, tanpa perlu sentuh kode. Dipakai buat hierarki
+    // notifikasi & cakupan lihat/edit KPI ("bawahan langsung" di scopedEmployeeIds()).
+    public function orgStructure()
+    {
+        if (!$this->isAdminSettings()) {
+            abort(403, 'Kamu tidak memiliki akses ke halaman ini.');
+        }
+
+        $hoProjectId = Project::where('kode', 'ho')->value('id');
+        $employees = Employee::aktif()->where('project_id', $hoProjectId)
+            ->with('position')->orderBy('nama_lengkap')
+            ->get(['id', 'nama_lengkap', 'position_id', 'atasan_id'])
+            ->map(fn ($e) => [
+                'id'           => $e->id,
+                'nama_lengkap' => $e->nama_lengkap,
+                'jabatan'      => $e->position?->nama_jabatan ?? '-',
+                'atasan_id'    => $e->atasan_id,
+            ]);
+
+        return Inertia::render('Kpi/OrgStructure', [
+            'employees' => $employees,
+        ]);
+    }
+
+    public function updateAtasan(Request $request, Employee $employee)
+    {
+        if (!$this->isAdminSettings()) {
+            abort(403, 'Kamu tidak memiliki akses untuk mengubah struktur organisasi.');
+        }
+
+        $data = $request->validate([
+            'atasan_id' => 'nullable|exists:employees,id',
+        ]);
+        $atasanId = $data['atasan_id'] ?: null;
+
+        if ($atasanId && (int) $atasanId === $employee->id) {
+            return back()->withErrors(['atasan_id' => 'Karyawan tidak bisa menjadi atasan untuk dirinya sendiri.']);
+        }
+
+        // Cegah struktur melingkar: telusuri ke atas dari atasan yang dipilih — kalau ketemu
+        // balik ke karyawan ini sendiri, berarti dia salah satu bawahan (langsung/tidak
+        // langsung) dari atasan barunya itu, dan itu akan bikin rantai atasan-bawahan berputar.
+        if ($atasanId) {
+            $cursorId = $atasanId;
+            $guard = 0;
+            while ($cursorId && $guard < 100) {
+                if ((int) $cursorId === $employee->id) {
+                    return back()->withErrors(['atasan_id' => 'Tidak bisa memilih bawahan sendiri sebagai atasan — akan membuat struktur organisasi melingkar.']);
+                }
+                $cursorId = Employee::where('id', $cursorId)->value('atasan_id');
+                $guard++;
+            }
+        }
+
+        $namaLama = $employee->atasan?->nama_lengkap ?? '— (tidak ada) —';
+        $employee->update(['atasan_id' => $atasanId]);
+        $namaBaru = $employee->fresh()->atasan?->nama_lengkap ?? '— (tidak ada) —';
+
+        ActivityLog::record('update', 'Struktur Organisasi', $employee->nama_lengkap, "Atasan diubah dari \"{$namaLama}\" menjadi \"{$namaBaru}\"");
+
+        return back()->with('success', "Atasan {$employee->nama_lengkap} berhasil diperbarui.");
+    }
 }

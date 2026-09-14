@@ -6,7 +6,7 @@ import { usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
   Target, Plus, Trash2, Pencil, X, TriangleAlert, Loader2,
-  Users, BarChart3, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Download,
+  Users, BarChart3, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Download, Network,
 } from 'lucide-react';
 
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content; }
@@ -48,20 +48,6 @@ function fmtDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   if (isNaN(d.getTime())) return dateStr;
   return `${d.getDate()} ${MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-// Susun daftar karyawan jadi berjenjang (atasan -> bawahan) buat tampilan sidebar/pilih goal owner.
-function buildHierarchy(employees) {
-  const byId = {}; employees.forEach(e => { byId[e.id] = { ...e, children: [] }; });
-  const roots = [];
-  employees.forEach(e => {
-    if (e.atasan_id && byId[e.atasan_id]) byId[e.atasan_id].children.push(byId[e.id]);
-    else roots.push(byId[e.id]);
-  });
-  const flat = [];
-  function walk(node, depth) { flat.push({ ...node, depth }); node.children.forEach(c => walk(c, depth + 1)); }
-  roots.forEach(r => walk(r, 0));
-  return flat;
 }
 
 // ── MODAL UPDATE PROGRESS CEPAT ─────────────────────────────
@@ -141,9 +127,12 @@ function ExportMenu({ employees }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const searchLow = search.trim().toLowerCase();
-  const list = searchLow
+  // Selalu rata (tidak berjenjang atasan-bawahan) — struktur organisasi diatur terpisah
+  // di Pengaturan, jadi daftar pemilihan di sini cukup diurutkan alfabetis saja.
+  const list = (searchLow
     ? employees.filter(e => e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow))
-    : buildHierarchy(employees);
+    : employees
+  ).slice().sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
 
   return (
     <div style={{ position: 'relative' }}>
@@ -165,18 +154,15 @@ function ExportMenu({ employees }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 260, overflowY: 'auto' }}>
                 {list.length === 0 && <div style={{ padding: 10, fontSize: 11.5, color: 'var(--muted)', textAlign: 'center' }}>Tidak ditemukan.</div>}
-                {list.map(e => {
-                  const depth = e.depth || 0;
-                  return (
-                    <a key={e.id} href={`/kpi/export?employee_id=${e.id}`} onClick={() => setOpen(false)}
-                      style={{ display: 'block', padding: '6px 8px', paddingLeft: 8 + depth * 14, borderRadius: 6, textDecoration: 'none', color: 'var(--text)' }}
-                      onMouseEnter={ev => ev.currentTarget.style.background = 'rgba(232,160,32,.08)'}
-                      onMouseLeave={ev => ev.currentTarget.style.background = ''}>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{e.nama_lengkap}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>{e.jabatan}</div>
-                    </a>
-                  );
-                })}
+                {list.map(e => (
+                  <a key={e.id} href={`/kpi/export?employee_id=${e.id}`} onClick={() => setOpen(false)}
+                    style={{ display: 'block', padding: '6px 8px', borderRadius: 6, textDecoration: 'none', color: 'var(--text)' }}
+                    onMouseEnter={ev => ev.currentTarget.style.background = 'rgba(232,160,32,.08)'}
+                    onMouseLeave={ev => ev.currentTarget.style.background = ''}>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>{e.nama_lengkap}</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>{e.jabatan}</div>
+                  </a>
+                ))}
               </div>
             </div>
           </div>
@@ -372,6 +358,9 @@ function TabGoals({ employees, goals, isViewer, isSelfOnly, onRefresh, highlight
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {!isViewer && !isSelfOnly && (
+            <button onClick={() => router.visit('/pengaturan/struktur-organisasi')} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--muted2)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Network size={14} /> Struktur Organisasi</button>
+          )}
           <ExportMenu employees={employees} />
           {!isViewer && (
             <button onClick={() => router.visit(addHref)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Tambah Goal</button>
