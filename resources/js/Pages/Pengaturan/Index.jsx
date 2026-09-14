@@ -685,7 +685,9 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     ...(isSuperAdmin ? [{key:'users', label:<><User size={14}/> Manajemen User</>, count:users.length}] : []),
     ...(isSuperAdmin ? [{key:'project', label:<><Building2 size={14}/> Project</>, count:projects.length}] : []),
     {key:'jabatan',        label:<><Briefcase size={14}/> Jabatan</>,        count:positions.length},
-    ...(!auth?.user?.can?.restrict_activity_log ? [{key:'log', label:<><ClipboardList size={14}/> Log Aktivitas</>, count:logs.length}] : []),
+    // Log Aktivitas cuma buat super-admin — standarnya user lain tidak perlu (dan tidak boleh)
+    // memantau aktivitas user lain, jadi bukan lagi soal restrict_activity_log per-akun.
+    ...(isSuperAdmin ? [{key:'log', label:<><ClipboardList size={14}/> Log Aktivitas</>, count:logs.length}] : []),
   ];
 
   const tabBtn = (active) => ({

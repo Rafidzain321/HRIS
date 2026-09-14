@@ -76,23 +76,11 @@ class UserManagementController extends Controller
                 'employees_count' => $p->employees_count,
             ]);
 
-        // ── Activity Log — super admin lihat semua, project user lihat project ASAL sendiri saja.
-        // Sengaja pakai project_id (home project, tetap), BUKAN activeProjectId() (project yang lagi
-        // di-switch) — supaya user multi-project (Budi/Efendi/Ali) yang lagi lihat data project lain
-        // tetap cuma lihat log aktivitas HO, bukan ikut lihat log aktivitas project yang sedang dilihat.
-        $logQuery = \App\Models\ActivityLog::with('user')->orderByDesc('created_at')->limit(1000);
-        if (!$isSuperAdmin) {
-            $ownProjectId = auth()->user()->project_id;
-            if ($ownProjectId) {
-                $userIds = User::where('project_id', $ownProjectId)->pluck('id');
-                $logQuery->whereIn('user_id', $userIds);
-            }
-        }
-        // Beberapa akun sengaja tidak boleh lihat Log Aktivitas sama sekali (mis. Nedriyanto,
-        // Rahmat Sjukri) — sama seperti restrict_payroll, dikunci per akun lewat kolom ini.
-        $logs = (!$isSuperAdmin && auth()->user()->restrict_activity_log)
-            ? collect()
-            : $logQuery->get()->map(fn($l) => [
+        // ── Activity Log — cuma super-admin. Standarnya user lain tidak perlu (dan tidak boleh)
+        // memantau aktivitas user lain, jadi bukan lagi dibatasi per-project atau per-akun
+        // (restrict_activity_log) seperti sebelumnya — langsung dikosongkan total untuk selain super-admin.
+        $logs = $isSuperAdmin
+            ? \App\Models\ActivityLog::with('user')->orderByDesc('created_at')->limit(1000)->get()->map(fn($l) => [
                 'id'          => $l->id,
                 'user_name'   => $l->user?->name ?? 'System',
                 'user_project'=> $l->user?->project?->nama ?? '—',
@@ -102,7 +90,8 @@ class UserManagementController extends Controller
                 'description' => $l->description,
                 'ip_address'  => $l->ip_address,
                 'created_at'  => $l->created_at->format('d M Y H:i:s'),
-            ]);
+            ])
+            : collect();
 
         $training_types = \App\Models\TrainingType::orderBy('urutan')
             ->withCount('trainings')->get()
