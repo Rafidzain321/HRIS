@@ -607,47 +607,68 @@ function EditTerminatedModal({ employee, onClose }) {
   );
 }
 
-// ── MODAL PINDAH PROJECT ──
-function PindahProjectModal({ employee, projects, isSuperAdmin, onClose, onSuccess }) {
-  const [toProjectId,    setToProjectId]    = useState('');
+// ── MODAL PINDAH (satu modal buat semuanya — pindah project, dan khusus karyawan HO
+// tujuannya juga bisa unit HO-1/HO-2, biar tidak perlu 2 tombol aksi terpisah) ──
+function PindahProjectModal({ employee, projects, isSuperAdmin, isHo, onClose, onSuccess }) {
+  const [toValue,        setToValue]        = useState(''); // 'unit:HO-1' | 'unit:HO-2' | '<project_id>'
   const [catatan,        setCatatan]        = useState('');
   const [loading,        setLoading]        = useState(false);
   const [error,          setError]          = useState('');
-  // currentProject bisa berubah setelah transfer berhasil (fresh dari server)
+  // Bisa berubah setelah aksi berhasil (fresh dari server), tanpa perlu tutup modal
   const [currentProject, setCurrentProject] = useState(employee.project_nama || 'Tidak ada project');
   const [currentProjectId, setCurrentProjectId] = useState(employee.project_id);
+  const [currentUnit,    setCurrentUnit]    = useState(employee.ho_unit || '');
 
-  const availableProjects = projects.filter(p => p.id !== currentProjectId);
+  // Karyawan HO tidak boleh "pindah ke HO" (sudah di situ) — daftar project tujuan buang HO.
+  const availableProjects = isHo
+    ? projects.filter(p => p.kode?.toLowerCase() !== 'ho')
+    : projects.filter(p => p.id !== currentProjectId);
+  const availableUnits = isHo ? ['HO-1', 'HO-2'].filter(u => u !== currentUnit) : [];
+  const isUnitChoice = toValue.startsWith('unit:');
+  const selectedProjectNama = !isUnitChoice && toValue ? availableProjects.find(p => p.id === Number(toValue))?.nama : null;
+
   const inp = { background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)', borderRadius:8, padding:'8px 11px', fontSize:12.5, fontFamily:"'Outfit',sans-serif", outline:'none', width:'100%', boxSizing:'border-box' };
+
   async function submit(e) {
     e.preventDefault();
-    if (!toProjectId) { setError('Pilih project tujuan.'); return; }
+    if (!toValue) { setError('Pilih tujuan.'); return; }
     setLoading(true); setError('');
+    const csrf = { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content } };
     try {
-      const url = isSuperAdmin ? `/employees/${employee.id}/transfer-direct` : `/employees/${employee.id}/transfer-request`;
-      const res = await axios.post(url, { to_project_id: toProjectId, catatan }, { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content } });
-      if (res.data.ok) {
-        // Update state modal langsung dari response server
-        if (res.data.new_project_id) {
-          setCurrentProjectId(res.data.new_project_id);
-          setCurrentProject(res.data.new_project_nama || '');
-          setToProjectId(''); // reset pilihan
-        }
-        onSuccess(res.data.message, res.data.new_project_id, res.data.new_project_nama);
-        onClose();
+      if (isUnitChoice) {
+        const unit = toValue.replace('unit:', '');
+        const res = await axios.post(`/employees/${employee.id}/pindah-unit-ho`, { unit, catatan }, csrf);
+        if (res.data.ok) {
+          setCurrentUnit(res.data.new_unit); setToValue('');
+          onSuccess(res.data.message);
+          onClose();
+        } else setError(res.data.message);
       } else {
-        setError(res.data.message);
+        const url = isSuperAdmin ? `/employees/${employee.id}/transfer-direct` : `/employees/${employee.id}/transfer-request`;
+        const res = await axios.post(url, { to_project_id: toValue, catatan }, csrf);
+        if (res.data.ok) {
+          if (res.data.new_project_id) {
+            setCurrentProjectId(res.data.new_project_id);
+            setCurrentProject(res.data.new_project_nama || '');
+            setToValue('');
+          }
+          onSuccess(res.data.message, res.data.new_project_id, res.data.new_project_nama);
+          onClose();
+        } else setError(res.data.message);
       }
     } catch (err) { setError(err.response?.data?.message || 'Terjadi kesalahan.'); }
     setLoading(false);
   }
+
+  const directAction = isUnitChoice || isSuperAdmin; // unit HO tidak butuh approval sama sekali
+
   return (
     <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(460px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',overflow:'hidden'}}>
         <div style={{height:4,background:'linear-gradient(90deg,#3A8FE0,#22C97A)'}}/>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
           <div>
-            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><RefreshCw size={15}/> {isSuperAdmin ? 'Pindah Project' : 'Ajukan Mutasi'}</div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><RefreshCw size={15}/> {isHo ? 'Pindah Karyawan' : (isSuperAdmin ? 'Pindah Project' : 'Ajukan Mutasi')}</div>
             <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{employee.nama_lengkap} · {employee.jabatan}</div>
           </div>
           <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
@@ -655,31 +676,38 @@ function PindahProjectModal({ employee, projects, isSuperAdmin, onClose, onSucce
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
             <div style={{padding:'10px 14px',borderRadius:9,background:'rgba(58,143,224,.08)',border:'1px solid rgba(58,143,224,.2)',fontSize:12}}>
-              <div style={{color:'var(--muted)',marginBottom:4}}>Project saat ini:</div>
-              <div style={{fontWeight:700,color:'var(--blue)'}}>{currentProject}</div>
+              <div style={{color:'var(--muted)',marginBottom:4}}>Saat ini:</div>
+              <div style={{fontWeight:700,color:'var(--blue)'}}>{currentProject}{isHo && currentUnit ? ` · Unit ${currentUnit}` : ''}</div>
             </div>
             <div>
-              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Project Tujuan *</label>
-              <select style={inp} value={toProjectId} onChange={e=>setToProjectId(e.target.value)}>
-                <option value="">— Pilih Project —</option>
-                {availableProjects.map(p=><option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>)}
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Tujuan *</label>
+              <select style={inp} value={toValue} onChange={e=>setToValue(e.target.value)}>
+                <option value="">— Pilih Tujuan —</option>
+                {availableUnits.length > 0 && (
+                  <optgroup label="Pindah Unit (tetap di HO)">
+                    {availableUnits.map(u=><option key={u} value={`unit:${u}`}>{u}</option>)}
+                  </optgroup>
+                )}
+                <optgroup label={isHo ? 'Pindah ke Project Lain' : 'Pindah Project'}>
+                  {availableProjects.map(p=><option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>)}
+                </optgroup>
               </select>
             </div>
             <div>
-              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Catatan {isSuperAdmin ? '(opsional)' : '(alasan mutasi)'}</label>
-              <textarea style={{...inp,minHeight:80,resize:'vertical'}} value={catatan} onChange={e=>setCatatan(e.target.value)} placeholder={isSuperAdmin ? 'Alasan pemindahan...' : 'Jelaskan alasan pengajuan mutasi...'} />
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Catatan {directAction ? '(opsional)' : '(alasan mutasi)'}</label>
+              <textarea style={{...inp,minHeight:80,resize:'vertical'}} value={catatan} onChange={e=>setCatatan(e.target.value)} placeholder={directAction ? 'Alasan pemindahan...' : 'Jelaskan alasan pengajuan mutasi...'} />
             </div>
-            {!isSuperAdmin && (
+            {!directAction && (
               <div style={{padding:'10px 14px',borderRadius:8,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',fontSize:11.5,color:'var(--muted2)'}}>
-                <Loader2 size={12} style={{verticalAlign:-2}}/> Pengajuan akan dikirim ke Super Admin untuk disetujui. Karyawan belum pindah sampai disetujui.
+                <Loader2 size={12} style={{verticalAlign:-2}}/> Pengajuan akan menunggu persetujuan dari {selectedProjectNama || 'project tujuan'} atau Super Admin. Karyawan belum pindah sampai disetujui.
               </div>
             )}
             {error && <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> {error}</div>}
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:isSuperAdmin?'linear-gradient(135deg,#3A8FE0,#1A5FA0)':'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : isSuperAdmin ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><RefreshCw size={14}/>Pindahkan Sekarang</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Download size={14}/>Kirim Pengajuan</span>}
+            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:directAction?'linear-gradient(135deg,#3A8FE0,#1A5FA0)':'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
+              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : directAction ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><RefreshCw size={14}/>Pindahkan Sekarang</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Download size={14}/>Kirim Pengajuan</span>}
             </button>
           </div>
         </form>
@@ -737,7 +765,7 @@ function BulkPindahProjectModal({ employeeIds, count, projects, isSuperAdmin, on
             </div>
             {!isSuperAdmin && (
               <div style={{padding:'10px 14px',borderRadius:8,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',fontSize:11.5,color:'var(--muted2)'}}>
-                <Loader2 size={12} style={{verticalAlign:-2}}/> Pengajuan akan dikirim ke Super Admin untuk disetujui. Karyawan belum pindah sampai disetujui.
+                <Loader2 size={12} style={{verticalAlign:-2}}/> Pengajuan akan menunggu persetujuan dari {toProjectId ? (projects.find(p=>p.id===Number(toProjectId))?.nama || 'project tujuan') : 'project tujuan'} atau Super Admin. Karyawan belum pindah sampai disetujui.
               </div>
             )}
             {error && <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> {error}</div>}
@@ -746,72 +774,6 @@ function BulkPindahProjectModal({ employeeIds, count, projects, isSuperAdmin, on
             <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
             <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:isSuperAdmin?'linear-gradient(135deg,#3A8FE0,#1A5FA0)':'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
               {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : isSuperAdmin ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><RefreshCw size={14}/>Pindahkan Sekarang</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Download size={14}/>Kirim Pengajuan</span>}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ── MODAL PINDAH UNIT HO ──
-function PindahUnitHoModal({ employee, onClose, onSuccess }) {
-  const [toUnit,  setToUnit]  = useState('');
-  const [catatan, setCatatan] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
-
-  const availableUnits = ['HO-1', 'HO-2'].filter(u => u !== employee.ho_unit);
-  const inp = { background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)', borderRadius:8, padding:'8px 11px', fontSize:12.5, fontFamily:"'Outfit',sans-serif", outline:'none', width:'100%', boxSizing:'border-box' };
-  async function submit(e) {
-    e.preventDefault();
-    if (!toUnit) { setError('Pilih unit tujuan.'); return; }
-    setLoading(true); setError('');
-    try {
-      const res = await axios.post(`/employees/${employee.id}/pindah-unit-ho`, { unit: toUnit, catatan }, { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content } });
-      if (res.data.ok) {
-        onSuccess(res.data.message);
-        onClose();
-      } else {
-        setError(res.data.message);
-      }
-    } catch (err) { setError(err.response?.data?.message || 'Terjadi kesalahan.'); }
-    setLoading(false);
-  }
-  return (
-    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
-      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(460px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',overflow:'hidden'}}>
-        <div style={{height:4,background:'linear-gradient(90deg,#3A8FE0,#22C97A)'}}/>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-          <div>
-            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Building2 size={15}/> Pindah Unit HO</div>
-            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{employee.nama_lengkap} · {employee.jabatan}</div>
-          </div>
-          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
-        </div>
-        <form onSubmit={submit}>
-          <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
-            <div style={{padding:'10px 14px',borderRadius:9,background:'rgba(58,143,224,.08)',border:'1px solid rgba(58,143,224,.2)',fontSize:12}}>
-              <div style={{color:'var(--muted)',marginBottom:4}}>Unit saat ini:</div>
-              <div style={{fontWeight:700,color:'var(--blue)'}}>{employee.ho_unit || 'Belum ditentukan'}</div>
-            </div>
-            <div>
-              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Unit Tujuan *</label>
-              <select style={inp} value={toUnit} onChange={e=>setToUnit(e.target.value)}>
-                <option value="">— Pilih Unit —</option>
-                {availableUnits.map(u=><option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Catatan (opsional)</label>
-              <textarea style={{...inp,minHeight:70,resize:'vertical'}} value={catatan} onChange={e=>setCatatan(e.target.value)} placeholder="Alasan pemindahan unit..." />
-            </div>
-            {error && <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> {error}</div>}
-          </div>
-          <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
-            <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
-              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><RefreshCw size={14}/>Pindahkan Sekarang</span>}
             </button>
           </div>
         </form>
@@ -1220,7 +1182,7 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
                       <td>
                         <div style={{display:'flex',gap:6,justifyContent:'center'}}>
                           <Link href={`/employees/${e.id}/edit`} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',textDecoration:'none',border:'1px solid rgba(232,160,32,.25)',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:5}}><Pencil size={11}/> Edit</Link>
-                          <button type="button" onClick={()=>onPindah(e)} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(58,143,224,.1)',color:'var(--blue)',border:'1px solid rgba(58,143,224,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><RefreshCw size={11}/> Pindah</button>
+                          <button type="button" onClick={()=>onPindah(e)} title="Pindah project / unit" style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(58,143,224,.1)',color:'var(--blue)',border:'1px solid rgba(58,143,224,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><RefreshCw size={11}/> Pindah</button>
                           <button type="button" onClick={()=>onTerminate(e)} style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><LogOut size={11}/> Terminate</button>
                         </div>
                       </td>
@@ -1349,10 +1311,10 @@ export default function EmployeeIndex({
   auth = {},
   project_info = null,
 }) {
+  const isHo = project_info?.tipe_gaji === 'ho';
   const [activeTab,    setActiveTab]    = useState('aktif');
   const [terminateEmp, setTerminateEmp] = useState(null);
   const [pindahEmp,    setPindahEmp]    = useState(null);
-  const [pindahHoEmp,  setPindahHoEmp]  = useState(null);
   const [flashTransfer,setFlashTransfer]= useState('');
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -1434,33 +1396,18 @@ export default function EmployeeIndex({
       {/* Modal terminate */}
       {terminateEmp && <TerminationModal employee={terminateEmp} onClose={()=>setTerminateEmp(null)} />}
 
-      {/* Modal pindah project */}
+      {/* Modal pindah (project, dan khusus HO juga unit HO-1/HO-2) */}
       {pindahEmp && (
         <PindahProjectModal
           employee={pindahEmp}
           projects={projects}
           isSuperAdmin={isSuperAdmin}
+          isHo={isHo}
           onClose={() => setPindahEmp(null)}
           onSuccess={(msg, newProjectId, newProjectNama) => {
             setFlashTransfer(msg);
             setPindahEmp(null);
             // Hard refresh supaya data project di tabel selalu fresh
-            router.visit(window.location.pathname + window.location.search, {
-              preserveScroll: true,
-              onSuccess: () => setTimeout(() => setFlashTransfer(''), 4000),
-            });
-          }}
-        />
-      )}
-
-      {/* Modal pindah unit HO */}
-      {pindahHoEmp && (
-        <PindahUnitHoModal
-          employee={pindahHoEmp}
-          onClose={() => setPindahHoEmp(null)}
-          onSuccess={(msg) => {
-            setFlashTransfer(msg);
-            setPindahHoEmp(null);
             router.visit(window.location.pathname + window.location.search, {
               preserveScroll: true,
               onSuccess: () => setTimeout(() => setFlashTransfer(''), 4000),
@@ -1515,20 +1462,14 @@ export default function EmployeeIndex({
           activeProjectId={usePage().props.active_project_id}
           project_info={project_info}
           onTerminate={emp => setTerminateEmp(emp)}
-          onPindah={emp => (project_info?.tipe_gaji === 'ho' || emp.ho_unit)
-            ? setPindahHoEmp({
-                id: emp.id,
-                nama_lengkap: emp.nama_lengkap,
-                jabatan: emp.jabatan,
-                ho_unit: emp.ho_unit,
-              })
-            : setPindahEmp({
-                id: emp.id,
-                nama_lengkap: emp.nama_lengkap,
-                jabatan: emp.jabatan,
-                project_id: emp.project_id,
-                project_nama: emp.project_nama,
-              })}
+          onPindah={emp => setPindahEmp({
+            id: emp.id,
+            nama_lengkap: emp.nama_lengkap,
+            jabatan: emp.jabatan,
+            project_id: emp.project_id,
+            project_nama: emp.project_nama,
+            ho_unit: emp.ho_unit,
+          })}
         />
       )}
       {activeTab === 'terminated' && <TabTerminated terminated={terminated} />}

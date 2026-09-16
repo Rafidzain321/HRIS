@@ -541,9 +541,86 @@ class EmployeeKpiController extends Controller
                 'atasan_id'    => $e->atasan_id,
             ]);
 
+        $doc = \App\Models\OrgStructureDocument::with('uploader')->latest()->first();
+
         return Inertia::render('Kpi/OrgStructure', [
             'employees' => $employees,
+            'document'  => $doc ? [
+                'id'           => $doc->id,
+                'nama_file'    => $doc->nama_file,
+                'mime_type'    => $doc->mime_type,
+                'size'         => $doc->size_formatted,
+                'uploaded_by'  => $doc->uploader?->name ?? '—',
+                'uploaded_at'  => $doc->created_at->format('d M Y H:i'),
+            ] : null,
         ]);
+    }
+
+    // Dokumen bagan/struktur organisasi resmi (gambar/PDF) — cuma referensi visual, terpisah
+    // dari data atasan_id fungsional. Selalu cuma nyimpen SATU dokumen terkini; upload baru
+    // otomatis mengganti (menghapus) yang lama.
+    public function uploadOrgDocument(Request $request)
+    {
+        if (!$this->isAdminSettings()) {
+            abort(403, 'Kamu tidak memiliki akses untuk mengganti dokumen ini.');
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
+        ]);
+
+        $old = \App\Models\OrgStructureDocument::latest()->first();
+        if ($old) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($old->path);
+            $old->delete();
+        }
+
+        $file = $request->file('file');
+        $name = time() . '_' . \Illuminate\Support\Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('org_structure', $name, 'public');
+
+        \App\Models\OrgStructureDocument::create([
+            'nama_file'   => $file->getClientOriginalName(),
+            'path'        => $path,
+            'mime_type'   => $file->getMimeType(),
+            'size'        => $file->getSize(),
+            'uploaded_by' => auth()->id(),
+        ]);
+
+        ActivityLog::record('upload', 'Struktur Organisasi', null, "Upload dokumen struktur organisasi: {$file->getClientOriginalName()}");
+
+        return back()->with('success', 'Dokumen struktur organisasi berhasil diupload.');
+    }
+
+    public function previewOrgDocument()
+    {
+        $doc = \App\Models\OrgStructureDocument::latest()->first();
+        if (!$doc || !\Illuminate\Support\Facades\Storage::disk('public')->exists($doc->path)) {
+            abort(404, 'Dokumen tidak ditemukan.');
+        }
+
+        $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($doc->path);
+        return response()->file($fullPath, [
+            'Content-Type'        => $doc->mime_type,
+            'Content-Disposition' => 'inline; filename="' . $doc->nama_file . '"',
+        ]);
+    }
+
+    public function destroyOrgDocument()
+    {
+        if (!$this->isAdminSettings()) {
+            abort(403, 'Kamu tidak memiliki akses untuk menghapus dokumen ini.');
+        }
+
+        $doc = \App\Models\OrgStructureDocument::latest()->first();
+        if ($doc) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($doc->path);
+            $nama = $doc->nama_file;
+            $doc->delete();
+            ActivityLog::record('delete', 'Struktur Organisasi', null, "Hapus dokumen struktur organisasi: {$nama}");
+        }
+
+        return back()->with('success', 'Dokumen struktur organisasi berhasil dihapus.');
     }
 
     public function updateAtasan(Request $request, Employee $employee)

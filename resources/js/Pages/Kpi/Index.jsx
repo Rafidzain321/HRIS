@@ -6,7 +6,7 @@ import { usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
   Target, Plus, Trash2, Pencil, X, TriangleAlert, Loader2,
-  Users, BarChart3, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Download, Network,
+  Users, BarChart3, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Download, Network, Info,
 } from 'lucide-react';
 
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content; }
@@ -555,7 +555,13 @@ function TabDashboard({ goals, employees }) {
                   <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Jabatan</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Goals</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Total Bobot</th>
-                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Skor Akhir</th>
+                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      Skor Akhir
+                      <Info size={11} style={{ cursor: 'help', flexShrink: 0 }}
+                        title="Skor Akhir = Σ(Progress% × Bobot) tiap goal, TIDAK dinormalisasi ke Total Bobot. Kalau Total Bobot karyawan belum 100%, Skor Akhir maksimalnya otomatis ikut lebih rendah dari 100 walau semua goal-nya tercapai penuh. Skor Akhir baru bisa dibandingkan adil antar karyawan kalau Total Bobot masing-masing sudah 100%." />
+                    </span>
+                  </th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Predikat</th>
                 </tr>
               </thead>

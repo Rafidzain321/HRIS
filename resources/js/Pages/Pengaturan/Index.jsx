@@ -310,7 +310,7 @@ function ResetPasswordModal({ user, onClose }) {
 
 // ── MODAL GANTI PASSWORD SENDIRI ────────────────────────────
 function ChangePasswordModal({ onClose }) {
-  const [form, setForm] = useState({ current_password:'', password:'', password_confirmation:'' });
+  const [form, setForm] = useState({ password:'', password_confirmation:'' });
   const [loading, setLoading] = useState(false);
   const [errors,  setErrors]  = useState({});
 
@@ -334,7 +334,6 @@ function ChangePasswordModal({ onClose }) {
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:13}}>
             {[
-              {label:'Password Lama *',        key:'current_password',      ph:'password yang sekarang'},
               {label:'Password Baru *',         key:'password',              ph:'min. 6 karakter'},
               {label:'Konfirmasi Password *',   key:'password_confirmation', ph:'ulangi password baru'},
             ].map(f=>(

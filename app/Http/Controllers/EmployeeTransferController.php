@@ -214,7 +214,7 @@ class EmployeeTransferController extends Controller
 
         $message = $isSuperAdmin
             ? "{$moved} karyawan berhasil dipindahkan ke {$toProject?->nama}." . ($skipped ? " {$skipped} dilewati (sudah di project tujuan)." : '')
-            : "{$requested} pengajuan mutasi dikirim, menunggu persetujuan Super Admin." . ($skipped ? " {$skipped} dilewati." : '');
+            : "{$requested} pengajuan mutasi dikirim, menunggu persetujuan dari {$toProject?->nama} atau Super Admin." . ($skipped ? " {$skipped} dilewati." : '');
 
         return response()->json(['ok' => true, 'message' => $message, 'moved' => $moved, 'requested' => $requested, 'skipped' => $skipped]);
     }
@@ -269,7 +269,7 @@ class EmployeeTransferController extends Controller
             "Pengajuan mutasi: {$employee->nama_lengkap} ke {$toProject?->nama}"
         );
 
-        return response()->json(['ok' => true, 'message' => 'Pengajuan mutasi berhasil dikirim. Menunggu persetujuan Super Admin.']);
+        return response()->json(['ok' => true, 'message' => "Pengajuan mutasi berhasil dikirim. Menunggu persetujuan dari {$toProject?->nama} atau Super Admin."]);
     }
 
     public function approve(Request $request, EmployeeTransfer $transfer)

@@ -90,18 +90,7 @@ function SnowCanvas() {
   return <canvas ref={canvasRef} style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none', opacity:0.5 }} />;
 }
 
-function NotifPanel({ open, onClose }) {
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    fetch('/notifications/data').then(r=>r.json()).then(d=>{setData(d);setLoading(false);}).catch(()=>setLoading(false));
-    const interval = setInterval(() => {
-      fetch('/notifications/data').then(r=>r.json()).then(d=>setData(d)).catch(()=>{});
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [open]);
+function NotifPanel({ open, onClose, data, loading }) {
   const typeIcon  = { sim:Car, mcu:Stethoscope, badge:CreditCard, kp:ClipboardList, kpi:Target };
   const typeColor = { sim:'#3A8FE0', mcu:'#E06A20', badge:'#E8A020', kp:'#22C97A', kpi:'#9B59B6' };
   if (!open) return null;
@@ -388,9 +377,23 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
 
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
+  const [notifData,    setNotifData]    = useState(null);
+  const [notifLoading, setNotifLoading] = useState(true);
 
   // Close sidebar when navigating on mobile
   useEffect(() => { setSidebarOpen(false); }, [url]);
+
+  // Ambil data notifikasi dari awal (bukan cuma pas panel dibuka) — supaya titik merah di
+  // ikon lonceng benar-benar mencerminkan ada/tidaknya notifikasi asli, bukan selalu nyala.
+  useEffect(() => {
+    let cancelled = false;
+    function load() {
+      fetch('/notifications/data').then(r=>r.json()).then(d=>{ if(!cancelled){ setNotifData(d); setNotifLoading(false); } }).catch(()=>{ if(!cancelled) setNotifLoading(false); });
+    }
+    load();
+    const interval = setInterval(load, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
 
   const CSS_VARS = `
     --bg:#EEF1F8; --bg2:#FFFFFF; --bg3:#E2E7F0; --card:#FFFFFF;
@@ -640,14 +643,14 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
                 <div style={{ position:'absolute', top:2, right:2, minWidth:15, height:15, padding:'0 3px', borderRadius:99, background:'var(--red)', color:'#fff', fontSize:9.5, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>
                   {kpiPendingReview}
                 </div>
-              ) : (
+              ) : notifData?.summary?.total > 0 ? (
                 <div style={{ position:'absolute', top:6, right:6, width:7, height:7, borderRadius:'50%', background:'var(--red)', animation:'blink 1.5s infinite' }}/>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
 
-        <NotifPanel open={notifOpen} onClose={()=>setNotifOpen(false)} />
+        <NotifPanel open={notifOpen} onClose={()=>setNotifOpen(false)} data={notifData} loading={notifLoading} />
         <FlashNotif />
 
         <div className="main-pad" style={{ padding:'22px 24px', flex:1, position:'relative', minWidth:0 }}>
@@ -671,7 +674,7 @@ function SidebarContent({ url, authUser, onLogout }) {
   // Project HO (kantor pusat) tidak punya compliance/training/timesheet — sembunyikan menu itu.
   const currentProjectKode = (projects?.find(p => p.id === activeProjectId)?.kode || userProject?.kode || '').toLowerCase();
   const isHoProject = currentProjectKode === 'ho';
-  const HO_HIDDEN_KEYS = ['sim', 'mcu', 'badge', 'ppe', 'ccpm', 'driver', 'equipment', 'timesheet', 'training'];
+  const HO_HIDDEN_KEYS = ['sim', 'mcu', 'badge', 'ppe', 'ccpm', 'driver', 'equipment', 'timesheet', 'training', 'slip-gaji', 'data-gaji'];
   // Kebalikannya: KPI cuma dipakai untuk Head Office, jadi sembunyikan menunya
   // kalau project yang lagi difilter/aktif BUKAN HO (mis. admin lagi lihat project Giam).
   const NON_HO_HIDDEN_KEYS = ['kpi', 'cuti'];
@@ -688,8 +691,11 @@ function SidebarContent({ url, authUser, onLogout }) {
     .filter(item => !restrictPayroll || !item.key || !PAYROLL_KEYS.includes(item.key))
     .filter(item => !item.key || canViewMenu(item.key));
   // Buang judul section yang jadi kosong setelah item-nya difilter (mis. "Compliance" tanpa isi).
+  // Khusus HO menunya sedikit (cuma beberapa item) — pemisah Utama/Operasional/Sistem jadi
+  // kurang perlu dan malah kelihatan kosong-kosong, jadi dibuang semua buat HO, tampil rata.
   const navItems = filteredNav.filter((item, i) => {
     if (!item.section) return true;
+    if (isHoProject) return false;
     const next = filteredNav[i + 1];
     return next && !next.section;
   }).map(item => {

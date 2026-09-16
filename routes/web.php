@@ -197,6 +197,9 @@ Route::middleware(['auth'])->group(function () {
     // ── Struktur Organisasi (atasan-bawahan, dulu hardcoded lewat DB) ──
     Route::get('/pengaturan/struktur-organisasi', [EmployeeKpiController::class, 'orgStructure'])->name('org-structure');
     Route::put('/pengaturan/struktur-organisasi/{employee}', [EmployeeKpiController::class, 'updateAtasan'])->name('org-structure.update');
+    Route::post('/pengaturan/struktur-organisasi/dokumen', [EmployeeKpiController::class, 'uploadOrgDocument'])->name('org-structure.document.upload');
+    Route::get('/pengaturan/struktur-organisasi/dokumen/preview', [EmployeeKpiController::class, 'previewOrgDocument'])->name('org-structure.document.preview');
+    Route::delete('/pengaturan/struktur-organisasi/dokumen', [EmployeeKpiController::class, 'destroyOrgDocument'])->name('org-structure.document.destroy');
 
     // ── Cuti Tahunan (khusus karyawan Head Office, HR yang input) ──
     Route::get('/cuti', [EmployeeLeaveController::class, 'index'])->middleware('menu:cuti,view')->name('cuti');
@@ -288,8 +291,10 @@ Route::middleware(['auth'])->group(function () {
 
         if ($proj && strtoupper($proj->kode) === 'HO') {
             $hoHiddenPrefixes = ['/compliance/sim', '/compliance/mcu', '/compliance/badge', '/compliance/ppe', '/ccpm', '/driver', '/equipment', '/training'];
+            // Timesheet, Slip Gaji, dan Data Gaji sekarang semua disembunyikan dari menu HO
+            // (lihat HO_HIDDEN_KEYS di AppLayout.jsx) — jangan kembali ke halaman itu.
             $isHidden = collect($hoHiddenPrefixes)->contains(fn ($p) => str_starts_with($refPath, $p))
-                || (str_starts_with($refPath, '/timesheet') && !str_starts_with($refPath, '/timesheet/slip-gaji') && !str_starts_with($refPath, '/timesheet/data-gaji'));
+                || str_starts_with($refPath, '/timesheet');
             if ($isHidden) {
                 return redirect('/');
             }

@@ -209,14 +209,11 @@ class UserManagementController extends Controller
         return back()->with('success', "Password {$user->name} berhasil direset.");
     }
 
-    // ── User ganti password sendiri ──
+    // ── User ganti password sendiri (semua role, tanpa perlu password lama —
+    // konsisten dengan super-admin reset password user lain yang juga tidak perlu itu) ──
     public function changePassword(Request $request)
     {
-        // current_password & password_confirmation opsional — dipakai modal Ganti Password di
-        // halaman Pengaturan lengkap (HR/super-admin). Halaman profil sederhana (manager, dst)
-        // cuma kirim "password" saja, tanpa perlu password lama.
         $data = $request->validate([
-            'current_password'      => 'nullable|string',
             'password'               => 'nullable|string|min:6',
             'password_confirmation' => 'nullable|string',
         ]);
@@ -230,11 +227,6 @@ class UserManagementController extends Controller
         }
 
         $user = auth()->user();
-
-        if (!empty($data['current_password']) && !Hash::check($data['current_password'], $user->password)) {
-            return back()->withErrors(['current_password' => 'Password lama tidak sesuai.']);
-        }
-
         $user->update(['password' => Hash::make($data['password']), 'plain_password' => $data['password']]);
         ActivityLog::record('update', 'User', $user->name, "Ganti password sendiri");
         return back()->with('success', "Password berhasil diubah.");
