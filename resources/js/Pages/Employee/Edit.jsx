@@ -383,7 +383,7 @@ function RiwayatGajiSection({ items = [] }) {
 }
 
 // ── MAIN COMPONENT ──
-export default function EmployeeEdit({ employee, positions = [], project_info = null, salary_history = [] }) {
+export default function EmployeeEdit({ employee, positions = [], departments = [], project_info = null, salary_history = [] }) {
   const isHo = project_info?.tipe_gaji === 'ho';
   const { data, setData, put, processing, isDirty } = useForm({
     id_badge:             employee.id_badge             || '',
@@ -398,6 +398,7 @@ export default function EmployeeEdit({ employee, positions = [], project_info = 
     tanggal_masuk:        employee.tanggal_masuk         || '',
     tanggal_akhir_probation: employee.tanggal_akhir_probation || '',
     position_id:          employee.position_id           || '',
+    department_id:        employee.department_id         || '',
     alamat:               employee.alamat               || '',
     agama:                employee.agama                || '',
     kota_asal:            employee.kota_asal            || '',
@@ -566,6 +567,12 @@ export default function EmployeeEdit({ employee, positions = [], project_info = 
                 <select style={selectStyle} value={data.position_id} onChange={e=>setData('position_id',e.target.value)}>
                   <option value="">— Pilih Jabatan —</option>
                   {positions.map((p,i)=><option key={i} value={p.id}>{p.nama_jabatan}</option>)}
+                </select>
+              </Field>
+              <Field label="Departemen">
+                <select style={selectStyle} value={data.department_id} onChange={e=>setData('department_id',e.target.value)}>
+                  <option value="">— Pilih Departemen —</option>
+                  {departments.map(d=><option key={d.id} value={d.id}>{d.nama}</option>)}
                 </select>
               </Field>
               <Field label="Kota Asal">

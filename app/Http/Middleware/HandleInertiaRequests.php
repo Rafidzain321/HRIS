@@ -3,7 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Employee;
-use App\Models\EmployeeGoal;
+use App\Models\KpiAppraisal;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -56,25 +56,27 @@ class HandleInertiaRequests extends Middleware
             }
         }
 
-        // Badge "pending review" KPI di sidebar — gabungan dari 2 sumber, keduanya cuma yang
-        // progress-nya belum pernah diisi sama sekali (masih = baseline):
-        //  1) goal yang menunjuk user ini sebagai reviewer yang ditugaskan bebas (reviewer_id)
-        //  2) goal milik bawahan langsungnya (atasan_id) — supaya manajer otomatis tahu ada
-        //     goal timnya yang belum diupdate, walau tidak ada penugasan reviewer eksplisit.
-        // Khusus akun self-input (bukan HR/super-admin/GM-Direktur — mereka sudah punya
-        // tab Dashboard KPI buat pantauan menyeluruh, badge personal begini kurang relevan).
+        // Badge "pending review" KPI di sidebar — jumlah orang yang penilaian semester
+        // berjalannya BELUM final (belum ada baris sama sekali, atau masih draft), dari
+        // cakupan: bawahan langsung (atasan_id) + siapa saja yang sudah pernah ditugaskan
+        // ke user ini sebagai reviewer di penilaian sebelumnya. Khusus akun self-input
+        // (bukan HR/super-admin/GM-Direktur — mereka sudah punya tab Dashboard KPI
+        // buat pantauan menyeluruh, badge personal begini kurang relevan).
         $kpiPendingReview = 0;
         if ($user && $user->employee_id && !$user->hasRole('super-admin') && !$user->can('edit-kpi') && !$user->can('view-all-kpi')) {
             $bawahanIds = Employee::where('atasan_id', $user->employee_id)->pluck('id')->toArray();
-            $kpiPendingReview = EmployeeGoal::where('aktif', true)
-                ->whereColumn('progress_sekarang', 'baseline')
-                ->where(function ($q) use ($user, $bawahanIds) {
-                    $q->where('reviewer_id', $user->employee_id);
-                    if (!empty($bawahanIds)) {
-                        $q->orWhereIn('employee_id', $bawahanIds);
-                    }
-                })
-                ->count();
+            $reviewOwnerIds = KpiAppraisal::where('reviewer_id', $user->employee_id)->pluck('employee_id')->toArray();
+            $scopeIds = array_values(array_unique([...$bawahanIds, ...$reviewOwnerIds]));
+
+            if (!empty($scopeIds)) {
+                $kpiSemester = now()->month <= 6 ? 1 : 2;
+                $submittedIds = KpiAppraisal::where('tahun', now()->year)
+                    ->where('semester', $kpiSemester)
+                    ->where('status', 'submitted')
+                    ->whereIn('employee_id', $scopeIds)
+                    ->pluck('employee_id')->toArray();
+                $kpiPendingReview = count(array_diff($scopeIds, $submittedIds));
+            }
         }
 
         return array_merge(parent::share($request), [

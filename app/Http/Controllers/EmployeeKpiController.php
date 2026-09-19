@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\Employee;
-use App\Models\EmployeeGoal;
+use App\Models\KpiAppraisal;
+use App\Models\KpiAppraisalScore;
+use App\Models\KpiCriteria;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,10 +18,9 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 
 class EmployeeKpiController extends Controller
 {
-    // HR (permission edit-kpi) atau super-admin boleh kelola goal siapa saja. Selain itu, akun
-    // yang terhubung ke data karyawan sendiri (users.employee_id) cuma boleh kelola goal dirinya
-    // sendiri DAN bawahan langsungnya (atasan_id) — dipakai fitur self-input KPI per manajer
-    // beserta dashboard tim mereka.
+    // HR (permission edit-kpi) atau super-admin boleh kelola penilaian siapa saja. Selain itu,
+    // akun yang terhubung ke data karyawan sendiri (users.employee_id) cuma boleh kelola
+    // penilaian dirinya sendiri DAN bawahan langsungnya (atasan_id).
     private function canEditKpiFor(int $employeeId): bool
     {
         $user = auth()->user();
@@ -31,19 +32,16 @@ class EmployeeKpiController extends Controller
         return Employee::where('id', $employeeId)->where('atasan_id', $user->employee_id)->exists();
     }
 
-    // Reviewer yang ditugaskan bebas (lihat kolom reviewer_id) boleh mengisi progress goal itu,
-    // di luar aturan atasan-bawahan biasa — dipakai khusus updateProgress().
-    private function isReviewerOf(EmployeeGoal $goal): bool
+    // Penilai yang ditugaskan bebas di form penilaian (reviewer_id) — boleh mengisi skor,
+    // di luar aturan atasan-bawahan biasa.
+    private function isReviewerOf(KpiAppraisal $appraisal): bool
     {
         $user = auth()->user();
-        return $user && $user->employee_id && $goal->reviewer_id && (int) $user->employee_id === (int) $goal->reviewer_id;
+        return $user && $user->employee_id && $appraisal->reviewer_id && (int) $user->employee_id === (int) $appraisal->reviewer_id;
     }
 
-    // Null = lihat semua (HR/super-admin, atau GM & Direktur lewat permission "view-all-kpi" —
-    // khusus lihat, BUKAN boleh edit KPI orang lain, itu tetap cuma HR lewat canEditKpiFor()).
-    // Selain itu, dikembalikan daftar ID: diri sendiri + seluruh bawahan langsung — dipakai buat
-    // mempersempit index()/summary() jadi "dashboard tim saya" untuk akun self-input (manajer
-    // tanpa bawahan otomatis cuma lihat dirinya sendiri).
+    // Null = lihat semua (HR/super-admin/view-all-kpi). Selain itu, daftar ID: diri sendiri +
+    // bawahan langsung + siapa saja yang penilaiannya ditugaskan ke user ini sebagai reviewer.
     private function scopedEmployeeIds(): ?array
     {
         $user = auth()->user();
@@ -53,16 +51,12 @@ class EmployeeKpiController extends Controller
         if (!$user->employee_id) return [];
 
         $bawahanIds = Employee::where('atasan_id', $user->employee_id)->pluck('id')->toArray();
-        // Ditugaskan sebagai reviewer goal orang lain — orang itu ikut masuk cakupan supaya
-        // goal yang mau direview kelihatan, walau bukan bawahan langsung.
-        $reviewOwnerIds = EmployeeGoal::where('reviewer_id', $user->employee_id)->where('aktif', true)
+        $reviewOwnerIds = KpiAppraisal::where('reviewer_id', $user->employee_id)
             ->pluck('employee_id')->toArray();
 
         return array_values(array_unique([(int) $user->employee_id, ...$bawahanIds, ...$reviewOwnerIds]));
     }
 
-    // Daftar karyawan yang boleh dilihat/dikelola user saat ini, termasuk atasan_id — dipakai
-    // buat menyusun tampilan berjenjang (hierarki) di halaman KPI & form Tambah/Edit Goal.
     private function employeesPayload()
     {
         $hoProjectId = Project::where('kode', 'ho')->value('id');
@@ -73,7 +67,7 @@ class EmployeeKpiController extends Controller
             ->when($scopedIds !== null, fn ($q) => $q->whereIn('id', $scopedIds))
             ->with('position')
             ->orderBy('nama_lengkap')
-            ->get(['id', 'nama_lengkap', 'position_id', 'atasan_id'])
+            ->get(['id', 'nama_lengkap', 'position_id', 'department_id', 'atasan_id'])
             ->map(fn ($e) => [
                 'id'           => $e->id,
                 'nama_lengkap' => $e->nama_lengkap,
@@ -85,8 +79,7 @@ class EmployeeKpiController extends Controller
     }
 
     // Daftar penuh karyawan HO (tanpa dibatasi cakupan atasan-bawahan) — dipakai khusus buat
-    // pemilihan "Reviewer / penanggung jawab update progress", supaya penugasannya bebas tidak
-    // kaku ke struktur hierarki (misal manajer boleh menunjuk HR atau manajer lain sebagai reviewer).
+    // pemilihan "Penilai / Reviewer", supaya penugasannya bebas tidak kaku ke struktur hierarki.
     private function allEmployeesPayload()
     {
         $hoProjectId = Project::where('kode', 'ho')->value('id');
@@ -104,172 +97,473 @@ class EmployeeKpiController extends Controller
             ]);
     }
 
-    private function serializeGoal(EmployeeGoal $g): array
+    // Periode berjalan sekarang — semester 1 = Jan-Jun, semester 2 = Jul-Des.
+    private function currentPeriod(): array
     {
-        return [
-            'id'                => $g->id,
-            'employee_id'       => $g->employee_id,
-            'reviewer_id'       => $g->reviewer_id,
-            'reviewer_nama'     => $g->reviewer?->nama_lengkap,
-            'nama_goal'         => $g->nama_goal,
-            'deskripsi'         => $g->deskripsi,
-            'siklus'            => $g->siklus,
-            'tanggal_mulai'     => $g->tanggal_mulai->format('Y-m-d'),
-            'tanggal_selesai'   => $g->tanggal_selesai->format('Y-m-d'),
-            'satuan'            => $g->satuan,
-            'baseline'          => $g->baseline,
-            'target'            => $g->target,
-            'progress_sekarang' => $g->progress_sekarang,
-            'bobot'             => $g->bobot,
-            'catatan'           => $g->catatan,
-            'diperbarui_oleh'   => $g->diperbarui_oleh,
-            'progress_percent'  => $g->progress_percent,
-            'status'            => $g->status,
-        ];
+        return [(int) now()->year, now()->month <= 6 ? 1 : 2];
     }
 
-    // KPI/Goal khusus untuk karyawan Head Office — tidak terpengaruh project aktif user.
+    // Kriteria yang berlaku buat satu karyawan: 20 poin baku (employee_id kosong) + poin
+    // tambahan khusus karyawan itu sendiri (beda-beda tiap orang, bukan per jabatan/departemen).
+    private function criteriaForEmployee(Employee $employee)
+    {
+        return KpiCriteria::where('is_active', true)
+            ->where(function ($q) use ($employee) {
+                $q->whereNull('employee_id')->orWhere('employee_id', $employee->id);
+            })
+            ->orderBy('section')->orderBy('urutan')
+            ->get();
+    }
+
+    // Hitung ulang nilai_a, nilai_b, total_nilai, predikat dari skor yang sudah tersimpan.
+    // Kriteria yang belum diisi skornya dihitung 0 (konsisten dengan cara kerja SUM di Excel).
+    private function recalculate(KpiAppraisal $appraisal): void
+    {
+        $employee = $appraisal->employee;
+        $criteria = $this->criteriaForEmployee($employee);
+        $scoresByCriteria = $appraisal->scores()->pluck('nilai', 'kpi_criteria_id');
+
+        $maxA = $criteria->where('section', 'A')->count() * 5;
+        $maxB = $criteria->where('section', 'B')->count() * 5;
+        $sumA = $criteria->where('section', 'A')->sum(fn ($c) => (int) ($scoresByCriteria[$c->id] ?? 0));
+        $sumB = $criteria->where('section', 'B')->sum(fn ($c) => (int) ($scoresByCriteria[$c->id] ?? 0));
+
+        $nilaiA = $maxA > 0 ? round((40 / $maxA) * $sumA, 2) : 0;
+        $nilaiB = $maxB > 0 ? round((60 / $maxB) * $sumB, 2) : 0;
+        $total  = round($nilaiA + $nilaiB, 2);
+
+        $appraisal->update([
+            'nilai_a'     => $nilaiA,
+            'nilai_b'     => $nilaiB,
+            'total_nilai' => $total,
+            'predikat'    => KpiAppraisal::predikatDari($total),
+        ]);
+    }
+
+    // ── HALAMAN UTAMA (daftar penilaian per periode + dashboard) ──
     public function index(Request $request)
     {
         [$employees, $isSelfOnly] = $this->employeesPayload();
+        [$defYear, $defSemester] = $this->currentPeriod();
+        $tahun    = (int) $request->get('tahun', $defYear);
+        $semester = (int) $request->get('semester', $defSemester);
 
-        $goals = EmployeeGoal::where('aktif', true)
+        $appraisals = KpiAppraisal::with('reviewer')
             ->whereIn('employee_id', $employees->pluck('id'))
-            ->orderByDesc('tanggal_mulai')
-            ->get()
-            ->map(fn ($g) => $this->serializeGoal($g));
+            ->where('tahun', $tahun)->where('semester', $semester)
+            ->get()->keyBy('employee_id');
+
+        $rows = $employees->map(function ($e) use ($appraisals) {
+            $a = $appraisals->get($e['id']);
+            return [
+                'employee_id'   => $e['id'],
+                'nama_lengkap'  => $e['nama_lengkap'],
+                'jabatan'       => $e['jabatan'],
+                'appraisal_id'  => $a?->id,
+                'nilai_a'       => $a?->nilai_a,
+                'nilai_b'       => $a?->nilai_b,
+                'total_nilai'   => $a?->total_nilai,
+                'predikat'      => $a?->predikat,
+                'predikat_label'=> KpiAppraisal::predikatLabel($a?->predikat),
+                'status'        => $a?->status ?? 'belum_dinilai',
+                'reviewer_id'   => $a?->reviewer_id,
+                'reviewer_nama' => $a?->reviewer?->nama_lengkap,
+            ];
+        });
 
         return Inertia::render('Kpi/Index', [
-            'employees'    => $employees,
-            'goals'        => $goals,
+            'rows'         => $rows,
+            'tahun'        => $tahun,
+            'semester'     => $semester,
             'is_self_only' => $isSelfOnly,
+            'all_employees'=> $this->allEmployeesPayload(),
             'highlight'    => $request->get('highlight'),
         ]);
     }
 
-    // Export Excel — cakupan data sama persis dengan index()/summary() (self + bawahan + goal
-    // yang direview, kecuali HR/super-admin/view-all-kpi yang lihat semua) supaya tidak bocor ke
-    // goal orang lain yang harusnya tidak boleh diakses user ini.
-    // 2 sheet: "Ringkasan" (nilai akhir per karyawan, sama seperti tab Dashboard) dan
-    // "Detail Goal" (rincian tiap goal, dengan warna baris mengikuti status-nya).
+    // Buka (atau buatkan kalau belum ada) form penilaian satu karyawan untuk satu periode.
+    public function openAppraisal(Request $request, Employee $employee)
+    {
+        [$defYear, $defSemester] = $this->currentPeriod();
+        $tahun    = (int) $request->get('tahun', $defYear);
+        $semester = (int) $request->get('semester', $defSemester);
+
+        $appraisal = KpiAppraisal::where('employee_id', $employee->id)
+            ->where('tahun', $tahun)->where('semester', $semester)->first();
+
+        if (!$appraisal && !$this->canEditKpiFor($employee->id)) {
+            abort(403, 'Kamu tidak memiliki akses untuk membuat penilaian baru untuk karyawan ini.');
+        }
+        if ($appraisal && !$this->canEditKpiFor($employee->id) && !$this->isReviewerOf($appraisal)) {
+            abort(403, 'Kamu tidak memiliki akses untuk melihat penilaian ini.');
+        }
+
+        if (!$appraisal) {
+            $appraisal = KpiAppraisal::create([
+                'employee_id' => $employee->id,
+                'tahun'       => $tahun,
+                'semester'    => $semester,
+                'status'      => 'draft',
+            ]);
+        }
+
+        $criteria = $this->criteriaForEmployee($employee);
+        // Pastikan setiap kriteria yang berlaku punya baris skor (kosong dulu kalau belum diisi).
+        $existingCriteriaIds = $appraisal->scores()->pluck('kpi_criteria_id')->toArray();
+        foreach ($criteria as $c) {
+            if (!in_array($c->id, $existingCriteriaIds)) {
+                KpiAppraisalScore::create(['kpi_appraisal_id' => $appraisal->id, 'kpi_criteria_id' => $c->id]);
+            }
+        }
+
+        $scores = $appraisal->scores()->pluck('nilai', 'kpi_criteria_id');
+
+        return Inertia::render('Kpi/AppraisalForm', [
+            'appraisal' => [
+                'id'          => $appraisal->id,
+                'tahun'       => $appraisal->tahun,
+                'semester'    => $appraisal->semester,
+                'status'      => $appraisal->status,
+                'catatan'     => $appraisal->catatan,
+                'reviewer_id' => $appraisal->reviewer_id,
+                'nilai_a'     => $appraisal->nilai_a,
+                'nilai_b'     => $appraisal->nilai_b,
+                'total_nilai' => $appraisal->total_nilai,
+                'predikat'    => $appraisal->predikat,
+            ],
+            'employee' => [
+                'id'           => $employee->id,
+                'nama_lengkap' => $employee->nama_lengkap,
+                'jabatan'      => $employee->position?->nama_jabatan ?? '-',
+                'departemen'   => $employee->department?->nama ?? '-',
+                'id_badge'     => $employee->id_badge,
+                'tanggal_masuk'=> $employee->tanggal_masuk?->format('d M Y'),
+            ],
+            'criteria' => $criteria->map(fn ($c) => [
+                'id'           => $c->id,
+                'section'      => $c->section,
+                'sub_kategori' => $c->sub_kategori,
+                'deskripsi'    => $c->deskripsi,
+                'is_base'      => $c->employee_id === null,
+                'nilai'        => $scores[$c->id] ?? null,
+            ]),
+            'all_employees' => $this->allEmployeesPayload(),
+            'can_edit'      => $this->canEditKpiFor($employee->id) || $this->isReviewerOf($appraisal),
+            'can_reopen'    => $this->isAdminSettings(),
+        ]);
+    }
+
+    // Simpan semua skor kriteria sekaligus (dipanggil tiap kali form disimpan, baik draft
+    // maupun submit final).
+    public function saveScores(Request $request, KpiAppraisal $appraisal)
+    {
+        if (!$this->canEditKpiFor($appraisal->employee_id) && !$this->isReviewerOf($appraisal)) {
+            return response()->json(['ok' => false, 'message' => 'Kamu tidak memiliki akses untuk mengisi penilaian ini.'], 403);
+        }
+        if ($appraisal->status === 'submitted') {
+            return response()->json(['ok' => false, 'message' => 'Penilaian ini sudah final dan terkunci. Minta HR/super-admin untuk membuka kembali kalau ada yang perlu dikoreksi.'], 422);
+        }
+
+        $data = $request->validate([
+            'reviewer_id'      => 'nullable|exists:employees,id',
+            'catatan'          => 'nullable|string|max:2000',
+            'scores'           => 'required|array',
+            'scores.*.criteria_id' => 'required|exists:kpi_criteria,id',
+            'scores.*.nilai'   => 'nullable|integer|min:1|max:5',
+            'submit'           => 'nullable|boolean',
+        ]);
+
+        foreach ($data['scores'] as $s) {
+            KpiAppraisalScore::updateOrCreate(
+                ['kpi_appraisal_id' => $appraisal->id, 'kpi_criteria_id' => $s['criteria_id']],
+                ['nilai' => $s['nilai'] ?? null]
+            );
+        }
+
+        $appraisal->update([
+            'reviewer_id' => $data['reviewer_id'] ?? $appraisal->reviewer_id,
+            'catatan'     => $data['catatan'] ?? $appraisal->catatan,
+        ]);
+
+        $this->recalculate($appraisal);
+
+        if (!empty($data['submit'])) {
+            $belumLengkap = collect($data['scores'])->contains(fn ($s) => empty($s['nilai']));
+            if ($belumLengkap) {
+                return response()->json(['ok' => false, 'message' => 'Semua poin penilaian harus diisi (1-5) sebelum bisa disimpan final.'], 422);
+            }
+            $appraisal->update(['status' => 'submitted', 'submitted_at' => now()]);
+            ActivityLog::record('update', 'Penilaian KPI', $appraisal->employee->nama_lengkap ?? '-', "Penilaian semester {$appraisal->semester}/{$appraisal->tahun} disimpan final — total {$appraisal->fresh()->total_nilai} ({$appraisal->fresh()->predikat})");
+        } else {
+            ActivityLog::record('update', 'Penilaian KPI', $appraisal->employee->nama_lengkap ?? '-', "Draft penilaian semester {$appraisal->semester}/{$appraisal->tahun} disimpan");
+        }
+
+        $fresh = $appraisal->fresh();
+        return response()->json([
+            'ok'      => true,
+            'message' => !empty($data['submit']) ? 'Penilaian berhasil disimpan final.' : 'Draft berhasil disimpan.',
+            'appraisal' => [
+                'status'      => $fresh->status,
+                'nilai_a'     => $fresh->nilai_a,
+                'nilai_b'     => $fresh->nilai_b,
+                'total_nilai' => $fresh->total_nilai,
+                'predikat'    => $fresh->predikat,
+            ],
+        ]);
+    }
+
+    public function destroyAppraisal(KpiAppraisal $appraisal)
+    {
+        if (!$this->canEditKpiFor($appraisal->employee_id)) {
+            return response()->json(['ok' => false, 'message' => 'Kamu tidak memiliki akses untuk menghapus penilaian ini.'], 403);
+        }
+        if ($appraisal->status === 'submitted') {
+            return response()->json(['ok' => false, 'message' => 'Penilaian yang sudah final tidak bisa langsung dihapus — buka kembali dulu lewat HR/super-admin.'], 422);
+        }
+
+        $nama = $appraisal->employee->nama_lengkap ?? '-';
+        $periode = "{$appraisal->semester}/{$appraisal->tahun}";
+        $appraisal->delete();
+
+        ActivityLog::record('delete', 'Penilaian KPI', $nama, "Hapus penilaian semester {$periode}");
+
+        return response()->json(['ok' => true]);
+    }
+
+    // Buka kembali penilaian yang sudah final — khusus HR/super-admin, dipakai kalau ada
+    // salah input yang baru ketahuan setelah disimpan final. Status balik ke draft supaya
+    // bisa dikoreksi lalu disimpan final ulang.
+    public function reopenAppraisal(KpiAppraisal $appraisal)
+    {
+        if (!$this->isAdminSettings()) {
+            abort(403, 'Hanya HR/super-admin yang bisa membuka kembali penilaian yang sudah final.');
+        }
+        if ($appraisal->status !== 'submitted') {
+            return response()->json(['ok' => false, 'message' => 'Penilaian ini belum final.'], 422);
+        }
+
+        $appraisal->update(['status' => 'draft', 'submitted_at' => null]);
+
+        $nama = $appraisal->employee->nama_lengkap ?? '-';
+        ActivityLog::record('update', 'Penilaian KPI', $nama, "Buka kembali penilaian semester {$appraisal->semester}/{$appraisal->tahun} (dari final ke draft)");
+
+        return response()->json(['ok' => true, 'status' => 'draft']);
+    }
+
+    // ── KRITERIA PENILAIAN (20 baku + tambahan khusus per karyawan) ──
+    private function canManageCriteria(): bool
+    {
+        $user = auth()->user();
+        if (!$user) return false;
+        if ($this->isAdminSettings()) return true;
+        return $user->employee_id && Employee::where('atasan_id', $user->employee_id)->exists();
+    }
+
+    // HR/super-admin boleh menambah kriteria untuk karyawan siapa saja. Atasan (bukan HR)
+    // hanya boleh menambah untuk bawahan langsungnya sendiri.
+    private function canTargetEmployeeForCriteria(int $employeeId): bool
+    {
+        $user = auth()->user();
+        if ($this->isAdminSettings()) return true;
+        return $user->employee_id && Employee::where('id', $employeeId)->where('atasan_id', $user->employee_id)->exists();
+    }
+
+    public function criteriaIndex()
+    {
+        if (!$this->canManageCriteria()) {
+            abort(403, 'Kamu tidak memiliki akses ke halaman ini.');
+        }
+
+        $criteria = KpiCriteria::with('employee')->where('is_active', true)
+            ->orderBy('section')->orderBy('employee_id')->orderBy('urutan')->get()
+            ->map(fn ($c) => [
+                'id'            => $c->id,
+                'section'       => $c->section,
+                'sub_kategori'  => $c->sub_kategori,
+                'deskripsi'     => $c->deskripsi,
+                'employee_id'   => $c->employee_id,
+                'employee_nama' => $c->employee?->nama_lengkap,
+                'is_base'       => $c->employee_id === null,
+            ]);
+
+        $user = auth()->user();
+        $targetEmployees = $this->isAdminSettings()
+            ? $this->allEmployeesPayload()
+            : Employee::aktif()->where('atasan_id', $user->employee_id)->with('position')->orderBy('nama_lengkap')
+                ->get(['id', 'nama_lengkap', 'position_id'])
+                ->map(fn ($e) => ['id' => $e->id, 'nama_lengkap' => $e->nama_lengkap, 'jabatan' => $e->position?->nama_jabatan ?? '-']);
+
+        return Inertia::render('Kpi/CriteriaManage', [
+            'criteria'         => $criteria,
+            'target_employees' => $targetEmployees,
+            'can_edit_text'    => $this->isAdminSettings(),
+        ]);
+    }
+
+    public function storeCriteria(Request $request)
+    {
+        if (!$this->canManageCriteria()) {
+            abort(403, 'Kamu tidak memiliki akses untuk menambah kriteria.');
+        }
+
+        $data = $request->validate([
+            'section'      => 'required|in:A,B',
+            'sub_kategori' => 'nullable|string|max:100',
+            'deskripsi'    => 'required|string|max:500',
+            'employee_id'  => 'required|exists:employees,id',
+        ]);
+
+        if (!$this->canTargetEmployeeForCriteria((int) $data['employee_id'])) {
+            abort(403, 'Kamu hanya bisa menambah kriteria untuk bawahan langsungmu sendiri.');
+        }
+
+        $urutan = KpiCriteria::where('section', $data['section'])->max('urutan') + 1;
+
+        $criteria = KpiCriteria::create([
+            ...$data,
+            'urutan'     => $urutan,
+            'created_by' => auth()->id(),
+            'is_active'  => true,
+        ]);
+
+        $emp = Employee::find($data['employee_id']);
+        ActivityLog::record('create', 'Kriteria KPI', $emp?->nama_lengkap, "Tambah kriteria: {$data['deskripsi']}");
+
+        return back()->with('success', 'Kriteria berhasil ditambahkan.');
+    }
+
+    // Edit teks kriteria (perbaiki salah ketik) — berlaku untuk 20 kriteria baku maupun
+    // tambahan, tapi khusus HR/super-admin (bukan atasan biasa) karena kriteria baku
+    // menyangkut semua karyawan sekaligus dan riwayat penilaian yang sudah ada.
+    public function updateCriteria(Request $request, KpiCriteria $criteria)
+    {
+        if (!$this->isAdminSettings()) {
+            abort(403, 'Hanya HR/super-admin yang bisa mengubah teks kriteria.');
+        }
+
+        $data = $request->validate([
+            'sub_kategori' => 'nullable|string|max:100',
+            'deskripsi'    => 'required|string|max:500',
+        ]);
+
+        $criteria->update($data);
+        ActivityLog::record('update', 'Kriteria KPI', $criteria->employee?->nama_lengkap, "Ubah teks kriteria menjadi: {$data['deskripsi']}");
+
+        return back()->with('success', 'Kriteria berhasil diperbarui.');
+    }
+
+    // Nonaktifkan (bukan hapus permanen) — biar skor historis yang sudah memakai kriteria ini
+    // tetap utuh, cuma tidak dipakai lagi buat penilaian baru ke depan.
+    public function destroyCriteria(KpiCriteria $criteria)
+    {
+        if (!$this->canManageCriteria()) {
+            abort(403, 'Kamu tidak memiliki akses untuk menghapus kriteria.');
+        }
+        if ($criteria->employee_id === null) {
+            return response()->json(['ok' => false, 'message' => '20 kriteria baku tidak bisa dihapus.'], 422);
+        }
+        if (!$this->canTargetEmployeeForCriteria($criteria->employee_id)) {
+            return response()->json(['ok' => false, 'message' => 'Kamu tidak memiliki akses untuk menghapus kriteria ini.'], 403);
+        }
+
+        $criteria->update(['is_active' => false]);
+        ActivityLog::record('delete', 'Kriteria KPI', $criteria->employee?->nama_lengkap, "Nonaktifkan kriteria: {$criteria->deskripsi}");
+
+        return response()->json(['ok' => true]);
+    }
+
+    // ── EXPORT EXCEL ──
     public function export(Request $request)
     {
-        $hoProjectId = Project::where('kode', 'ho')->value('id');
-        $scopedIds   = $this->scopedEmployeeIds();
+        [$employees] = $this->employeesPayload();
+        [$defYear, $defSemester] = $this->currentPeriod();
+        $tahun    = (int) $request->get('tahun', $defYear);
+        $semester = (int) $request->get('semester', $defSemester);
         $onlyEmployeeId = $request->get('employee_id');
 
-        $employeesModel = Employee::aktif()->where('project_id', $hoProjectId)
-            ->when($scopedIds !== null, fn ($q) => $q->whereIn('id', $scopedIds))
-            // Export satu karyawan tertentu (dipilih dari menu Export Excel) — tetap disaring
-            // lewat cakupan akses di atas, jadi tidak bisa dipakai buat mengintip karyawan
-            // di luar cakupan cuma dengan menebak-nebak employee_id di url.
+        $employeesModel = Employee::aktif()->whereIn('id', $employees->pluck('id'))
             ->when($onlyEmployeeId, fn ($q) => $q->where('id', $onlyEmployeeId))
-            ->with(['position', 'goals' => fn ($q) => $q->where('aktif', true)])
-            ->orderBy('nama_lengkap')->get();
+            ->with('position')->orderBy('nama_lengkap')->get();
 
-        $statusLabel = [
-            'not_updated' => 'Not Updated',
-            'on_track'    => 'On Track',
-            'off_track'   => 'Off Track',
-            'completed'   => 'Completed',
-        ];
-        $statusColor = [
-            'not_updated' => 'E8E8E8',
-            'on_track'    => 'C8E6C9',
-            'off_track'   => 'FFCDD2',
-            'completed'   => 'BBDEFB',
-        ];
-
-        $goals = EmployeeGoal::with(['employee.position', 'reviewer'])
-            ->where('aktif', true)
+        $appraisals = KpiAppraisal::with(['scores.criteria', 'reviewer'])
             ->whereIn('employee_id', $employeesModel->pluck('id'))
-            ->orderBy('employee_id')
-            ->orderByDesc('tanggal_mulai')
-            ->get();
+            ->where('tahun', $tahun)->where('semester', $semester)
+            ->get()->keyBy('employee_id');
+
+        $predikatColor = ['A' => 'BBDEFB', 'BS' => 'C8E6C9', 'B' => 'C8E6C9', 'C' => 'FFE0B2', 'K' => 'FFCDD2'];
 
         $wb = new Spreadsheet();
 
-        // ── SHEET 1: RINGKASAN (nilai akhir per karyawan — sama dengan tab Dashboard) ──
+        // ── SHEET 1: RINGKASAN ──
         $sheet1 = $wb->getActiveSheet()->setTitle('Ringkasan');
-        $this->kpiExportTitle($sheet1, 'RINGKASAN KPI KARYAWAN — PT. ANDALAS KARYA MULIA (HEAD OFFICE)', 'J', $employeesModel->count());
+        $this->kpiExportTitle($sheet1, "RINGKASAN PENILAIAN KPI SEMESTER {$semester} {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'H', $employeesModel->count());
         $headers1 = [
             'A' => ['No.', 4], 'B' => ['Nama Karyawan', 26], 'C' => ['Jabatan', 24],
-            'D' => ['Jml Goal', 10], 'E' => ['Total Bobot %', 12], 'F' => ['Nilai Akhir', 12],
-            'G' => ['Predikat', 14],
-            'H' => ['Not Updated', 12], 'I' => ['On Track / Off Track', 18], 'J' => ['Completed', 11],
+            'D' => ['Nilai A (40%)', 13], 'E' => ['Nilai B (60%)', 13], 'F' => ['Total Nilai', 12],
+            'G' => ['Predikat', 16], 'H' => ['Status', 13],
         ];
         $this->kpiExportHeaderRow($sheet1, $headers1, 4);
-        $predikatColor = ['Baik Sekali' => 'BBDEFB', 'Baik' => 'C8E6C9', 'Cukup' => 'FFE0B2', 'Kurang' => 'FFCDD2'];
         foreach ($employeesModel as $idx => $e) {
-            $row        = 5 + $idx;
-            $goalsOwned = $e->goals;
-            $totalBobot = $goalsOwned->sum('bobot');
-            $skorAkhir  = $totalBobot > 0 ? round($goalsOwned->sum(fn ($g) => $g->progress_percent * $g->bobot / 100), 2) : null;
-            $predikat   = $this->kpiPredikatLabel($skorAkhir);
+            $row = 5 + $idx;
+            $a = $appraisals->get($e->id);
+            $predikatLabel = $a ? (KpiAppraisal::predikatLabel($a->predikat) . " ({$a->predikat})") : '—';
             $this->kpiExportRow($sheet1, $row, $idx, [
                 'A' => $idx + 1,
                 'B' => strtoupper($e->nama_lengkap),
                 'C' => $e->position?->nama_jabatan ?? '—',
-                'D' => $goalsOwned->count(),
-                'E' => $totalBobot,
-                'F' => $skorAkhir ?? '—',
-                'G' => $predikat ?? '—',
-                'H' => $goalsOwned->filter(fn ($g) => $g->status === 'not_updated')->count(),
-                'I' => $goalsOwned->filter(fn ($g) => $g->status === 'on_track')->count() . ' / ' . $goalsOwned->filter(fn ($g) => $g->status === 'off_track')->count(),
-                'J' => $goalsOwned->filter(fn ($g) => $g->status === 'completed')->count(),
-            ], ['A', 'D', 'E', 'F', 'G', 'H', 'I', 'J']);
-            if ($predikat) {
-                $sheet1->getStyle('G' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($predikatColor[$predikat] ?? 'FFFFFF');
+                'D' => $a?->nilai_a ?? '—',
+                'E' => $a?->nilai_b ?? '—',
+                'F' => $a?->total_nilai ?? '—',
+                'G' => $predikatLabel,
+                'H' => $a ? ($a->status === 'submitted' ? 'Final' : 'Draft') : 'Belum Dinilai',
+            ], ['A', 'D', 'E', 'F', 'G', 'H']);
+            if ($a?->predikat) {
+                $sheet1->getStyle('G' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($predikatColor[$a->predikat] ?? 'FFFFFF');
             }
         }
-        $sheet1->setAutoFilter('A4:J4');
+        $sheet1->setAutoFilter('A4:H4');
         $sheet1->freezePane('B5');
         $sheet1->setShowGridlines(false);
 
-        // ── SHEET 2: DETAIL GOAL ──
-        $sheet2 = $wb->createSheet()->setTitle('Detail Goal');
-        $this->kpiExportTitle($sheet2, 'DETAIL GOAL KPI — PT. ANDALAS KARYA MULIA (HEAD OFFICE)', 'M', $goals->count());
+        // ── SHEET 2: DETAIL PENILAIAN (tiap kriteria per karyawan) ──
+        $sheet2 = $wb->createSheet()->setTitle('Detail Penilaian');
+        $detailRows = collect();
+        foreach ($employeesModel as $e) {
+            $a = $appraisals->get($e->id);
+            if (!$a) continue;
+            foreach ($a->scores as $s) {
+                $detailRows->push([
+                    'nama'      => $e->nama_lengkap,
+                    'jabatan'   => $e->position?->nama_jabatan ?? '—',
+                    'section'   => $s->criteria->section,
+                    'sub'       => $s->criteria->sub_kategori,
+                    'deskripsi' => $s->criteria->deskripsi,
+                    'nilai'     => $s->nilai,
+                ]);
+            }
+        }
+        $this->kpiExportTitle($sheet2, "DETAIL PENILAIAN KPI SEMESTER {$semester} {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'F', $detailRows->count());
         $headers2 = [
-            'A' => ['No.', 4], 'B' => ['Nama Karyawan', 26], 'C' => ['Jabatan', 24],
-            'D' => ['Nama Goal', 34], 'E' => ['Periode', 22], 'F' => ['Satuan', 12],
-            'G' => ['Baseline', 12], 'H' => ['Target', 12], 'I' => ['Progress', 12],
-            'J' => ['Progress %', 12], 'K' => ['Bobot %', 10], 'L' => ['Status', 13],
-            'M' => ['Reviewer', 22],
+            'A' => ['No.', 4], 'B' => ['Nama Karyawan', 26], 'C' => ['Jabatan', 22],
+            'D' => ['Section', 10], 'E' => ['Kriteria', 55], 'F' => ['Nilai (1-5)', 11],
         ];
         $hRow2 = 4;
         $this->kpiExportHeaderRow($sheet2, $headers2, $hRow2);
-
-        $startRow = 5;
-        foreach ($goals as $idx => $g) {
-            $row = $startRow + $idx;
+        foreach ($detailRows as $idx => $r) {
+            $row = 5 + $idx;
+            $label = $r['section'] === 'A' ? 'A. Keselamatan' : ('B. ' . ($r['sub'] ?? 'Produktivitas'));
             $this->kpiExportRow($sheet2, $row, $idx, [
-                'A' => $idx + 1,
-                'B' => strtoupper($g->employee?->nama_lengkap ?? '—'),
-                'C' => $g->employee?->position?->nama_jabatan ?? '—',
-                'D' => $g->nama_goal,
-                'E' => $g->tanggal_mulai->format('d M Y') . ' – ' . $g->tanggal_selesai->format('d M Y'),
-                'F' => $g->satuan,
-                'G' => $g->baseline,
-                'H' => $g->target,
-                'I' => $g->progress_sekarang,
-                'J' => $g->progress_percent . '%',
-                'K' => $g->bobot,
-                'L' => $statusLabel[$g->status] ?? $g->status,
-                'M' => $g->reviewer?->nama_lengkap ?? '—',
-            ], ['A', 'F', 'G', 'H', 'I', 'J', 'K', 'L']);
-            // Status diwarnai sesuai kondisinya (not updated/on track/off track/completed) —
-            // biar kelihatan sekilas tanpa perlu buka grafik terpisah.
-            $sheet2->getStyle('L' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($statusColor[$g->status] ?? 'FFFFFF');
+                'A' => $idx + 1, 'B' => strtoupper($r['nama']), 'C' => $r['jabatan'],
+                'D' => $label, 'E' => $r['deskripsi'], 'F' => $r['nilai'] ?? '—',
+            ], ['A', 'D', 'F']);
         }
-
-        if ($goals->isEmpty()) {
-            $sheet2->mergeCells("A{$startRow}:M{$startRow}");
-            $sheet2->setCellValue("A{$startRow}", 'Belum ada data goal.');
-            $sheet2->getStyle("A{$startRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        if ($detailRows->isEmpty()) {
+            $sheet2->mergeCells("A5:F5");
+            $sheet2->setCellValue('A5', 'Belum ada data penilaian.');
+            $sheet2->getStyle('A5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
-
         $sheet2->freezePane('B5');
-        $sheet2->setAutoFilter("A{$hRow2}:M{$hRow2}");
+        $sheet2->setAutoFilter("A{$hRow2}:F{$hRow2}");
         $sheet2->setShowGridlines(false);
         $sheet2->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
         $sheet2->getPageSetup()->setFitToPage(true)->setFitToWidth(1)->setFitToHeight(0);
@@ -288,19 +582,6 @@ class EmployeeKpiController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $namaFile . '"',
             'Cache-Control'       => 'max-age=0',
         ]);
-    }
-
-    // ── Helper kecil khusus export KPI (judul, header, baris) ──
-    // Ubah Skor Akhir (0-100) jadi kesimpulan/predikat — pola penilaian KPI standar:
-    // >=100 Baik Sekali, 75-99 Baik, 45-74 Cukup, <45 Kurang. Sama persis dengan frontend
-    // (lihat getPredikat() di Kpi/Index.jsx) supaya angka & kesimpulannya konsisten.
-    private function kpiPredikatLabel(?float $skorAkhir): ?string
-    {
-        if ($skorAkhir === null) return null;
-        if ($skorAkhir >= 100) return 'Baik Sekali';
-        if ($skorAkhir >= 75) return 'Baik';
-        if ($skorAkhir >= 45) return 'Cukup';
-        return 'Kurang';
     }
 
     private function kpiExportTitle($sheet, string $title, string $lastCol, int $count): void
@@ -352,172 +633,6 @@ class EmployeeKpiController extends Controller
             ]);
         }
         $sheet->getRowDimension($row)->setRowHeight(15);
-    }
-
-    // Halaman penuh Tambah Goal (bukan modal) — supaya lega, dengan pemilihan "Goal owner"
-    // berjenjang sesuai struktur atasan-bawahan.
-    public function create(Request $request)
-    {
-        [$employees, $isSelfOnly] = $this->employeesPayload();
-
-        return Inertia::render('Kpi/GoalForm', [
-            'mode'         => 'add',
-            'goal'         => null,
-            'employees'    => $employees,
-            'all_employees'=> $this->allEmployeesPayload(),
-            'is_self_only' => $isSelfOnly,
-            'default_employee_id' => $request->get('employee_id'),
-        ]);
-    }
-
-    // Halaman penuh Edit Goal.
-    public function edit(EmployeeGoal $goal)
-    {
-        if (!$this->canEditKpiFor($goal->employee_id)) {
-            abort(403, 'Kamu tidak memiliki akses untuk mengubah goal ini.');
-        }
-
-        [$employees, $isSelfOnly] = $this->employeesPayload();
-
-        return Inertia::render('Kpi/GoalForm', [
-            'mode'         => 'edit',
-            'goal'         => $this->serializeGoal($goal),
-            'employees'    => $employees,
-            'all_employees'=> $this->allEmployeesPayload(),
-            'is_self_only' => $isSelfOnly,
-        ]);
-    }
-
-    public function storeGoal(Request $request)
-    {
-        $data = $request->validate([
-            'employee_id'      => 'required|exists:employees,id',
-            'reviewer_id'      => 'nullable|exists:employees,id',
-            'nama_goal'        => 'required|string|max:255',
-            'deskripsi'        => 'nullable|string|max:1000',
-            'siklus'           => 'required|in:custom,monthly,half_yearly,yearly',
-            'tanggal_mulai'    => 'required|date',
-            'tanggal_selesai'  => 'required|date|after_or_equal:tanggal_mulai',
-            'satuan'           => 'required|in:percentage,number,rupiah',
-            'baseline'         => 'required|numeric',
-            'target'           => 'required|numeric',
-            'bobot'            => 'required|numeric|min:0.01|max:100',
-        ]);
-
-        if (!$this->canEditKpiFor((int) $data['employee_id'])) {
-            abort(403, 'Kamu tidak memiliki akses untuk menambah goal ini.');
-        }
-
-        $goal = EmployeeGoal::create([
-            ...$data,
-            'progress_sekarang' => $data['baseline'],
-            'diperbarui_oleh'   => auth()->user()?->name,
-            'aktif'             => true,
-        ]);
-
-        ActivityLog::record('create', 'KPI', $goal->employee->nama_lengkap ?? '-', "Tambah goal: {$data['nama_goal']} ({$data['bobot']}%)");
-
-        return redirect()->route('kpi')->with('success', "Goal \"{$goal->nama_goal}\" berhasil ditambahkan.");
-    }
-
-    public function updateGoal(Request $request, EmployeeGoal $goal)
-    {
-        if (!$this->canEditKpiFor($goal->employee_id)) {
-            abort(403, 'Kamu tidak memiliki akses untuk mengubah goal ini.');
-        }
-
-        $data = $request->validate([
-            'reviewer_id'      => 'nullable|exists:employees,id',
-            'nama_goal'        => 'required|string|max:255',
-            'deskripsi'        => 'nullable|string|max:1000',
-            'siklus'           => 'required|in:custom,monthly,half_yearly,yearly',
-            'tanggal_mulai'    => 'required|date',
-            'tanggal_selesai'  => 'required|date|after_or_equal:tanggal_mulai',
-            'satuan'           => 'required|in:percentage,number,rupiah',
-            'baseline'         => 'required|numeric',
-            'target'           => 'required|numeric',
-            'bobot'            => 'required|numeric|min:0.01|max:100',
-        ]);
-
-        $goal->update($data);
-
-        ActivityLog::record('update', 'KPI', $goal->employee->nama_lengkap ?? '-', "Update goal: {$goal->nama_goal}");
-
-        return redirect()->route('kpi')->with('success', "Goal \"{$goal->nama_goal}\" berhasil diperbarui.");
-    }
-
-    // Update cepat: cuma nilai progress + catatan — dipakai buat "check-in" progress goal
-    // tanpa perlu buka form edit lengkap.
-    public function updateProgress(Request $request, EmployeeGoal $goal)
-    {
-        if (!$this->canEditKpiFor($goal->employee_id) && !$this->isReviewerOf($goal)) {
-            return response()->json(['ok' => false, 'message' => 'Kamu tidak memiliki akses untuk mengisi progress goal ini.'], 403);
-        }
-
-        $data = $request->validate([
-            'progress_sekarang' => 'required|numeric|min:0',
-            'catatan'           => 'nullable|string|max:1000',
-        ]);
-
-        $goal->update([
-            'progress_sekarang' => $data['progress_sekarang'],
-            'catatan'           => $data['catatan'] ?? $goal->catatan,
-            'diperbarui_oleh'   => auth()->user()?->name,
-        ]);
-
-        ActivityLog::record('update', 'KPI', $goal->employee->nama_lengkap ?? '-', "Update progress goal: {$goal->nama_goal} -> {$data['progress_sekarang']}");
-
-        return response()->json(['ok' => true, 'goal' => $this->serializeGoal($goal->fresh())]);
-    }
-
-    public function destroyGoal(EmployeeGoal $goal)
-    {
-        if (!$this->canEditKpiFor($goal->employee_id)) {
-            return response()->json(['ok' => false, 'message' => 'Kamu tidak memiliki akses untuk menghapus goal ini.'], 403);
-        }
-
-        $namaGoal = $goal->nama_goal;
-        $namaEmployee = $goal->employee->nama_lengkap ?? '-';
-        $goal->delete();
-
-        ActivityLog::record('delete', 'KPI', $namaEmployee, "Hapus goal: {$namaGoal}");
-
-        return response()->json(['ok' => true]);
-    }
-
-    // Ringkasan per karyawan: breakdown status goal + 1 skor akhir gabungan (rata-rata progress
-    // tiap goal, dibobotkan) — dipakai tab Dashboard.
-    public function summary(Request $request)
-    {
-        $hoProjectId = Project::where('kode', 'ho')->value('id');
-        $scopedIds   = $this->scopedEmployeeIds();
-
-        $employees = Employee::aktif()->where('project_id', $hoProjectId)
-            ->when($scopedIds !== null, fn ($q) => $q->whereIn('id', $scopedIds))
-            ->with('position')->orderBy('nama_lengkap')->get();
-
-        $result = $employees->map(function ($e) {
-            $goals = $e->goals()->where('aktif', true)->get();
-            $totalBobot = $goals->sum('bobot');
-            $skorAkhir  = $totalBobot > 0
-                ? round($goals->sum(fn ($g) => $g->progress_percent * $g->bobot / 100), 2)
-                : null;
-
-            return [
-                'employee_id'   => $e->id,
-                'nama_lengkap'  => $e->nama_lengkap,
-                'jabatan'       => $e->position?->nama_jabatan ?? '-',
-                'total_bobot'   => $totalBobot,
-                'skor_akhir'    => $skorAkhir,
-                'jml_goal'      => $goals->count(),
-                'not_updated'   => $goals->filter(fn ($g) => $g->status === 'not_updated')->count(),
-                'on_track'      => $goals->filter(fn ($g) => $g->status === 'on_track')->count(),
-                'off_track'     => $goals->filter(fn ($g) => $g->status === 'off_track')->count(),
-                'completed'     => $goals->filter(fn ($g) => $g->status === 'completed')->count(),
-            ];
-        });
-
-        return response()->json(['rows' => $result]);
     }
 
     // ── STRUKTUR ORGANISASI (atasan-bawahan) ─────────────────────

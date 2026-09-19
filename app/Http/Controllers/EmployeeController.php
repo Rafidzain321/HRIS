@@ -199,6 +199,7 @@ class EmployeeController extends Controller
             'alamat' => 'nullable|string',
             'agama' => 'nullable|string|max:50',
             'position_id' => 'nullable|exists:positions,id',
+            'department_id' => 'nullable|exists:departments,id',
             'ptkp' => 'nullable|in:TK/0,TK/1,TK/2,TK/3,K/0,K/1,K/2,K/3',
             'status' => 'required|in:AKTIF,NONAKTIF',
             'status_mcu' => 'nullable|string|max:20',
@@ -281,6 +282,7 @@ class EmployeeController extends Controller
                 'ho_detail' => $employee->hoDetail,
             ]),
             'positions' => \App\Models\Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']),
+            'departments' => \App\Models\Department::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
             'project_info' => $projectInfo,
             // Riwayat gaji mentah hasil import HO — arsip referensi, cuma relevan untuk karyawan HO.
             'salary_history' => \App\Models\EmployeeSalaryHistory::where('employee_id', $employee->id)
@@ -364,6 +366,7 @@ class EmployeeController extends Controller
             'start_pkwt' => 'nullable|date',
             'end_pkwt' => 'nullable|date',
             'position_id' => 'nullable|exists:positions,id',
+            'department_id' => 'nullable|exists:departments,id',
             'tanggal_masuk' => 'nullable|date',
             'tanggal_akhir_probation' => 'nullable|date',
             'agama' => 'nullable|string|max:50',

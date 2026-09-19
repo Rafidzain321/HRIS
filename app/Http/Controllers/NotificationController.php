@@ -2,7 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
-use App\Models\EmployeeGoal;
+use App\Models\KpiAppraisal;
 use Carbon\Carbon;
 use Inertia\Inertia;
 
@@ -105,37 +105,45 @@ class NotificationController extends Controller
 
         }
 
-        // KPI — goal yang perlu direview / diupdate progress-nya oleh user yang sedang login
-        // (penugasan reviewer eksplisit, atau goal bawahan langsung yang belum diupdate).
-        // Logika sama persis dengan badge sidebar KPI di HandleInertiaRequests.
+        // KPI — karyawan yang penilaian semester berjalannya belum disimpan final oleh user
+        // yang sedang login (penugasan reviewer eksplisit, atau bawahan langsung). Logika
+        // cakupan sama persis dengan badge sidebar KPI di HandleInertiaRequests. "Tenggat"
+        // dipakai akhir semester berjalan (30 Jun / 31 Des) supaya tetap punya makna
+        // expired/warning walau penilaian ini bukan konsep goal per-tanggal lagi.
         $user = auth()->user();
         if ($user && $user->employee_id && !$user->hasRole('super-admin') && !$user->can('edit-kpi') && !$user->can('view-all-kpi')) {
             $bawahanIds = Employee::where('atasan_id', $user->employee_id)->pluck('id')->toArray();
-            EmployeeGoal::with('employee.position')
-                ->where('aktif', true)
-                ->whereColumn('progress_sekarang', 'baseline')
-                ->where(function ($q) use ($user, $bawahanIds) {
-                    $q->where('reviewer_id', $user->employee_id);
-                    if (!empty($bawahanIds)) { $q->orWhereIn('employee_id', $bawahanIds); }
-                })
-                ->limit(20)->get()
-                ->each(function ($g) use ($today, $items) {
-                    $selesai = $g->tanggal_selesai;
-                    $items->push([
-                        'id'        => $g->id,
-                        'type'      => 'kpi',
-                        'level'     => $selesai && $selesai < $today ? 'expired' : 'warning',
-                        'nama'      => $g->employee?->nama_lengkap ?? '-',
-                        'jabatan'   => $g->employee?->position?->nama_jabatan ?? '-',
-                        'label'     => 'KPI',
-                        'goal_nama' => $g->nama_goal,
-                        'date'      => $selesai?->format('d M Y'),
-                        'days'      => $selesai ? $today->diffInDays($selesai, false) : 0,
-                        // Klik cuma antar ke halaman KPI & sorot baris goal-nya (bukan langsung
-                        // buka modal update progress) — biar user lihat dulu konteksnya.
-                        'href'      => '/kpi',
-                    ]);
-                });
+            $reviewOwnerIds = KpiAppraisal::where('reviewer_id', $user->employee_id)->pluck('employee_id')->toArray();
+            $scopeIds = array_values(array_unique([...$bawahanIds, ...$reviewOwnerIds]));
+
+            if (!empty($scopeIds)) {
+                $tahun    = (int) $today->year;
+                $semester = $today->month <= 6 ? 1 : 2;
+                $deadline = $semester === 1 ? Carbon::create($tahun, 6, 30) : Carbon::create($tahun, 12, 31);
+
+                $submittedIds = KpiAppraisal::where('tahun', $tahun)->where('semester', $semester)
+                    ->where('status', 'submitted')->whereIn('employee_id', $scopeIds)
+                    ->pluck('employee_id')->toArray();
+                $pendingIds = array_diff($scopeIds, $submittedIds);
+
+                Employee::with('position')->whereIn('id', $pendingIds)->limit(20)->get()
+                    ->each(function ($e) use ($today, $deadline, $tahun, $semester, $items) {
+                        $items->push([
+                            'id'        => $e->id,
+                            'type'      => 'kpi',
+                            'level'     => $deadline < $today ? 'expired' : 'warning',
+                            'nama'      => $e->nama_lengkap,
+                            'jabatan'   => $e->position?->nama_jabatan ?? '-',
+                            'label'     => 'KPI',
+                            'goal_nama' => "Penilaian Semester {$semester} {$tahun}",
+                            'date'      => $deadline->format('d M Y'),
+                            'days'      => $today->diffInDays($deadline, false),
+                            // Klik cuma antar ke halaman KPI & sorot baris karyawannya (bukan
+                            // langsung buka form) — biar user lihat dulu konteksnya.
+                            'href'      => '/kpi',
+                        ]);
+                    });
+            }
         }
 
         $sorted  = $this->sortItems($items);

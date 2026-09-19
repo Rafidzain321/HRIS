@@ -183,16 +183,17 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/training', [TrainingController::class, 'index'])->middleware('menu:training,view')->name('training');
 
-    // ── KPI (khusus karyawan Head Office) ──────────────────
+    // ── KPI: Penilaian standar per semester (khusus karyawan Head Office) ──
     Route::get('/kpi', [EmployeeKpiController::class, 'index'])->middleware('menu:kpi,view')->name('kpi');
-    Route::get('/kpi/summary', [EmployeeKpiController::class, 'summary'])->middleware('menu:kpi,view')->name('kpi.summary');
     Route::get('/kpi/export', [EmployeeKpiController::class, 'export'])->middleware('menu:kpi,view')->name('kpi.export');
-    Route::get('/kpi/goals/create', [EmployeeKpiController::class, 'create'])->middleware('menu:kpi,view')->name('kpi.goals.create');
-    Route::get('/kpi/goals/{goal}/edit', [EmployeeKpiController::class, 'edit'])->middleware('menu:kpi,view')->name('kpi.goals.edit');
-    Route::post('/kpi/goals', [EmployeeKpiController::class, 'storeGoal'])->middleware('menu:kpi,view')->name('kpi.goals.store');
-    Route::put('/kpi/goals/{goal}', [EmployeeKpiController::class, 'updateGoal'])->middleware('menu:kpi,view')->name('kpi.goals.update');
-    Route::put('/kpi/goals/{goal}/progress', [EmployeeKpiController::class, 'updateProgress'])->middleware('menu:kpi,view')->name('kpi.goals.progress');
-    Route::delete('/kpi/goals/{goal}', [EmployeeKpiController::class, 'destroyGoal'])->middleware('menu:kpi,view')->name('kpi.goals.destroy');
+    Route::get('/kpi/appraisals/{employee}', [EmployeeKpiController::class, 'openAppraisal'])->middleware('menu:kpi,view')->name('kpi.appraisals.open');
+    Route::put('/kpi/appraisals/{appraisal}', [EmployeeKpiController::class, 'saveScores'])->middleware('menu:kpi,view')->name('kpi.appraisals.save');
+    Route::delete('/kpi/appraisals/{appraisal}', [EmployeeKpiController::class, 'destroyAppraisal'])->middleware('menu:kpi,view')->name('kpi.appraisals.destroy');
+    Route::put('/kpi/appraisals/{appraisal}/reopen', [EmployeeKpiController::class, 'reopenAppraisal'])->middleware('menu:kpi,view')->name('kpi.appraisals.reopen');
+    Route::get('/kpi/kriteria', [EmployeeKpiController::class, 'criteriaIndex'])->middleware('menu:kpi,view')->name('kpi.criteria');
+    Route::post('/kpi/kriteria', [EmployeeKpiController::class, 'storeCriteria'])->middleware('menu:kpi,view')->name('kpi.criteria.store');
+    Route::put('/kpi/kriteria/{criteria}', [EmployeeKpiController::class, 'updateCriteria'])->middleware('menu:kpi,view')->name('kpi.criteria.update');
+    Route::delete('/kpi/kriteria/{criteria}', [EmployeeKpiController::class, 'destroyCriteria'])->middleware('menu:kpi,view')->name('kpi.criteria.destroy');
 
     // ── Struktur Organisasi (atasan-bawahan, dulu hardcoded lewat DB) ──
     Route::get('/pengaturan/struktur-organisasi', [EmployeeKpiController::class, 'orgStructure'])->name('org-structure');
