@@ -26,3 +26,4 @@ Thumbs.db
 /.claude/*.lock
 /.agents/
 /.claude/
+/CLAUDE.md
