@@ -8,7 +8,7 @@ import axios from 'axios';
 import {
   Plus, Check, TriangleAlert, X, Loader2, Trash2, LogOut, ClipboardList,
   User, CreditCard, Car, HardHat, Stethoscope, Building2, FileText, Landmark, Save,
-  ScrollText, Wallet,
+  ScrollText, Wallet, RefreshCw,
 } from 'lucide-react';
 
 function ComboBox({ value, onChange, options, placeholder, inputStyle }) {
@@ -333,6 +333,65 @@ function HistoryKeluarSection({ employeeId }) {
                   <div style={{fontSize:12,color:'var(--muted2)',lineHeight:1.5}}>{log.catatan_keluar}</div>
                 )}
                 <div style={{fontSize:10.5,color:'var(--muted)',marginTop:6}}>Dicatat oleh: {log.dicatat_oleh} · {log.created_at}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SECTION RIWAYAT PERPINDAHAN PROJECT ──
+function RiwayatPerpindahanSection({ employeeId }) {
+  const [logs,    setLogs]    = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    axios.get(`/employees/${employeeId}/history`)
+      .then(r => { setLogs(r.data.transfers || []); })
+      .finally(() => setLoading(false));
+  }, [employeeId]);
+
+  const STATUS_COLOR = {
+    pending:  { bg:'rgba(232,160,32,.12)', color:'var(--accent)', label:'Menunggu' },
+    approved: { bg:'rgba(34,201,122,.12)', color:'#22C97A',       label:'Disetujui' },
+    rejected: { bg:'rgba(224,69,69,.12)',  color:'#E04545',       label:'Ditolak' },
+  };
+
+  return (
+    <div style={{marginBottom:24}}>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--muted2)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:6}}>
+        <RefreshCw size={14}/> Riwayat Perpindahan Project
+      </div>
+
+      {loading ? (
+        <div style={{padding:12,textAlign:'center',color:'var(--muted)',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Loader2 size={13} style={{animation:'spin .8s linear infinite'}}/> Memuat...</div>
+      ) : logs.length === 0 ? (
+        <div style={{padding:16,textAlign:'center',color:'var(--muted)',fontSize:12,borderRadius:8,border:'1px dashed var(--border)'}}>
+          Belum pernah pindah project
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {logs.map((log,i) => {
+            const sc = STATUS_COLOR[log.status] || STATUS_COLOR.pending;
+            return (
+              <div key={i} style={{padding:'12px 14px',borderRadius:9,background:'var(--bg3)',border:'1px solid var(--border)'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
+                  <span style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{log.from_project}</span>
+                  <span style={{color:'var(--muted)'}}>→</span>
+                  <span style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{log.to_project}</span>
+                  <span style={{padding:'3px 10px',borderRadius:99,fontSize:11,fontWeight:700,background:sc.bg,color:sc.color}}>{sc.label}</span>
+                </div>
+                {log.catatan && <div style={{fontSize:12,color:'var(--muted2)',lineHeight:1.5}}>{log.catatan}</div>}
+                {log.catatan_approval && (
+                  <div style={{fontSize:11.5,marginTop:4,fontStyle:'italic',color:log.status==='approved'?'#22C97A':'#E04545'}}>Catatan approval: {log.catatan_approval}</div>
+                )}
+                <div style={{fontSize:10.5,color:'var(--muted)',marginTop:6}}>
+                  Diajukan oleh: {log.requested_by} · {log.created_at}
+                  {log.approved_by && <> · {log.status === 'rejected' ? 'Ditolak' : 'Disetujui'} oleh {log.approved_by}{log.approved_at ? ` (${log.approved_at})` : ''}</>}
+                </div>
               </div>
             );
           })}
@@ -833,10 +892,11 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
         {/* ── PANEL DI LUAR FORM ── */}
         <div style={{ display:'flex', flexDirection:'column', gap:12, marginTop:16 }}>
 
-          {/* SP & History Keluar */}
+          {/* SP, History Keluar & Riwayat Perpindahan */}
           <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px' }}>
             <SpSection employeeId={employee.id} />
             <HistoryKeluarSection employeeId={employee.id} />
+            <RiwayatPerpindahanSection employeeId={employee.id} />
           </div>
 
           {/* Dokumen */}

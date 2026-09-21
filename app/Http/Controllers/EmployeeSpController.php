@@ -5,6 +5,7 @@ use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\EmployeeSp;
 use App\Models\EmployeeTerminationLog;
+use App\Models\EmployeeTransfer;
 use Illuminate\Http\Request;
 
 class EmployeeSpController extends Controller
@@ -75,9 +76,27 @@ class EmployeeSpController extends Controller
                 'created_at'     => $t->created_at->format('d M Y H:i'),
             ]);
 
+        $transfers = EmployeeTransfer::where('employee_id', $employeeId)
+            ->with(['fromProject:id,nama,kode', 'toProject:id,nama,kode', 'requestedBy:id,name', 'approvedBy:id,name'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($t) => [
+                'id'               => $t->id,
+                'from_project'     => $t->fromProject?->nama ?? '—',
+                'to_project'       => $t->toProject?->nama ?? '—',
+                'status'           => $t->status,
+                'catatan'          => $t->catatan,
+                'catatan_approval' => $t->catatan_approval,
+                'requested_by'     => $t->requestedBy?->name ?? '—',
+                'approved_by'      => $t->approvedBy?->name,
+                'approved_at'      => $t->approved_at?->format('d M Y H:i'),
+                'created_at'       => $t->created_at->format('d M Y H:i'),
+            ]);
+
         return response()->json([
-            'sp'      => $sp,
-            'termLog' => $termLog,
+            'sp'        => $sp,
+            'termLog'   => $termLog,
+            'transfers' => $transfers,
         ]);
     }
 }
