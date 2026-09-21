@@ -276,7 +276,7 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
           <div style={{ ...card, padding: 16 }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Catatan Penilai (opsional)</div>
             <textarea value={catatan} onChange={e => setCatatan(e.target.value)} disabled={!editable} rows={3}
-              placeholder="Catatan tambahan mengenai kinerja karyawan..." style={{ ...inp, resize: 'vertical', fontFamily: "'Outfit',sans-serif" }} />
+              placeholder="Catatan tambahan mengenai kinerja karyawan..." style={{ ...inp, resize: 'vertical', minHeight: 68, fontFamily: "'Outfit',sans-serif" }} />
           </div>
         </div>
 
