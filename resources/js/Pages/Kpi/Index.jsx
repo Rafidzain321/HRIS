@@ -1,11 +1,17 @@
 // resources/js/Pages/Kpi/Index.jsx
 import React, { useState, useEffect } from 'react';
-import AppLayout from '@/Layouts/AppLayout';
+import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { usePage, router } from '@inertiajs/react';
+import axios from 'axios';
 import {
   Target, Search, BarChart3, ClipboardList, ChevronLeft, ChevronRight,
-  Download, ChevronDown, Users, Network, ListChecks,
+  Download, ChevronDown, Users, Network, ListChecks, Eye, Pencil, FilePlus2, Trash2,
 } from 'lucide-react';
+
+function csrfHeaders() {
+  const token = document.querySelector('meta[name=csrf-token]')?.content;
+  return { 'X-CSRF-TOKEN': token, 'Content-Type': 'application/json' };
+}
 
 const card = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12 };
 const inp = {
@@ -48,6 +54,24 @@ function DonutChart({ counts, colorMap, size = 130 }) {
         <div style={{ fontSize: 9.5, color: 'var(--muted)' }}>karyawan</div>
       </div>
     </div>
+  );
+}
+
+// ── TOMBOL IKON AKSI TABEL (dengan tooltip native) ──
+function IconBtn({ icon, title, onClick, color = 'var(--muted2)', borderColor, hoverBg, disabled }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} title={title}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{
+        width: 28, height: 28, borderRadius: 7, cursor: disabled ? 'default' : 'pointer',
+        border: `1px solid ${borderColor || 'var(--border)'}`,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: hover && !disabled ? (hoverBg || 'var(--bg3)') : 'var(--card)',
+        color, opacity: disabled ? 0.4 : 1, transition: 'background .12s',
+      }}>
+      {icon}
+    </button>
   );
 }
 
@@ -139,6 +163,17 @@ function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [confirmDiscard, setConfirmDiscard] = useState(null);
+  const [discarding, setDiscarding] = useState(false);
+
+  function discardDraft() {
+    const r = confirmDiscard;
+    setDiscarding(true);
+    axios.delete(`/kpi/appraisals/${r.appraisal_id}`, { headers: csrfHeaders() })
+      .then(() => { setConfirmDiscard(null); router.reload({ only: ['rows'] }); })
+      .catch(err => alert(err.response?.data?.message || 'Gagal membuang draft.'))
+      .finally(() => setDiscarding(false));
+  }
 
   const searchLow = search.trim().toLowerCase();
   const filtered = rows.filter(r => {
@@ -190,7 +225,7 @@ function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
                 <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Total</th>
                 <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Predikat</th>
                 <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Status</th>
-                {showActions && <th style={{ padding: '10px 14px' }} />}
+                {showActions && <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Aksi</th>}
               </tr>
             </thead>
             <tbody>
@@ -216,12 +251,23 @@ function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
                       <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: statusMeta.bg, color: statusMeta.color }}>{statusMeta.label}</span>
                     </td>
                     {showActions && (
-                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                      <td style={{ padding: '6px 14px' }}>
                         {!isViewer && (
-                          <button onClick={() => router.visit(`/kpi/appraisals/${r.employee_id}?tahun=${tahun}&semester=${semester}`)}
-                            style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid rgba(232,160,32,.3)', background: 'rgba(232,160,32,.1)', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap' }}>
-                            {r.status === 'belum_dinilai' ? 'Isi Penilaian' : 'Lihat / Edit'}
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <IconBtn
+                              onClick={() => router.visit(`/kpi/appraisals/${r.employee_id}?tahun=${tahun}&semester=${semester}`)}
+                              color="var(--accent)" borderColor="rgba(232,160,32,.3)" hoverBg="rgba(232,160,32,.12)"
+                              title={r.status === 'belum_dinilai' ? 'Isi Penilaian' : (r.status === 'submitted' ? 'Lihat' : 'Lanjutkan / Edit')}
+                              icon={r.status === 'belum_dinilai' ? <FilePlus2 size={14} /> : r.status === 'submitted' ? <Eye size={14} /> : <Pencil size={14} />}
+                            />
+                            {r.status === 'draft' && (
+                              <IconBtn
+                                onClick={() => setConfirmDiscard(r)}
+                                color="#E04545" borderColor="rgba(224,69,69,.3)" hoverBg="rgba(224,69,69,.12)"
+                                title="Buang Draft" icon={<Trash2 size={13} />}
+                              />
+                            )}
+                          </div>
                         )}
                       </td>
                     )}
@@ -242,6 +288,16 @@ function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        open={!!confirmDiscard}
+        onCancel={() => setConfirmDiscard(null)}
+        onConfirm={discardDraft}
+        title="Buang Draft"
+        message={confirmDiscard ? `Buang draft penilaian ${confirmDiscard.nama_lengkap}? Semua skor yang sudah diisi akan hilang dan status kembali ke "Belum Dinilai".` : ''}
+        confirmLabel={discarding ? 'Membuang...' : 'Ya, Buang'}
+        type="danger"
+      />
     </div>
   );
 }

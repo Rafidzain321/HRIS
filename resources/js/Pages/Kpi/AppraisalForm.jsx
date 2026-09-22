@@ -1,9 +1,9 @@
 // resources/js/Pages/Kpi/AppraisalForm.jsx
 import React, { useState, useMemo } from 'react';
-import AppLayout from '@/Layouts/AppLayout';
+import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
-import { ArrowLeft, Save, CheckCircle2, Search, Loader2, Info } from 'lucide-react';
+import { ArrowLeft, Save, CheckCircle2, Search, Loader2, Info, Trash2 } from 'lucide-react';
 
 const card = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12 };
 const inp = {
@@ -177,6 +177,8 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
   const [catatan, setCatatan] = useState(appraisal.catatan || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [confirmReopen, setConfirmReopen] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const isFinal = appraisal.status === 'submitted';
   const editable = can_edit && !isFinal;
@@ -223,12 +225,20 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
   }
 
   function reopen() {
-    if (!window.confirm('Buka kembali penilaian ini ke status draft supaya bisa dikoreksi?')) return;
+    setConfirmReopen(false);
     setSaving(true);
     axios.put(`/kpi/appraisals/${appraisal.id}/reopen`, {}, { headers: csrfHeaders() })
       .then(() => router.reload())
       .catch(err => setError(err.response?.data?.message || 'Gagal membuka kembali penilaian.'))
       .finally(() => setSaving(false));
+  }
+
+  function hapusDraft() {
+    setConfirmDiscard(false);
+    setSaving(true);
+    axios.delete(`/kpi/appraisals/${appraisal.id}`, { headers: csrfHeaders() })
+      .then(() => router.visit(`/kpi?tahun=${appraisal.tahun}&semester=${appraisal.semester}`))
+      .catch(err => { setError(err.response?.data?.message || 'Gagal membuang draft.'); setSaving(false); });
   }
 
   const predikatMeta = PREDIKAT_META[live.predikat];
@@ -246,7 +256,7 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
           </span>
         )}
         {isFinal && can_reopen && (
-          <button onClick={reopen} disabled={saving}
+          <button onClick={() => setConfirmReopen(true)} disabled={saving}
             style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 11.5, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
             Buka Kembali
           </button>
@@ -320,11 +330,34 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
                   style={{ padding: '10px 16px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12.5, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Simpan Final
                 </button>
+                <button onClick={() => setConfirmDiscard(true)} disabled={saving}
+                  style={{ padding: '9px 16px', borderRadius: 9, border: '1px solid rgba(224,69,69,.25)', background: 'rgba(224,69,69,.06)', color: '#E04545', fontSize: 12, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 }}>
+                  <Trash2 size={13} /> Buang Draft
+                </button>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirmReopen}
+        onCancel={() => setConfirmReopen(false)}
+        onConfirm={reopen}
+        title="Buka Kembali Penilaian"
+        message="Buka kembali penilaian ini ke status draft supaya bisa dikoreksi?"
+        confirmLabel="Ya, Buka Kembali"
+        type="warning"
+      />
+      <ConfirmModal
+        open={confirmDiscard}
+        onCancel={() => setConfirmDiscard(false)}
+        onConfirm={hapusDraft}
+        title="Buang Draft"
+        message='Buang draft penilaian ini? Semua skor yang sudah diisi akan hilang dan status kembali ke "Belum Dinilai".'
+        confirmLabel="Ya, Buang"
+        type="danger"
+      />
     </AppLayout>
   );
 }

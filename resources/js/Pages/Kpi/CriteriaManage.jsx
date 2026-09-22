@@ -1,6 +1,6 @@
 // resources/js/Pages/Kpi/CriteriaManage.jsx
 import React, { useState } from 'react';
-import AppLayout from '@/Layouts/AppLayout';
+import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
 import { ArrowLeft, Plus, Trash2, ShieldCheck, UserCog, Search, Pencil, Check, X } from 'lucide-react';
@@ -179,6 +179,7 @@ function CriteriaRow({ c, canEdit, onSaved, onDelete, deleting, numbered }) {
 export default function CriteriaManage({ criteria = [], target_employees = [], can_edit_text = false }) {
   const [list, setList] = useState(criteria);
   const [deletingId, setDeletingId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   function reload() {
     router.reload({ only: ['criteria'], onSuccess: (page) => setList(page.props.criteria) });
@@ -188,8 +189,9 @@ export default function CriteriaManage({ criteria = [], target_employees = [], c
     setList(l => l.map(c => c.id === id ? { ...c, ...patch } : c));
   }
 
-  function handleDelete(c) {
-    if (!window.confirm(`Nonaktifkan kriteria "${c.deskripsi}"? Riwayat penilaian yang sudah memakai kriteria ini tetap tersimpan.`)) return;
+  function handleDelete() {
+    const c = confirmDelete;
+    setConfirmDelete(null);
     setDeletingId(c.id);
     axios.delete(`/kpi/kriteria/${c.id}`, { headers: csrfHeaders() })
       .then(() => setList(l => l.filter(x => x.id !== c.id)))
@@ -248,7 +250,7 @@ export default function CriteriaManage({ criteria = [], target_employees = [], c
                   <div key={c.id} style={{ padding: '7px 10px', borderRadius: 8, background: 'var(--bg3)', marginBottom: 6, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(58,143,224,.12)', color: 'var(--blue)', flexShrink: 0, marginTop: 1 }}>{c.section}</span>
                     <div style={{ flex: 1 }}>
-                      <CriteriaRow c={c} canEdit={can_edit_text} onSaved={handleSaved} onDelete={() => handleDelete(c)} deleting={deletingId === c.id} />
+                      <CriteriaRow c={c} canEdit={can_edit_text} onSaved={handleSaved} onDelete={() => setConfirmDelete(c)} deleting={deletingId === c.id} />
                     </div>
                   </div>
                 ))}
@@ -259,6 +261,16 @@ export default function CriteriaManage({ criteria = [], target_employees = [], c
 
         <AddCriteriaForm employees={target_employees} onAdded={reload} />
       </div>
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        title="Nonaktifkan Kriteria"
+        message={confirmDelete ? `Nonaktifkan kriteria "${confirmDelete.deskripsi}"? Riwayat penilaian yang sudah memakai kriteria ini tetap tersimpan.` : ''}
+        confirmLabel="Ya, Nonaktifkan"
+        type="warning"
+      />
     </AppLayout>
   );
 }
