@@ -5,7 +5,7 @@ import { usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
   Target, Search, BarChart3, ClipboardList, ChevronLeft, ChevronRight,
-  Download, ChevronDown, Users, Network, ListChecks, Eye, Pencil, FilePlus2, Trash2, RotateCcw,
+  Download, Network, ListChecks, Eye, Pencil, FilePlus2, Trash2, RotateCcw,
 } from 'lucide-react';
 
 function csrfHeaders() {
@@ -85,52 +85,12 @@ function StatTile({ label, value }) {
 }
 
 // ── TOMBOL EXPORT EXCEL (semua karyawan / satu karyawan tertentu) ──
-function ExportMenu({ employees, tahun, semester }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const searchLow = search.trim().toLowerCase();
-  const list = (searchLow
-    ? employees.filter(e => e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow))
-    : employees
-  ).slice().sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
-
-  const baseHref = `/kpi/export?tahun=${tahun}&semester=${semester}`;
-
+function ExportButton({ tahun, semester }) {
   return (
-    <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Download size={14} /> Export Excel <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
-      </button>
-      {open && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 60 }} onClick={() => setOpen(false)} />
-          <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 70, width: 280, background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, boxShadow: '0 12px 36px rgba(0,0,0,.35)', overflow: 'hidden' }}>
-            <a href={baseHref} onClick={() => setOpen(false)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', fontSize: 12.5, fontWeight: 700, color: 'var(--text)', textDecoration: 'none', borderBottom: '1px solid var(--border)' }}>
-              <Users size={13} /> Semua Karyawan
-            </a>
-            <div style={{ padding: 8 }}>
-              <div style={{ position: 'relative', marginBottom: 6 }}>
-                <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={12} /></span>
-                <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Atau cari karyawan tertentu..." style={{ ...inp, paddingLeft: 28, fontSize: 12 }} autoFocus />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 260, overflowY: 'auto' }}>
-                {list.length === 0 && <div style={{ padding: 10, fontSize: 11.5, color: 'var(--muted)', textAlign: 'center' }}>Tidak ditemukan.</div>}
-                {list.map(e => (
-                  <a key={e.id} href={`${baseHref}&employee_id=${e.id}`} onClick={() => setOpen(false)}
-                    style={{ display: 'block', padding: '6px 8px', borderRadius: 6, textDecoration: 'none', color: 'var(--text)' }}
-                    onMouseEnter={ev => ev.currentTarget.style.background = 'rgba(232,160,32,.08)'}
-                    onMouseLeave={ev => ev.currentTarget.style.background = ''}>
-                    <div style={{ fontSize: 12, fontWeight: 600 }}>{e.nama_lengkap}</div>
-                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>{e.jabatan}</div>
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+    <a href={`/kpi/export?tahun=${tahun}&semester=${semester}`}
+      style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+      <Download size={14} /> Export Excel
+    </a>
   );
 }
 
@@ -394,7 +354,7 @@ function TabDashboard({ rows, tahun, semester }) {
 }
 
 // ── MAIN ────────────────────────────────────────────────────
-export default function KpiIndex({ rows = [], tahun, semester, is_self_only = false, all_employees = [], highlight = null, can_reopen = false }) {
+export default function KpiIndex({ rows = [], tahun, semester, is_self_only = false, highlight = null, can_reopen = false }) {
   const { auth } = usePage().props;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -459,7 +419,7 @@ export default function KpiIndex({ rows = [], tahun, semester, is_self_only = fa
             <button onClick={() => router.visit('/kpi/kriteria')} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--muted2)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><ClipboardList size={14} /> Kelola Kriteria</button>
           </>
         )}
-        <ExportMenu employees={all_employees} tahun={tahun} semester={semester} />
+        <ExportButton tahun={tahun} semester={semester} />
       </div>
 
       <div style={{ marginBottom: 10, fontSize: 11.5, color: 'var(--muted)' }}>

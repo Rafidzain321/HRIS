@@ -182,7 +182,6 @@ class EmployeeKpiController extends Controller
             'tahun'        => $tahun,
             'semester'     => $semester,
             'is_self_only' => $isSelfOnly,
-            'all_employees'=> $this->allEmployeesPayload(),
             'highlight'    => $request->get('highlight'),
             'can_reopen'   => $this->isAdminSettings(),
         ]);
@@ -490,10 +489,8 @@ class EmployeeKpiController extends Controller
         [$defYear, $defSemester] = $this->currentPeriod();
         $tahun    = (int) $request->get('tahun', $defYear);
         $semester = (int) $request->get('semester', $defSemester);
-        $onlyEmployeeId = $request->get('employee_id');
 
         $employeesModel = Employee::aktif()->whereIn('id', $employees->pluck('id'))
-            ->when($onlyEmployeeId, fn ($q) => $q->where('id', $onlyEmployeeId))
             ->with('position')->orderBy('nama_lengkap')->get();
 
         $appraisals = KpiAppraisal::with(['scores.criteria', 'reviewer'])
@@ -625,9 +622,7 @@ class EmployeeKpiController extends Controller
 
         $wb->setActiveSheetIndex(0);
 
-        $namaFile = $onlyEmployeeId && $employeesModel->first()
-            ? 'KPI_' . str_replace(' ', '_', $employeesModel->first()->nama_lengkap) . '_' . now()->format('Ymd_His') . '.xlsx'
-            : 'KPI_' . now()->format('Ymd_His') . '.xlsx';
+        $namaFile = 'KPI_' . now()->format('Ymd_His') . '.xlsx';
 
         $writer = new Xlsx($wb);
         $writer->setIncludeCharts(true);
