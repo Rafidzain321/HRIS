@@ -15,6 +15,12 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Chart\Chart;
+use PhpOffice\PhpSpreadsheet\Chart\DataSeries;
+use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
+use PhpOffice\PhpSpreadsheet\Chart\Legend;
+use PhpOffice\PhpSpreadsheet\Chart\PlotArea;
+use PhpOffice\PhpSpreadsheet\Chart\Title;
 
 class EmployeeKpiController extends Controller
 {
@@ -525,6 +531,50 @@ class EmployeeKpiController extends Controller
         $sheet1->freezePane('B5');
         $sheet1->setShowGridlines(false);
 
+        // ── DATA RINGKAS + GRAFIK DONUT (status & predikat) — disisipkan di kolom J ke
+        // kanan supaya tidak bertabrakan dengan tabel utama berapa pun jumlah karyawannya.
+        $statusCounts = ['belum_dinilai' => 0, 'draft' => 0, 'submitted' => 0];
+        $predikatCounts = ['K' => 0, 'C' => 0, 'B' => 0, 'BS' => 0, 'A' => 0];
+        foreach ($employeesModel as $e) {
+            $a = $appraisals->get($e->id);
+            $statusCounts[$a?->status ?? 'belum_dinilai']++;
+            if ($a?->predikat) {
+                $predikatCounts[$a->predikat]++;
+            }
+        }
+
+        $sheet1->getColumnDimension('J')->setWidth(20);
+        $sheet1->getColumnDimension('K')->setWidth(10);
+
+        $sheet1->setCellValue('J4', 'Distribusi Status Penilaian');
+        $sheet1->getStyle('J4')->getFont()->setBold(true);
+        $statusLabels = ['belum_dinilai' => 'Belum Dinilai', 'draft' => 'Draft', 'submitted' => 'Final'];
+        $row = 6;
+        foreach ($statusLabels as $key => $label) {
+            $sheet1->setCellValue("J{$row}", $label);
+            $sheet1->setCellValue("K{$row}", $statusCounts[$key]);
+            $row++;
+        }
+
+        $sheet1->setCellValue('J10', 'Distribusi Predikat');
+        $sheet1->getStyle('J10')->getFont()->setBold(true);
+        $predikatLabels = ['K' => 'K - Kurang', 'C' => 'C - Cukup', 'B' => 'B - Baik', 'BS' => 'BS - Baik Sekali', 'A' => 'A - Memuaskan'];
+        $row = 12;
+        foreach ($predikatLabels as $key => $label) {
+            $sheet1->setCellValue("J{$row}", $label);
+            $sheet1->setCellValue("K{$row}", $predikatCounts[$key]);
+            $row++;
+        }
+
+        $sheet1->addChart($this->kpiDonutChart(
+            'Ringkasan', 'chart_status', 'Distribusi Status Penilaian',
+            '$J$6:$J$8', '$K$6:$K$8', 3, 'M4', 'T18'
+        ));
+        $sheet1->addChart($this->kpiDonutChart(
+            'Ringkasan', 'chart_predikat', 'Distribusi Predikat',
+            '$J$12:$J$16', '$K$12:$K$16', 5, 'M20', 'T34'
+        ));
+
         // ── SHEET 2: DETAIL PENILAIAN (tiap kriteria per karyawan) ──
         $sheet2 = $wb->createSheet()->setTitle('Detail Penilaian');
         $detailRows = collect();
@@ -575,6 +625,7 @@ class EmployeeKpiController extends Controller
             : 'KPI_' . now()->format('Ymd_His') . '.xlsx';
 
         $writer = new Xlsx($wb);
+        $writer->setIncludeCharts(true);
         return response()->stream(function () use ($writer) {
             $writer->save('php://output');
         }, 200, [
@@ -582,6 +633,25 @@ class EmployeeKpiController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $namaFile . '"',
             'Cache-Control'       => 'max-age=0',
         ]);
+    }
+
+    // Bikin chart donut native Excel dari satu range kategori + satu range nilai di sheet
+    // yang sama (dipakai untuk grafik distribusi status & predikat pada export KPI).
+    private function kpiDonutChart(string $sheetTitle, string $name, string $titleText, string $catRange, string $valRange, int $count, string $topLeft, string $bottomRight): Chart
+    {
+        $labels = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'{$sheetTitle}'!{$catRange}", null, $count)];
+        $values = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'{$sheetTitle}'!{$valRange}", null, $count)];
+
+        $series = new DataSeries(DataSeries::TYPE_DOUGHNUTCHART, null, [0], [], $labels, $values);
+        $plotArea = new PlotArea(null, [$series]);
+        $legend = new Legend(Legend::POSITION_RIGHT, null, false);
+        $title = new Title($titleText);
+
+        $chart = new Chart($name, $title, $legend, $plotArea);
+        $chart->setTopLeftPosition($topLeft);
+        $chart->setBottomRightPosition($bottomRight);
+
+        return $chart;
     }
 
     private function kpiExportTitle($sheet, string $title, string $lastCol, int $count): void
