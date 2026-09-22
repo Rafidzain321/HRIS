@@ -300,8 +300,10 @@ class EmployeeKpiController extends Controller
             }
             $appraisal->update(['status' => 'submitted', 'submitted_at' => now()]);
             ActivityLog::record('update', 'Penilaian KPI', $appraisal->employee->nama_lengkap ?? '-', "Penilaian semester {$appraisal->semester}/{$appraisal->tahun} disimpan final — total {$appraisal->fresh()->total_nilai} ({$appraisal->fresh()->predikat})");
+            session()->flash('success', "Penilaian {$appraisal->employee->nama_lengkap} berhasil disimpan final.");
         } else {
             ActivityLog::record('update', 'Penilaian KPI', $appraisal->employee->nama_lengkap ?? '-', "Draft penilaian semester {$appraisal->semester}/{$appraisal->tahun} disimpan");
+            session()->flash('success', 'Draft penilaian berhasil disimpan.');
         }
 
         $fresh = $appraisal->fresh();
@@ -332,6 +334,7 @@ class EmployeeKpiController extends Controller
         $appraisal->delete();
 
         ActivityLog::record('delete', 'Penilaian KPI', $nama, "Hapus penilaian semester {$periode}");
+        session()->flash('success', "Draft penilaian {$nama} berhasil dibuang.");
 
         return response()->json(['ok' => true]);
     }
@@ -352,6 +355,7 @@ class EmployeeKpiController extends Controller
 
         $nama = $appraisal->employee->nama_lengkap ?? '-';
         ActivityLog::record('update', 'Penilaian KPI', $nama, "Buka kembali penilaian semester {$appraisal->semester}/{$appraisal->tahun} (dari final ke draft)");
+        session()->flash('success', "Penilaian {$nama} dibuka kembali ke draft.");
 
         return response()->json(['ok' => true, 'status' => 'draft']);
     }

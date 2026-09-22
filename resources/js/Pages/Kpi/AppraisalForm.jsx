@@ -118,7 +118,7 @@ function ScorePicker({ value, onChange, disabled }) {
   );
 }
 
-function CriteriaTable({ title, subtitle, rows, scores, onScore, disabled, groupBySub }) {
+function CriteriaTable({ title, subtitle, rows, scores, onScore, disabled, groupBySub, invalidIds }) {
   const groups = groupBySub
     ? rows.reduce((acc, r) => {
         const key = r.sub_kategori || '-';
@@ -150,18 +150,22 @@ function CriteriaTable({ title, subtitle, rows, scores, onScore, disabled, group
                     <td colSpan={3} style={{ padding: '6px 14px', background: 'rgba(232,160,32,.06)', fontSize: 11, fontWeight: 700, color: 'var(--accent)', borderTop: '1px solid var(--border)' }}>{sub}</td>
                   </tr>
                 )}
-                {items.map((r, i) => (
-                  <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
-                    <td style={{ padding: '9px 14px', color: 'var(--muted2)' }}>{i + 1}</td>
-                    <td style={{ padding: '9px 14px' }}>
-                      {r.deskripsi}
-                      {r.is_base === false && <span style={{ marginLeft: 6, fontSize: 9.5, padding: '1px 7px', borderRadius: 99, background: 'rgba(58,143,224,.12)', color: 'var(--blue)' }}>Khusus Karyawan Ini</span>}
-                    </td>
-                    <td style={{ padding: '7px 14px' }}>
-                      <ScorePicker value={scores[r.id] ?? null} onChange={v => onScore(r.id, v)} disabled={disabled} />
-                    </td>
-                  </tr>
-                ))}
+                {items.map((r, i) => {
+                  const isInvalid = invalidIds?.has(r.id);
+                  return (
+                    <tr key={r.id} data-crit-id={r.id} style={{ borderTop: '1px solid var(--border)', background: isInvalid ? 'rgba(224,69,69,.07)' : undefined, transition: 'background .4s' }}>
+                      <td style={{ padding: '9px 14px', color: 'var(--muted2)' }}>{i + 1}</td>
+                      <td style={{ padding: '9px 14px' }}>
+                        {r.deskripsi}
+                        {r.is_base === false && <span style={{ marginLeft: 6, fontSize: 9.5, padding: '1px 7px', borderRadius: 99, background: 'rgba(58,143,224,.12)', color: 'var(--blue)' }}>Khusus Karyawan Ini</span>}
+                        {isInvalid && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: 'rgba(224,69,69,.15)', color: '#E04545' }}>Wajib diisi</span>}
+                      </td>
+                      <td style={{ padding: '7px 14px', borderLeft: isInvalid ? '3px solid #E04545' : '3px solid transparent' }}>
+                        <ScorePicker value={scores[r.id] ?? null} onChange={v => onScore(r.id, v)} disabled={disabled} />
+                      </td>
+                    </tr>
+                  );
+                })}
               </React.Fragment>
             ))}
           </tbody>
@@ -179,6 +183,7 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
   const [error, setError] = useState('');
   const [confirmReopen, setConfirmReopen] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [invalidIds, setInvalidIds] = useState(() => new Set());
 
   const isFinal = appraisal.status === 'submitted';
   const editable = can_edit && !isFinal;
@@ -199,7 +204,13 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
   }, [scores, criteriaA, criteriaB, criteria]);
 
   function handleScore(criteriaId, v) {
-    setScores(s => ({ ...s, [criteriaId]: s[criteriaId] === v ? null : v }));
+    setScores(s => {
+      const next = { ...s, [criteriaId]: s[criteriaId] === v ? null : v };
+      setInvalidIds(prevInvalid => (
+        prevInvalid.size === 0 ? prevInvalid : new Set(criteria.filter(c => !next[c.id]).map(c => c.id))
+      ));
+      return next;
+    });
   }
 
   function buildPayload(submit) {
@@ -211,8 +222,25 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
     };
   }
 
+  function scrollToCriteria(criteriaId) {
+    const row = document.querySelector(`tr[data-crit-id="${criteriaId}"]`);
+    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   function save(submit) {
     setError('');
+
+    if (submit) {
+      const missing = criteria.filter(c => !scores[c.id]).map(c => c.id);
+      if (missing.length > 0) {
+        setInvalidIds(new Set(missing));
+        setError('Semua poin penilaian harus diisi (1-5) sebelum bisa disimpan final.');
+        scrollToCriteria(missing[0]);
+        return;
+      }
+    }
+
+    setInvalidIds(new Set());
     setSaving(true);
     axios.put(`/kpi/appraisals/${appraisal.id}`, buildPayload(submit), { headers: csrfHeaders() })
       .then(() => {
@@ -280,8 +308,8 @@ export default function AppraisalForm({ appraisal, employee, criteria, all_emplo
             </div>
           </div>
 
-          <CriteriaTable title="A. Aspek Keselamatan (Bobot 40%)" rows={criteriaA} scores={scores} onScore={handleScore} disabled={!editable} />
-          <CriteriaTable title="B. Produktifitas Kerja, Keandalan, Kerjasama Team & Komunikasi (Bobot 60%)" rows={criteriaB} scores={scores} onScore={handleScore} disabled={!editable} groupBySub />
+          <CriteriaTable title="A. Aspek Keselamatan (Bobot 40%)" rows={criteriaA} scores={scores} onScore={handleScore} disabled={!editable} invalidIds={invalidIds} />
+          <CriteriaTable title="B. Produktifitas Kerja, Keandalan, Kerjasama Team & Komunikasi (Bobot 60%)" rows={criteriaB} scores={scores} onScore={handleScore} disabled={!editable} groupBySub invalidIds={invalidIds} />
 
           <div style={{ ...card, padding: 16 }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Catatan Penilai (opsional)</div>

@@ -170,7 +170,7 @@ function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
     const r = confirmDiscard;
     setDiscarding(true);
     axios.delete(`/kpi/appraisals/${r.appraisal_id}`, { headers: csrfHeaders() })
-      .then(() => { setConfirmDiscard(null); router.reload({ only: ['rows'] }); })
+      .then(() => { setConfirmDiscard(null); router.reload(); })
       .catch(err => alert(err.response?.data?.message || 'Gagal membuang draft.'))
       .finally(() => setDiscarding(false));
   }
