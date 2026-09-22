@@ -5,7 +5,7 @@ import { usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
   Target, Search, BarChart3, ClipboardList, ChevronLeft, ChevronRight,
-  Download, ChevronDown, Users, Network, ListChecks, Eye, Pencil, FilePlus2, Trash2,
+  Download, ChevronDown, Users, Network, ListChecks, Eye, Pencil, FilePlus2, Trash2, RotateCcw,
 } from 'lucide-react';
 
 function csrfHeaders() {
@@ -158,13 +158,15 @@ function PeriodSelector({ tahun, semester }) {
 }
 
 // ── TABEL PENILAIAN (dipakai di tab Penilaian & Dashboard) ──
-function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
+function AppraisalTable({ rows, tahun, semester, showActions, isViewer, canReopen }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [confirmDiscard, setConfirmDiscard] = useState(null);
   const [discarding, setDiscarding] = useState(false);
+  const [confirmReopen, setConfirmReopen] = useState(null);
+  const [reopening, setReopening] = useState(false);
 
   function discardDraft() {
     const r = confirmDiscard;
@@ -173,6 +175,15 @@ function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
       .then(() => { setConfirmDiscard(null); router.reload(); })
       .catch(err => alert(err.response?.data?.message || 'Gagal membuang draft.'))
       .finally(() => setDiscarding(false));
+  }
+
+  function reopenAppraisal() {
+    const r = confirmReopen;
+    setReopening(true);
+    axios.put(`/kpi/appraisals/${r.appraisal_id}/reopen`, {}, { headers: csrfHeaders() })
+      .then(() => { setConfirmReopen(null); router.reload(); })
+      .catch(err => alert(err.response?.data?.message || 'Gagal membuka kembali penilaian.'))
+      .finally(() => setReopening(false));
   }
 
   const searchLow = search.trim().toLowerCase();
@@ -267,6 +278,13 @@ function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
                                 title="Buang Draft" icon={<Trash2 size={13} />}
                               />
                             )}
+                            {r.status === 'submitted' && canReopen && (
+                              <IconBtn
+                                onClick={() => setConfirmReopen(r)}
+                                color="var(--blue)" borderColor="rgba(58,143,224,.3)" hoverBg="rgba(58,143,224,.12)"
+                                title="Buka Kembali" icon={<RotateCcw size={13} />}
+                              />
+                            )}
                           </div>
                         )}
                       </td>
@@ -297,6 +315,15 @@ function AppraisalTable({ rows, tahun, semester, showActions, isViewer }) {
         message={confirmDiscard ? `Buang draft penilaian ${confirmDiscard.nama_lengkap}? Semua skor yang sudah diisi akan hilang dan status kembali ke "Belum Dinilai".` : ''}
         confirmLabel={discarding ? 'Membuang...' : 'Ya, Buang'}
         type="danger"
+      />
+      <ConfirmModal
+        open={!!confirmReopen}
+        onCancel={() => setConfirmReopen(null)}
+        onConfirm={reopenAppraisal}
+        title="Buka Kembali Penilaian"
+        message={confirmReopen ? `Buka kembali penilaian ${confirmReopen.nama_lengkap} ke status draft supaya bisa dikoreksi?` : ''}
+        confirmLabel={reopening ? 'Memproses...' : 'Ya, Buka Kembali'}
+        type="warning"
       />
     </div>
   );
@@ -367,7 +394,7 @@ function TabDashboard({ rows, tahun, semester }) {
 }
 
 // ── MAIN ────────────────────────────────────────────────────
-export default function KpiIndex({ rows = [], tahun, semester, is_self_only = false, all_employees = [], highlight = null }) {
+export default function KpiIndex({ rows = [], tahun, semester, is_self_only = false, all_employees = [], highlight = null, can_reopen = false }) {
   const { auth } = usePage().props;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -440,7 +467,7 @@ export default function KpiIndex({ rows = [], tahun, semester, is_self_only = fa
       </div>
 
       {activeTab === 'dashboard' && <TabDashboard rows={rows} tahun={tahun} semester={semester} />}
-      {activeTab === 'penilaian' && <AppraisalTable rows={rows} tahun={tahun} semester={semester} showActions isViewer={isViewer} />}
+      {activeTab === 'penilaian' && <AppraisalTable rows={rows} tahun={tahun} semester={semester} showActions isViewer={isViewer} canReopen={can_reopen} />}
     </AppLayout>
   );
 }

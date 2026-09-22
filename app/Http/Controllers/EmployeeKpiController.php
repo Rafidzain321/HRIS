@@ -184,6 +184,7 @@ class EmployeeKpiController extends Controller
             'is_self_only' => $isSelfOnly,
             'all_employees'=> $this->allEmployeesPayload(),
             'highlight'    => $request->get('highlight'),
+            'can_reopen'   => $this->isAdminSettings(),
         ]);
     }
 
@@ -668,14 +669,7 @@ class EmployeeKpiController extends Controller
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
         ]);
         $sheet->getRowDimension(1)->setRowHeight(28);
-
-        $sheet->mergeCells("A2:{$lastCol}2");
-        $sheet->setCellValue('A2', 'Diekspor pada: ' . now()->format('d M Y H:i') . ' WIB  |  Total: ' . $count . ' data');
-        $sheet->getStyle('A2')->applyFromArray([
-            'font'      => ['name' => 'Arial', 'size' => 9, 'italic' => true, 'color' => ['rgb' => '666666']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
-        ]);
-        $sheet->getRowDimension(2)->setRowHeight(16);
+        $sheet->getRowDimension(2)->setRowHeight(6);
         $sheet->getRowDimension(3)->setRowHeight(6);
     }
 
