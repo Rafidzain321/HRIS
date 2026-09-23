@@ -665,6 +665,7 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                   <option value="">— Pilih —</option>
                   <option value="AKTIF">AKTIF</option>
                   <option value="NONAKTIF">NONAKTIF</option>
+                  <option value="TIDAK ADA">TIDAK ADA</option>
                 </select>
               </Field>
             </Section>
