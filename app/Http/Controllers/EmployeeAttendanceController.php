@@ -39,6 +39,7 @@ class EmployeeAttendanceController extends Controller
                 'nama_lengkap' => $e->nama_lengkap,
                 'jabatan'      => $e->position?->nama_jabatan ?? '-',
                 'hadir'        => $r->hadir ?? 0,
+                'dinas_luar'   => $r->dinas_luar ?? 0,
                 'izin'         => $r->izin ?? 0,
                 'sakit'        => $r->sakit ?? 0,
                 'alpha'        => $r->alpha ?? 0,
@@ -61,31 +62,33 @@ class EmployeeAttendanceController extends Controller
             'tahun'       => 'required|integer|min:2020|max:2100',
             'bulan'       => 'required|integer|min:1|max:12',
             'hadir'       => 'required|integer|min:0|max:31',
+            'dinas_luar'  => 'nullable|integer|min:0|max:31',
             'izin'        => 'required|integer|min:0|max:31',
             'sakit'       => 'required|integer|min:0|max:31',
             'alpha'       => 'required|integer|min:0|max:31',
         ]);
+        $dinasLuar = $data['dinas_luar'] ?? 0;
 
         $daysInMonth = Carbon::create($data['tahun'], $data['bulan'], 1)->daysInMonth;
         $cuti = EmployeeLeave::hariCutiDalamBulan((int) $data['employee_id'], (int) $data['tahun'], (int) $data['bulan']);
-        $total = $data['hadir'] + $data['izin'] + $data['sakit'] + $data['alpha'] + $cuti;
+        $total = $data['hadir'] + $dinasLuar + $data['izin'] + $data['sakit'] + $data['alpha'] + $cuti;
 
         if ($total > $daysInMonth) {
             return back()->withErrors([
-                'hadir' => "Total Hadir+Izin+Sakit+Alpha+Cuti ({$total} hari) tidak boleh melebihi jumlah hari di bulan itu ({$daysInMonth} hari). Cuti bulan ini sudah {$cuti} hari (dari Cuti Tahunan).",
+                'hadir' => "Total Hadir+Dinas Luar+Izin+Sakit+Alpha+Cuti ({$total} hari) tidak boleh melebihi jumlah hari di bulan itu ({$daysInMonth} hari). Cuti bulan ini sudah {$cuti} hari (dari Cuti Tahunan).",
             ]);
         }
 
         EmployeeAttendance::updateOrCreate(
             ['employee_id' => $data['employee_id'], 'tahun' => $data['tahun'], 'bulan' => $data['bulan']],
             [
-                'hadir' => $data['hadir'], 'izin' => $data['izin'], 'sakit' => $data['sakit'], 'alpha' => $data['alpha'],
+                'hadir' => $data['hadir'], 'dinas_luar' => $dinasLuar, 'izin' => $data['izin'], 'sakit' => $data['sakit'], 'alpha' => $data['alpha'],
                 'dicatat_oleh' => auth()->user()?->name,
             ]
         );
 
         $employeeNama = Employee::find($data['employee_id'])?->nama_lengkap ?? '-';
-        ActivityLog::record('update', 'Kehadiran', $employeeNama, "Rekap kehadiran {$data['bulan']}/{$data['tahun']}: H{$data['hadir']} I{$data['izin']} S{$data['sakit']} A{$data['alpha']}");
+        ActivityLog::record('update', 'Kehadiran', $employeeNama, "Rekap kehadiran {$data['bulan']}/{$data['tahun']}: H{$data['hadir']} DL{$dinasLuar} I{$data['izin']} S{$data['sakit']} A{$data['alpha']}");
 
         return back()->with('success', 'Kehadiran berhasil disimpan.');
     }
@@ -111,11 +114,13 @@ class EmployeeAttendanceController extends Controller
         $result = $employees->map(function ($e) use ($rows, $tahun, $bulanAwal, $bulanAkhir) {
             $recs = $rows->get($e->id, collect());
             $hadir = $recs->sum('hadir');
+            $dinasLuar = $recs->sum('dinas_luar');
             $izin  = $recs->sum('izin');
             $sakit = $recs->sum('sakit');
             $alpha = $recs->sum('alpha');
-            $dasar = $hadir + $izin + $sakit + $alpha;
-            $pct = $dasar > 0 ? round($hadir / $dasar * 100, 1) : null;
+            $masuk = $hadir + $dinasLuar;
+            $dasar = $masuk + $izin + $sakit + $alpha;
+            $pct = $dasar > 0 ? round($masuk / $dasar * 100, 1) : null;
 
             $cuti = 0;
             for ($b = $bulanAwal; $b <= $bulanAkhir; $b++) {
@@ -126,7 +131,7 @@ class EmployeeAttendanceController extends Controller
                 'employee_id'  => $e->id,
                 'nama_lengkap' => $e->nama_lengkap,
                 'jabatan'      => $e->position?->nama_jabatan ?? '-',
-                'hadir' => $hadir, 'izin' => $izin, 'sakit' => $sakit, 'alpha' => $alpha, 'cuti' => $cuti,
+                'hadir' => $hadir, 'dinas_luar' => $dinasLuar, 'izin' => $izin, 'sakit' => $sakit, 'alpha' => $alpha, 'cuti' => $cuti,
                 'persentase' => $pct,
                 'bulan_terisi' => $recs->count(),
             ];

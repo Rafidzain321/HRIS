@@ -21,14 +21,14 @@ const MONTH_NAMES = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Ju
 
 // ── BARIS EDITABLE (Hadir/Izin/Sakit/Alpha) ─────────────────
 function AttendanceRow({ row, tahun, bulan, daysInMonth, canEdit, onSaved }) {
-  const [form, setForm] = useState({ hadir: row.hadir, izin: row.izin, sakit: row.sakit, alpha: row.alpha });
+  const [form, setForm] = useState({ hadir: row.hadir, dinas_luar: row.dinas_luar, izin: row.izin, sakit: row.sakit, alpha: row.alpha });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => { setForm({ hadir: row.hadir, izin: row.izin, sakit: row.sakit, alpha: row.alpha }); setDirty(false); }, [row.hadir, row.izin, row.sakit, row.alpha]);
+  useEffect(() => { setForm({ hadir: row.hadir, dinas_luar: row.dinas_luar, izin: row.izin, sakit: row.sakit, alpha: row.alpha }); setDirty(false); }, [row.hadir, row.dinas_luar, row.izin, row.sakit, row.alpha]);
 
-  const total = (Number(form.hadir) || 0) + (Number(form.izin) || 0) + (Number(form.sakit) || 0) + (Number(form.alpha) || 0) + row.cuti;
+  const total = (Number(form.hadir) || 0) + (Number(form.dinas_luar) || 0) + (Number(form.izin) || 0) + (Number(form.sakit) || 0) + (Number(form.alpha) || 0) + row.cuti;
   const over = total > daysInMonth;
 
   function setField(key, val) {
@@ -41,7 +41,7 @@ function AttendanceRow({ row, tahun, bulan, daysInMonth, canEdit, onSaved }) {
     try {
       const res = await axios.post('/kehadiran', {
         employee_id: row.employee_id, tahun, bulan,
-        hadir: form.hadir || 0, izin: form.izin || 0, sakit: form.sakit || 0, alpha: form.alpha || 0,
+        hadir: form.hadir || 0, dinas_luar: form.dinas_luar || 0, izin: form.izin || 0, sakit: form.sakit || 0, alpha: form.alpha || 0,
       }, { headers: { 'X-CSRF-TOKEN': csrf() } });
       setDirty(false);
       onSaved?.();
@@ -55,7 +55,7 @@ function AttendanceRow({ row, tahun, bulan, daysInMonth, canEdit, onSaved }) {
     <tr style={{ borderTop: '1px solid var(--border)', background: over ? 'rgba(224,69,69,.04)' : 'transparent' }}>
       <td style={{ padding: '9px 14px', fontWeight: 600 }}>{row.nama_lengkap}</td>
       <td style={{ padding: '9px 14px', color: 'var(--muted2)', fontSize: 12 }}>{row.jabatan}</td>
-      {['hadir', 'izin', 'sakit', 'alpha'].map(k => (
+      {['hadir', 'dinas_luar', 'izin', 'sakit', 'alpha'].map(k => (
         <td key={k} style={{ padding: '6px 8px', textAlign: 'center' }}>
           <input type="text" inputMode="numeric" style={numInp} value={form[k]} disabled={!canEdit}
             onChange={e => setField(k, e.target.value)} onBlur={() => dirty && canEdit && save()} />
@@ -112,6 +112,7 @@ function TabSemester({ tahun }) {
                   <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Karyawan</th>
                   <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Jabatan</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Hadir</th>
+                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Dinas Luar</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Izin</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Sakit</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Alpha</th>
@@ -120,7 +121,7 @@ function TabSemester({ tahun }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 && <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada data.</td></tr>}
+                {filtered.length === 0 && <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada data.</td></tr>}
                 {filtered.map(r => {
                   const color = r.persentase === null ? 'var(--muted)' : r.persentase >= 95 ? '#22C97A' : r.persentase >= 85 ? '#E8A020' : '#E04545';
                   return (
@@ -128,6 +129,7 @@ function TabSemester({ tahun }) {
                       <td style={{ padding: '9px 14px', fontWeight: 600 }}>{r.nama_lengkap}</td>
                       <td style={{ padding: '9px 14px', color: 'var(--muted2)' }}>{r.jabatan}</td>
                       <td style={{ padding: '9px 14px', textAlign: 'center' }}>{r.hadir}</td>
+                      <td style={{ padding: '9px 14px', textAlign: 'center' }}>{r.dinas_luar}</td>
                       <td style={{ padding: '9px 14px', textAlign: 'center' }}>{r.izin}</td>
                       <td style={{ padding: '9px 14px', textAlign: 'center' }}>{r.sakit}</td>
                       <td style={{ padding: '9px 14px', textAlign: 'center' }}>{r.alpha}</td>
@@ -143,7 +145,7 @@ function TabSemester({ tahun }) {
           </div>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 10 }}>% Kehadiran = Hadir ÷ (Hadir + Izin + Sakit + Alpha) × 100. Cuti tidak ikut dihitung (hak karyawan).</div>
+      <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 10 }}>% Kehadiran = (Hadir + Dinas Luar) ÷ (Hadir + Dinas Luar + Izin + Sakit + Alpha) × 100. Cuti tidak ikut dihitung (hak karyawan).</div>
     </div>
   );
 }
@@ -228,6 +230,7 @@ export default function AttendanceIndex({ employees = [], tahun, bulan, days_in_
                     <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Karyawan</th>
                     <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Jabatan</th>
                     <th style={{ textAlign: 'center', padding: '10px 8px', fontSize: 11, color: 'var(--muted)' }}>Hadir</th>
+                    <th style={{ textAlign: 'center', padding: '10px 8px', fontSize: 11, color: 'var(--muted)' }}>Dinas Luar</th>
                     <th style={{ textAlign: 'center', padding: '10px 8px', fontSize: 11, color: 'var(--muted)' }}>Izin</th>
                     <th style={{ textAlign: 'center', padding: '10px 8px', fontSize: 11, color: 'var(--muted)' }}>Sakit</th>
                     <th style={{ textAlign: 'center', padding: '10px 8px', fontSize: 11, color: 'var(--muted)' }}>Alpha</th>
@@ -238,7 +241,7 @@ export default function AttendanceIndex({ employees = [], tahun, bulan, days_in_
                 </thead>
                 <tbody>
                   {filteredEmployees.length === 0 && (
-                    <tr><td colSpan={9} style={{ padding: 28, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada karyawan.</td></tr>
+                    <tr><td colSpan={10} style={{ padding: 28, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada karyawan.</td></tr>
                   )}
                   {filteredEmployees.map(row => (
                     <AttendanceRow key={row.employee_id} row={row} tahun={tahun} bulan={bulan} daysInMonth={days_in_month} canEdit={canEdit} onSaved={reload} />
@@ -247,7 +250,7 @@ export default function AttendanceIndex({ employees = [], tahun, bulan, days_in_
               </table>
             </div>
           </div>
-          <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 10 }}>Kolom Cuti otomatis diambil dari Cuti Tahunan — tidak diketik manual. Total (Hadir+Izin+Sakit+Alpha+Cuti) tidak boleh melebihi jumlah hari di bulan ini ({days_in_month} hari).</div>
+          <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 10 }}>Kolom Cuti otomatis diambil dari Cuti Tahunan — tidak diketik manual. Dinas Luar dihitung sebagai Masuk. Total (Hadir+Dinas Luar+Izin+Sakit+Alpha+Cuti) tidak boleh melebihi jumlah hari di bulan ini ({days_in_month} hari).</div>
         </div>
       )}
 
