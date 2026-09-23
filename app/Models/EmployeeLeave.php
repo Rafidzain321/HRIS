@@ -9,7 +9,7 @@ use Illuminate\Support\Carbon;
 class EmployeeLeave extends Model
 {
     protected $fillable = [
-        'employee_id', 'tanggal_mulai', 'tanggal_selesai',
+        'employee_id', 'jenis', 'tanggal_mulai', 'tanggal_selesai',
         'jumlah_hari', 'keterangan', 'dicatat_oleh',
     ];
 
@@ -47,13 +47,15 @@ class EmployeeLeave extends Model
     // Total hari kerja cuti seorang karyawan yang jatuh di bulan tertentu — dipakai fitur
     // Kehadiran (Attendance) supaya nilai "Cuti" selalu diambil dari sini, bukan diketik ulang.
     // Satu catatan cuti bisa melewati batas bulan (mis. 29 Des - 3 Jan), jadi dipotong dulu ke
-    // rentang bulan yang diminta sebelum dihitung hari kerjanya.
+    // rentang bulan yang diminta sebelum dihitung hari kerjanya. Cuma jenis 'cuti_tahunan' yang
+    // dihitung — "Izin Tanpa Pemotongan Cuti" bukan cuti sungguhan, jadi tidak ikut di sini.
     public static function hariCutiDalamBulan(int $employeeId, int $tahun, int $bulan): int
     {
         $awalBulan   = Carbon::create($tahun, $bulan, 1)->startOfMonth();
         $akhirBulan  = $awalBulan->copy()->endOfMonth();
 
         $leaves = static::where('employee_id', $employeeId)
+            ->where('jenis', 'cuti_tahunan')
             ->where('tanggal_mulai', '<=', $akhirBulan)
             ->where('tanggal_selesai', '>=', $awalBulan)
             ->get(['tanggal_mulai', 'tanggal_selesai']);

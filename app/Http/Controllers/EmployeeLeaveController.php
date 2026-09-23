@@ -37,6 +37,7 @@ class EmployeeLeaveController extends Controller
             ->map(fn ($l) => [
                 'id'              => $l->id,
                 'employee_id'     => $l->employee_id,
+                'jenis'           => $l->jenis,
                 'tanggal_mulai'   => $l->tanggal_mulai->format('Y-m-d'),
                 'tanggal_selesai' => $l->tanggal_selesai->format('Y-m-d'),
                 'jumlah_hari'     => $l->jumlah_hari,
@@ -90,7 +91,7 @@ class EmployeeLeaveController extends Controller
         $this->exportHeaderRow($sheet1, $headers1, 4);
         foreach ($employees as $idx => $e) {
             $row = 5 + $idx;
-            $terpakai = $leavesByEmployee->get($e->id, collect())->sum('jumlah_hari');
+            $terpakai = $leavesByEmployee->get($e->id, collect())->where('jenis', 'cuti_tahunan')->sum('jumlah_hari');
             $sisa = self::JATAH_TAHUNAN - $terpakai;
             $this->exportRow($sheet1, $row, $idx, [
                 'A' => $idx + 1, 'B' => strtoupper($e->nama_lengkap), 'C' => $e->position?->nama_jabatan ?? '—',
@@ -106,8 +107,8 @@ class EmployeeLeaveController extends Controller
         $this->exportTitle($sheet2, "DETAIL CUTI TAHUNAN {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'G', $leaves->count());
         $headers2 = [
             'A' => ['No.', 4], 'B' => ['Nama Karyawan', 28], 'C' => ['Jabatan', 24],
-            'D' => ['Tgl Mulai', 14], 'E' => ['Tgl Selesai', 14], 'F' => ['Jumlah Hari', 12],
-            'G' => ['Keterangan', 28],
+            'D' => ['Jenis', 20], 'E' => ['Tgl Mulai', 14], 'F' => ['Tgl Selesai', 14], 'G' => ['Jumlah Hari', 12],
+            'H' => ['Keterangan', 28],
         ];
         $this->exportHeaderRow($sheet2, $headers2, 4);
         $employeesById = $employees->keyBy('id');
@@ -116,16 +117,17 @@ class EmployeeLeaveController extends Controller
             $emp = $employeesById->get($l->employee_id);
             $this->exportRow($sheet2, $row, $idx, [
                 'A' => $idx + 1, 'B' => strtoupper($emp?->nama_lengkap ?? '—'), 'C' => $emp?->position?->nama_jabatan ?? '—',
-                'D' => $l->tanggal_mulai->format('d M Y'), 'E' => $l->tanggal_selesai->format('d M Y'),
-                'F' => $l->jumlah_hari, 'G' => $l->keterangan ?? '—',
-            ], ['A', 'D', 'E', 'F']);
+                'D' => $l->jenis === 'izin_tanpa_potong' ? 'Izin (Tanpa Potong Cuti)' : 'Cuti Tahunan',
+                'E' => $l->tanggal_mulai->format('d M Y'), 'F' => $l->tanggal_selesai->format('d M Y'),
+                'G' => $l->jumlah_hari, 'H' => $l->keterangan ?? '—',
+            ], ['A', 'D', 'E', 'F', 'G']);
         }
         if ($leaves->isEmpty()) {
-            $sheet2->mergeCells('A5:G5');
+            $sheet2->mergeCells('A5:H5');
             $sheet2->setCellValue('A5', 'Belum ada catatan cuti.');
             $sheet2->getStyle('A5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
-        $sheet2->setAutoFilter('A4:G4');
+        $sheet2->setAutoFilter('A4:H4');
         $sheet2->freezePane('B5');
         $sheet2->setShowGridlines(false);
 
@@ -222,10 +224,12 @@ class EmployeeLeaveController extends Controller
     {
         $data = $request->validate([
             'employee_id'     => 'required|exists:employees,id',
+            'jenis'           => 'nullable|in:cuti_tahunan,izin_tanpa_potong',
             'tanggal_mulai'   => 'required|date',
             'tanggal_selesai' => 'required|date|after_or_equal:tanggal_mulai',
             'keterangan'      => 'nullable|string|max:200',
         ]);
+        $data['jenis'] = $data['jenis'] ?? 'cuti_tahunan';
 
         $jumlahHari = EmployeeLeave::hitungHariKerja($data['tanggal_mulai'], $data['tanggal_selesai']);
         if ($jumlahHari < 1) {
@@ -238,9 +242,10 @@ class EmployeeLeaveController extends Controller
             'dicatat_oleh' => auth()->user()?->name,
         ]);
 
-        ActivityLog::record('create', 'Cuti', $leave->employee->nama_lengkap ?? '-', "Catat cuti {$jumlahHari} hari kerja ({$data['tanggal_mulai']} s/d {$data['tanggal_selesai']})");
+        $labelJenis = $data['jenis'] === 'izin_tanpa_potong' ? 'Izin (tanpa potong cuti)' : 'Cuti';
+        ActivityLog::record('create', 'Cuti', $leave->employee->nama_lengkap ?? '-', "Catat {$labelJenis} {$jumlahHari} hari kerja ({$data['tanggal_mulai']} s/d {$data['tanggal_selesai']})");
 
-        return back()->with('success', "Cuti {$jumlahHari} hari kerja berhasil dicatat.");
+        return back()->with('success', "{$labelJenis} {$jumlahHari} hari kerja berhasil dicatat.");
     }
 
     public function destroy(EmployeeLeave $leave)

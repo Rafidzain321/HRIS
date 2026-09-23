@@ -72,7 +72,7 @@ function EmployeeCombobox({ employees, value, onChange }) {
 // ── KALENDER KUSTOM (CSS grid, tanpa library) — tandai Minggu/hari libur
 // (merah) dan tanggal cuti karyawan terpilih (biru). Klik angka tanggal buat
 // tandai/hapus hari libur (kalau canEdit). ────────────────────
-function MiniCalendar({ year, month, onMonthChange, holidaysByDate, leaveDatesSet, canEdit, onDayClick }) {
+function MiniCalendar({ year, month, onMonthChange, holidaysByDate, leaveDatesMap, canEdit, onDayClick }) {
   const startWeekday = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells = [];
@@ -97,11 +97,13 @@ function MiniCalendar({ year, month, onMonthChange, holidaysByDate, leaveDatesSe
           const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const isSunday = new Date(year, month, d).getDay() === 0;
           const holiday = holidaysByDate[iso];
-          const isLeave = leaveDatesSet.has(iso);
+          const leaveJenis = leaveDatesMap.get(iso);
+          const isLeave = !!leaveJenis;
+          const isIzin = leaveJenis === 'izin_tanpa_potong';
           const clickable = canEdit && !isSunday;
           let bg = 'transparent', color = 'var(--text)';
           if (isSunday || holiday) { bg = 'rgba(224,69,69,.12)'; color = '#E04545'; }
-          if (isLeave) { bg = 'rgba(58,143,224,.18)'; color = 'var(--blue)'; }
+          if (isLeave) { bg = isIzin ? 'rgba(155,89,182,.18)' : 'rgba(58,143,224,.18)'; color = isIzin ? '#9B59B6' : 'var(--blue)'; }
           return (
             <div key={i} title={holiday ? `${holiday.keterangan} — klik untuk hapus` : (clickable ? 'Klik untuk tandai hari libur' : '')}
               onClick={() => clickable && onDayClick(iso, holiday || null)}
@@ -115,7 +117,8 @@ function MiniCalendar({ year, month, onMonthChange, holidaysByDate, leaveDatesSe
       </div>
       <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 10, color: 'var(--muted)', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: 'rgba(224,69,69,.5)' }} /> Minggu / Hari Libur</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: 'var(--blue)' }} /> Cuti</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: 'var(--blue)' }} /> Cuti Tahunan</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: '#9B59B6' }} /> Izin (Tanpa Potong)</span>
       </div>
     </div>
   );
@@ -125,6 +128,7 @@ function MiniCalendar({ year, month, onMonthChange, holidaysByDate, leaveDatesSe
 function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
   const [form, setForm] = useState({
     employee_id: defaultEmployeeId || employees[0]?.id || '',
+    jenis: 'cuti_tahunan',
     tanggal_mulai: '', tanggal_selesai: '', keterangan: '',
   });
   const [loading, setLoading] = useState(false);
@@ -146,7 +150,7 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
       onClick={e => { e.target === e.currentTarget && e.currentTarget.dataset.downOutside === 'true' && onClose(); }}>
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 16, width: 'min(420px,100%)', boxShadow: '0 24px 80px rgba(0,0,0,.5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><CalendarDays size={15} /> Catat Cuti</div>
+          <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><CalendarDays size={15} /> Catat Cuti / Izin</div>
           <div onClick={onClose} style={{ cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}><X size={18} /></div>
         </div>
         <form onSubmit={submit}>
@@ -154,6 +158,28 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
             <div>
               <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Karyawan</label>
               <EmployeeCombobox employees={employees} value={Number(form.employee_id)} onChange={id => setForm(p => ({ ...p, employee_id: id }))} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Jenis</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[
+                  { key: 'cuti_tahunan', label: 'Cuti Tahunan' },
+                  { key: 'izin_tanpa_potong', label: 'Izin (Tanpa Potong Cuti)' },
+                ].map(opt => (
+                  <div key={opt.key} onClick={() => setForm(p => ({ ...p, jenis: opt.key }))}
+                    style={{
+                      flex: 1, textAlign: 'center', padding: '8px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
+                      border: `1px solid ${form.jenis === opt.key ? 'transparent' : 'var(--border)'}`,
+                      background: form.jenis === opt.key ? 'linear-gradient(135deg,#E8A020,#A06010)' : 'var(--bg3)',
+                      color: form.jenis === opt.key ? '#0C0F14' : 'var(--muted2)',
+                    }}>
+                    {opt.label}
+                  </div>
+                ))}
+              </div>
+              {form.jenis === 'izin_tanpa_potong' && (
+                <div style={{ fontSize: 10.5, color: '#9B59B6', marginTop: 6 }}>Izin jenis ini tidak akan mengurangi sisa jatah Cuti Tahunan karyawan.</div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>
@@ -207,7 +233,10 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
   employees.forEach(e => { employeesById[e.id] = e; });
 
   const usageByEmployee = {};
-  leaves.forEach(l => { usageByEmployee[l.employee_id] = (usageByEmployee[l.employee_id] || 0) + l.jumlah_hari; });
+  leaves.forEach(l => {
+    if (l.jenis === 'izin_tanpa_potong') return; // tidak memotong jatah cuti
+    usageByEmployee[l.employee_id] = (usageByEmployee[l.employee_id] || 0) + l.jumlah_hari;
+  });
 
   const searchLow = search.trim().toLowerCase();
   const filteredEmployees = employees.filter(e => !searchLow || e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow));
@@ -221,10 +250,10 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
 
   const selected = employees.find(e => e.id === selectedId) || employees[0];
   const selectedLeaves = leaves.filter(l => l.employee_id === selected?.id);
-  const leaveDatesSet = new Set();
+  const leaveDatesMap = new Map();
   selectedLeaves.forEach(l => {
     for (let d = new Date(l.tanggal_mulai + 'T00:00:00'); d <= new Date(l.tanggal_selesai + 'T00:00:00'); d.setDate(d.getDate() + 1)) {
-      leaveDatesSet.add(d.toISOString().slice(0, 10));
+      leaveDatesMap.set(d.toISOString().slice(0, 10), l.jenis);
     }
   });
 
@@ -246,14 +275,14 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
   return (
     <AppLayout title="Cuti & Kehadiran" subtitle="Head Office">
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        <div style={{ padding: '7px 4px', marginRight: 18, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', borderBottom: '2px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
-          <CalendarDays size={13} /> Cuti Tahunan
-        </div>
         {canViewKehadiran && (
           <div onClick={() => router.visit('/kehadiran')} style={{ padding: '7px 4px', marginRight: 18, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', borderBottom: '2px solid transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
             <ClipboardCheck size={13} /> Kehadiran
           </div>
         )}
+        <div style={{ padding: '7px 4px', marginRight: 18, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', borderBottom: '2px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
+          <CalendarDays size={13} /> Cuti Tahunan
+        </div>
       </div>
 
       {showAdd && <AddLeaveModal employees={employees} defaultEmployeeId={selected?.id} onClose={() => setShowAdd(false)} />}
@@ -356,7 +385,7 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <MiniCalendar year={calState.year} month={calState.month} onMonthChange={setCalState} holidaysByDate={holidaysByDate} leaveDatesSet={leaveDatesSet}
+          <MiniCalendar year={calState.year} month={calState.month} onMonthChange={setCalState} holidaysByDate={holidaysByDate} leaveDatesMap={leaveDatesMap}
             canEdit={canEdit} onDayClick={(iso, existing) => setHolidayModal({ iso, existing })} />
 
           <div style={{ ...card, padding: 14 }}>
@@ -365,10 +394,16 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
               {leaves.map(l => {
                 const owner = employeesById[l.employee_id];
+                const isIzin = l.jenis === 'izin_tanpa_potong';
                 return (
                   <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700 }}>{owner?.nama_lengkap || '—'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{owner?.nama_lengkap || '—'}</div>
+                        <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: isIzin ? 'rgba(155,89,182,.15)' : 'rgba(58,143,224,.15)', color: isIzin ? '#9B59B6' : 'var(--blue)' }}>
+                          {isIzin ? 'Izin (Tanpa Potong)' : 'Cuti Tahunan'}
+                        </span>
+                      </div>
                       <div style={{ fontSize: 11.5, color: 'var(--text)', marginTop: 2 }}>{fmtDate(l.tanggal_mulai)} – {fmtDate(l.tanggal_selesai)}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{l.jumlah_hari} hari kerja{l.keterangan ? ` · ${l.keterangan}` : ''}</div>
                     </div>

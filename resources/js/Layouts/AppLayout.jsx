@@ -834,7 +834,7 @@ function SidebarContent({ url, authUser, onLogout }) {
             <div key={i} style={{fontSize:9.5,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.1em',fontWeight:600,padding:'10px 8px 4px'}}>{item.section}</div>
           ) : (
             <Link key={item.key} href={item.href}
-              className={`nav-item ${url===item.href||(item.href!=='/'&&url.startsWith(item.href))?'active':''}`}>
+              className={`nav-item ${url===item.href||(item.href!=='/'&&url.startsWith(item.href))||(item.key==='cuti'&&url.startsWith('/kehadiran'))?'active':''}`}>
               <span style={{width:18,display:'flex',justifyContent:'center',flexShrink:0}}><item.icon size={15}/></span>
               {item.label}
               {item.badge && <span style={{marginLeft:'auto',background:'var(--red)',color:'#fff',fontSize:9.5,fontWeight:700,borderRadius:99,padding:'1px 6px'}}>{item.badge}</span>}

@@ -176,14 +176,14 @@ export default function AttendanceIndex({ employees = [], tahun, bulan, days_in_
   return (
     <AppLayout title="Cuti & Kehadiran" subtitle="Head Office">
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        <div style={{ padding: '7px 4px', marginRight: 18, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', borderBottom: '2px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
+          <ClipboardCheck size={13} /> Kehadiran
+        </div>
         {canViewCuti && (
           <div onClick={() => router.visit('/cuti')} style={{ padding: '7px 4px', marginRight: 18, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', borderBottom: '2px solid transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
             <CalendarDays size={13} /> Cuti Tahunan
           </div>
         )}
-        <div style={{ padding: '7px 4px', marginRight: 18, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', borderBottom: '2px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
-          <ClipboardCheck size={13} /> Kehadiran
-        </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
