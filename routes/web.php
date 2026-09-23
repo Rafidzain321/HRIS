@@ -5,6 +5,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeKpiController;
 use App\Http\Controllers\EmployeeLeaveController;
 use App\Http\Controllers\EmployeeAttendanceController;
+use App\Http\Controllers\EmployeeCounselingController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\EmployeeTransferController;
 use App\Http\Controllers\McuController;
@@ -212,6 +213,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/kehadiran', [EmployeeAttendanceController::class, 'index'])->middleware('menu:kehadiran,view')->name('kehadiran');
     Route::post('/kehadiran', [EmployeeAttendanceController::class, 'store'])->middleware('menu:kehadiran,edit')->name('kehadiran.store');
     Route::get('/kehadiran/semester', [EmployeeAttendanceController::class, 'semester'])->middleware('menu:kehadiran,view')->name('kehadiran.semester');
+
+    // ── Konseling (pembinaan karyawan) — HR/super-admin atau atasan langsung saja ──
+    Route::get('/konseling', [EmployeeCounselingController::class, 'index'])->middleware('menu:konseling,view')->name('konseling');
+    Route::post('/konseling', [EmployeeCounselingController::class, 'store'])->middleware('menu:konseling,edit')->name('konseling.store');
+    Route::put('/konseling/{counseling}/selesai', [EmployeeCounselingController::class, 'markSelesai'])->middleware('menu:konseling,edit')->name('konseling.selesai');
+    Route::delete('/konseling/{counseling}', [EmployeeCounselingController::class, 'destroy'])->middleware('menu:konseling,edit')->name('konseling.destroy');
 
     Route::get('/employees/{employee}/trainings', [TrainingController::class, 'forEmployee'])->middleware('menu:training,view');
     Route::post('/employees/{employee}/trainings', [TrainingController::class, 'store'])->middleware('menu:training,edit');

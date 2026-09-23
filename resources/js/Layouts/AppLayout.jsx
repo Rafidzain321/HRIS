@@ -6,7 +6,7 @@ import {
   LayoutDashboard, User, Shield, Stethoscope, CreditCard, HardHat,
   ClipboardList, Car, Truck, Calendar, Receipt, Wallet, BookOpen, Bell,
   Settings, X, Loader2, CheckCircle2, XCircle, TriangleAlert,
-  Trash2, LogOut, Menu, Eye, Building2, Check, Target, CalendarDays,
+  Trash2, LogOut, Menu, Eye, Building2, Check, Target, CalendarDays, HeartHandshake,
 } from 'lucide-react';
 
 const NAV = [
@@ -28,6 +28,7 @@ const NAV = [
   { key: 'training',   icon: BookOpen, label: 'Training',      href: '/training' },
   { key: 'kpi',        icon: Target, label: 'KPI',           href: '/kpi' },
   { key: 'cuti',       icon: CalendarDays, label: 'Cuti & Kehadiran', href: '/cuti' },
+  { key: 'konseling',  icon: HeartHandshake, label: 'Konseling', href: '/konseling' },
   { section: 'Sistem' },
   { key: 'notifications', icon: Bell, label: 'Notifikasi', href: '/notifications' },
   { key: 'pengaturan', icon: Settings, label: 'Pengaturan',   href: '/pengaturan' },

@@ -161,17 +161,17 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
             </div>
             <div>
               <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Jenis</label>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
                 {[
-                  { key: 'cuti_tahunan', label: 'Cuti Tahunan' },
-                  { key: 'izin_tanpa_potong', label: 'Izin (Tanpa Potong Cuti)' },
+                  { key: 'cuti_tahunan', label: 'Cuti Tahunan', color: 'var(--blue)', bg: 'rgba(58,143,224,.12)', border: 'rgba(58,143,224,.3)' },
+                  { key: 'izin_tanpa_potong', label: 'Izin (Tanpa Potong Cuti)', color: '#9B59B6', bg: 'rgba(155,89,182,.12)', border: 'rgba(155,89,182,.35)' },
                 ].map(opt => (
                   <div key={opt.key} onClick={() => setForm(p => ({ ...p, jenis: opt.key }))}
                     style={{
-                      flex: 1, textAlign: 'center', padding: '8px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
-                      border: `1px solid ${form.jenis === opt.key ? 'transparent' : 'var(--border)'}`,
-                      background: form.jenis === opt.key ? 'linear-gradient(135deg,#E8A020,#A06010)' : 'var(--bg3)',
-                      color: form.jenis === opt.key ? '#0C0F14' : 'var(--muted2)',
+                      flex: 1, textAlign: 'center', padding: '6px 8px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                      border: `1px solid ${form.jenis === opt.key ? opt.border : 'var(--border)'}`,
+                      background: form.jenis === opt.key ? opt.bg : 'transparent',
+                      color: form.jenis === opt.key ? opt.color : 'var(--muted)',
                     }}>
                     {opt.label}
                   </div>
@@ -309,7 +309,7 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <a href={`/cuti/export?tahun=${tahun}`} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}><Download size={14} /> Export Excel</a>
           {canEdit && (
-            <button onClick={() => setShowAdd(true)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Catat Cuti</button>
+            <button onClick={() => setShowAdd(true)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> Catat Cuti/Izin</button>
           )}
         </div>
       </div>
@@ -362,7 +362,7 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
                         <td style={{ padding: '8px 14px', textAlign: 'right' }}>
                           <button onClick={ev => { ev.stopPropagation(); setSelectedId(e.id); setShowAdd(true); }}
                             style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(232,160,32,.3)', background: 'rgba(232,160,32,.08)', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                            <Plus size={12} /> Catat Cuti
+                            <Plus size={12} /> Catat Cuti/Izin
                           </button>
                         </td>
                       )}
