@@ -361,6 +361,19 @@ class EmployeeImportController extends Controller
                     : ($val ?: null);
             }
 
+            // Agama & PTKP di form web berupa dropdown tetap — kalau isi Excel tidak cocok
+            // (mis. salah ketik atau nilai yang sistem tidak kenal), jangan ikut masuk DB
+            // supaya tidak ada data "nyasar" yang tidak terbaca fitur lain.
+            if (!empty($data['agama'])) {
+                $agamaMatch = collect(['Islam', 'Kristen Protestan', 'Kristen Katolik', 'Hindu', 'Buddha', 'Konghucu'])
+                    ->first(fn ($o) => strcasecmp($o, $data['agama']) === 0);
+                $data['agama'] = $agamaMatch ?: null;
+            }
+            if (!empty($data['ptkp'])) {
+                $ptkp = strtoupper($data['ptkp']);
+                $data['ptkp'] = in_array($ptkp, ['TK/0', 'TK/1', 'TK/2', 'TK/3', 'K/0', 'K/1', 'K/2', 'K/3']) ? $ptkp : null;
+            }
+
             foreach ($dateCols as $field) {
                 $val          = $row[$colMap[$field]] ?? null;
                 $data[$field] = self::parseDate($val);
@@ -381,6 +394,11 @@ class EmployeeImportController extends Controller
                 $hoData['unit'] = null;
             } elseif (!empty($hoData['unit'])) {
                 $hoData['unit'] = strtoupper($hoData['unit']);
+            }
+            if (!empty($hoData['status_karyawan']) && !in_array(strtoupper($hoData['status_karyawan']), ['PKWT', 'PKWTT'])) {
+                $hoData['status_karyawan'] = null;
+            } elseif (!empty($hoData['status_karyawan'])) {
+                $hoData['status_karyawan'] = strtoupper($hoData['status_karyawan']);
             }
 
             try {
