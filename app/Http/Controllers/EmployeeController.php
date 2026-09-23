@@ -285,9 +285,13 @@ class EmployeeController extends Controller
             'departments' => \App\Models\Department::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
             'project_info' => $projectInfo,
             // Riwayat gaji mentah hasil import HO — arsip referensi, cuma relevan untuk karyawan HO.
-            'salary_history' => \App\Models\EmployeeSalaryHistory::where('employee_id', $employee->id)
-                ->orderByRaw('tahun IS NULL, tahun, bulan IS NULL, bulan, urutan')
-                ->get(['label', 'nominal', 'tahun', 'bulan']),
+            // Data gaji sensitif, jadi cuma dikirim ke frontend kalau yang buka super-admin —
+            // akun lain (termasuk atasan/manager) tidak boleh lihat sama sekali.
+            'salary_history' => auth()->user()?->hasRole('super-admin')
+                ? \App\Models\EmployeeSalaryHistory::where('employee_id', $employee->id)
+                    ->orderByRaw('tahun IS NULL, tahun, bulan IS NULL, bulan, urutan')
+                    ->get(['label', 'nominal', 'tahun', 'bulan'])
+                : [],
         ]);
     }
 
