@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { router } from '@inertiajs/react';
 import {
-  HeartHandshake, Plus, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, TriangleAlert, Loader2,
+  HeartHandshake, Plus, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, TriangleAlert, Loader2, Target,
 } from 'lucide-react';
 
 const card = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12 };
@@ -26,12 +26,38 @@ const STATUS_META = {
   perlu_tindak_lanjut: { label: 'Perlu Tindak Lanjut',  color: '#E04545', bg: 'rgba(224,69,69,.12)' },
 };
 
+// Warna predikat KPI — dipakai sebagai acuan pertimbangan konseling (predikat rendah = sinyal
+// karyawan itu mungkin perlu dibina), sesuai poin 12 SOP.
+const PREDIKAT_META = {
+  K:  { label: 'Kurang',        color: '#E04545' },
+  C:  { label: 'Cukup',         color: '#E8A020' },
+  B:  { label: 'Baik',          color: '#22C97A' },
+  BS: { label: 'Baik Sekali',   color: '#3A8FE0' },
+  A:  { label: 'Memuaskan',     color: '#9B59B6' },
+};
+const PREDIKAT_PERLU_PERHATIAN = ['K', 'C'];
+
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 function fmtDate(iso) {
   if (!iso) return '-';
   const d = new Date(iso + 'T00:00:00');
   if (isNaN(d.getTime())) return iso;
   return `${d.getDate()} ${MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// ── BADGE PREDIKAT KPI (acuan konseling) ──
+function KpiBadge({ kpi, size = 'normal' }) {
+  if (!kpi) return <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>Belum ada data KPI</span>;
+  const meta = PREDIKAT_META[kpi.predikat] || { label: kpi.predikat, color: 'var(--muted2)' };
+  const small = size === 'small';
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ fontSize: small ? 9.5 : 10.5, fontWeight: 700, padding: small ? '2px 7px' : '3px 9px', borderRadius: 99, background: `${meta.color}22`, color: meta.color }}>
+        {kpi.predikat} · {meta.label}
+      </span>
+      <span style={{ fontSize: small ? 9.5 : 10.5, color: 'var(--muted)' }}>{kpi.total_nilai} · {kpi.periode}</span>
+    </span>
+  );
 }
 
 // ── COMBOBOX KARYAWAN (searchable) ──
@@ -126,6 +152,7 @@ function AddCounselingModal({ employees, defaultEmployeeId, onClose }) {
 
   const kategoriOptions = Object.entries(KATEGORI_META).map(([key, m]) => ({ key, label: m.label, color: m.color, bg: m.bg, border: m.color }));
   const statusOptions = Object.entries(STATUS_META).map(([key, m]) => ({ key, label: m.label, color: m.color, bg: m.bg, border: m.color }));
+  const selectedEmployee = employees.find(e => e.id === Number(form.employee_id));
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
@@ -142,6 +169,13 @@ function AddCounselingModal({ employees, defaultEmployeeId, onClose }) {
               <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Karyawan</label>
               <EmployeeCombobox employees={employees} value={Number(form.employee_id)} onChange={id => setForm(p => ({ ...p, employee_id: id }))} />
               {errors.employee_id && <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: '#E04545', marginTop: 4 }}><TriangleAlert size={12} />{errors.employee_id}</div>}
+              {selectedEmployee && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '6px 9px', borderRadius: 7, background: 'var(--bg3)' }}>
+                  <Target size={12} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 10.5, color: 'var(--muted)', flexShrink: 0 }}>Acuan KPI:</span>
+                  <KpiBadge kpi={selectedEmployee.kpi_terakhir} size="small" />
+                </div>
+              )}
             </div>
             <div>
               <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Kategori</label>
@@ -185,6 +219,7 @@ export default function KonselingIndex({ employees = [], sessions = [], can_edit
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [onlyPerluPerhatian, setOnlyPerluPerhatian] = useState(false);
 
   const employeesById = {};
   employees.forEach(e => { employeesById[e.id] = e; });
@@ -193,7 +228,9 @@ export default function KonselingIndex({ employees = [], sessions = [], can_edit
   sessions.forEach(s => { (sessionsByEmployee[s.employee_id] = sessionsByEmployee[s.employee_id] || []).push(s); });
 
   const searchLow = search.trim().toLowerCase();
-  const filteredEmployees = employees.filter(e => !searchLow || e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow));
+  const filteredEmployees = employees
+    .filter(e => !searchLow || e.nama_lengkap.toLowerCase().includes(searchLow) || e.jabatan.toLowerCase().includes(searchLow))
+    .filter(e => !onlyPerluPerhatian || PREDIKAT_PERLU_PERHATIAN.includes(e.kpi_terakhir?.predikat));
 
   const totalEmployees = filteredEmployees.length;
   const totalPages   = perPage === 'all' ? 1 : Math.max(1, Math.ceil(totalEmployees / perPage));
@@ -226,9 +263,21 @@ export default function KonselingIndex({ employees = [], sessions = [], can_edit
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
         <div style={{ ...card, overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', maxWidth: 280, flex: 1 }}>
-              <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
-              <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', maxWidth: 280, flex: 1, minWidth: 180 }}>
+                <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
+                <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
+              </div>
+              <div onClick={() => { setOnlyPerluPerhatian(v => !v); setPage(1); }}
+                title="Tampilkan cuma karyawan dengan predikat KPI Kurang/Cukup — sinyal mungkin perlu dibina"
+                style={{
+                  padding: '7px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+                  border: `1px solid ${onlyPerluPerhatian ? 'rgba(224,69,69,.35)' : 'var(--border)'}`,
+                  background: onlyPerluPerhatian ? 'rgba(224,69,69,.12)' : 'transparent',
+                  color: onlyPerluPerhatian ? '#E04545' : 'var(--muted)',
+                }}>
+                Perlu Perhatian (KPI)
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Tampilkan</span>
@@ -246,6 +295,7 @@ export default function KonselingIndex({ employees = [], sessions = [], can_edit
                 <tr style={{ background: 'var(--bg3)' }}>
                   <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Karyawan</th>
                   <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Jabatan</th>
+                  <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>KPI Terakhir</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Jumlah Sesi</th>
                   <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Sesi Terakhir</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11, color: 'var(--muted)' }}>Status</th>
@@ -253,7 +303,7 @@ export default function KonselingIndex({ employees = [], sessions = [], can_edit
               </thead>
               <tbody>
                 {pagedEmployees.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada karyawan dalam cakupanmu.</td></tr>
+                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada karyawan dalam cakupanmu.</td></tr>
                 )}
                 {pagedEmployees.map(e => {
                   const empSessions = (sessionsByEmployee[e.id] || []);
@@ -264,6 +314,7 @@ export default function KonselingIndex({ employees = [], sessions = [], can_edit
                     <tr key={e.id} onClick={() => setSelectedId(e.id)} style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', background: active ? 'rgba(232,160,32,.08)' : 'transparent' }}>
                       <td style={{ padding: '10px 14px', fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>{e.nama_lengkap}</td>
                       <td style={{ padding: '10px 14px', color: 'var(--muted2)' }}>{e.jabatan}</td>
+                      <td style={{ padding: '10px 14px' }}><KpiBadge kpi={e.kpi_terakhir} size="small" /></td>
                       <td style={{ padding: '10px 14px', textAlign: 'center' }}>{empSessions.length}</td>
                       <td style={{ padding: '10px 14px', color: 'var(--muted2)' }}>{last ? fmtDate(last.tanggal_konseling) : '—'}</td>
                       <td style={{ padding: '10px 14px', textAlign: 'center' }}>
@@ -289,6 +340,11 @@ export default function KonselingIndex({ employees = [], sessions = [], can_edit
           )}
         </div>
 
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ ...card, padding: 14 }}>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.06em', display: 'flex', alignItems: 'center', gap: 6 }}><Target size={12} /> Acuan KPI</div>
+          <KpiBadge kpi={selected?.kpi_terakhir} />
+        </div>
         <div style={{ ...card, padding: 14 }}>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.06em' }}>Riwayat Konseling · {selected?.nama_lengkap || '—'}</div>
           {selectedSessions.length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Belum ada catatan konseling.</div>}
@@ -324,6 +380,7 @@ export default function KonselingIndex({ employees = [], sessions = [], can_edit
               );
             })}
           </div>
+        </div>
         </div>
       </div>
     </AppLayout>

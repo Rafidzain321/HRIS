@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\EmployeeCounseling;
+use App\Models\KpiAppraisal;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -36,12 +37,35 @@ class EmployeeCounselingController extends Controller
     {
         $scopedIds = $this->scopedEmployeeIds();
 
-        $employees = $this->applyProjectFilter(Employee::aktif())
+        $employeeModels = $this->applyProjectFilter(Employee::aktif())
             ->when($scopedIds !== null, fn ($q) => $q->whereIn('id', $scopedIds))
             ->with('position')
             ->orderBy('nama_lengkap')
-            ->get(['id', 'nama_lengkap', 'position_id'])
-            ->map(fn ($e) => ['id' => $e->id, 'nama_lengkap' => $e->nama_lengkap, 'jabatan' => $e->position?->nama_jabatan ?? '-']);
+            ->get(['id', 'nama_lengkap', 'position_id']);
+
+        // Hasil KPI (final) terbaru per karyawan — dipakai sebagai acuan pertimbangan konseling
+        // (mis. predikat Kurang/Cukup jadi sinyal karyawan itu mungkin perlu dibina), sesuai poin
+        // 12 SOP: "data hasil KPI dapat menjadi acuan dalam menentukan kebutuhan konseling".
+        $latestKpiByEmployee = KpiAppraisal::where('status', 'submitted')
+            ->whereIn('employee_id', $employeeModels->pluck('id'))
+            ->orderByDesc('tahun')->orderByDesc('semester')
+            ->get()
+            ->unique('employee_id')
+            ->keyBy('employee_id');
+
+        $employees = $employeeModels->map(function ($e) use ($latestKpiByEmployee) {
+            $kpi = $latestKpiByEmployee->get($e->id);
+            return [
+                'id'           => $e->id,
+                'nama_lengkap' => $e->nama_lengkap,
+                'jabatan'      => $e->position?->nama_jabatan ?? '-',
+                'kpi_terakhir' => $kpi ? [
+                    'total_nilai' => $kpi->total_nilai,
+                    'predikat'    => $kpi->predikat,
+                    'periode'     => "S{$kpi->semester} {$kpi->tahun}",
+                ] : null,
+            ];
+        });
 
         $sessions = EmployeeCounseling::whereIn('employee_id', $employees->pluck('id'))
             ->orderByDesc('tanggal_konseling')
