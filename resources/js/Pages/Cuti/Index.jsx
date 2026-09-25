@@ -17,6 +17,32 @@ const MONTH_NAMES = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Ju
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const DOW = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
+// Jenis cuti/izin — sesuai Peraturan Perusahaan Pasal 25-27 (Cuti Haji/Umroh, Izin Berbayar,
+// Izin Tanpa Upah) & UU Ketenagakerjaan Pasal 81-82 (Cuti Haid, Cuti Bersalin). Cuma
+// 'cuti_tahunan' yang memotong jatah 12 hari/tahun — sisanya tidak memotong sama sekali.
+const JENIS_META = {
+  cuti_tahunan:      { label: 'Cuti Tahunan',       color: 'var(--blue)', bg: 'rgba(58,143,224,.15)' },
+  izin_tanpa_potong: { label: 'Izin (Tanpa Potong)', color: '#9B59B6',    bg: 'rgba(155,89,182,.15)' },
+  cuti_haji:         { label: 'Cuti Haji',          color: '#0EA5A5',    bg: 'rgba(14,165,165,.15)' },
+  cuti_umroh:        { label: 'Cuti Umroh',         color: '#22C97A',    bg: 'rgba(34,201,122,.15)' },
+  izin_tanpa_upah:   { label: 'Izin Tanpa Upah',    color: '#E04545',    bg: 'rgba(224,69,69,.15)' },
+  cuti_bersalin:     { label: 'Cuti Bersalin',      color: '#EC4899',    bg: 'rgba(236,72,153,.15)' },
+  cuti_haid:         { label: 'Cuti Haid',          color: '#F472B6',    bg: 'rgba(244,114,182,.15)' },
+};
+
+// Pasal 26 PP — sub-alasan Izin Tidak Masuk Kerja Dengan Upah, dipakai sebagai hint jumlah
+// hari yang lazim (HR tetap bebas atur tanggal manual, ini cuma acuan).
+const KATEGORI_IZIN_META = {
+  menikah:                    'Karyawan Menikah (3 hari)',
+  pernikahan_anak:            'Pernikahan Anak (2 hari)',
+  istri_melahirkan_keguguran: 'Istri Melahirkan/Keguguran (2 hari)',
+  keluarga_meninggal:         'Keluarga Inti Meninggal (3 hari)',
+  khitan_baptis_anak:         'Khitan/Baptis Anak (2 hari)',
+  keluarga_serumah_meninggal: 'Keluarga Serumah Meninggal (1 hari)',
+  saksi_pengadilan:           'Saksi di Pengadilan',
+  lainnya:                    'Lainnya',
+};
+
 function fmtDate(iso) {
   if (!iso) return '-';
   const d = new Date(iso + 'T00:00:00');
@@ -99,11 +125,11 @@ function MiniCalendar({ year, month, onMonthChange, holidaysByDate, leaveDatesMa
           const holiday = holidaysByDate[iso];
           const leaveJenis = leaveDatesMap.get(iso);
           const isLeave = !!leaveJenis;
-          const isIzin = leaveJenis === 'izin_tanpa_potong';
+          const jenisMeta = leaveJenis ? (JENIS_META[leaveJenis] || JENIS_META.izin_tanpa_potong) : null;
           const clickable = canEdit && !isSunday;
           let bg = 'transparent', color = 'var(--text)';
           if (isSunday || holiday) { bg = 'rgba(224,69,69,.12)'; color = '#E04545'; }
-          if (isLeave) { bg = isIzin ? 'rgba(155,89,182,.18)' : 'rgba(58,143,224,.18)'; color = isIzin ? '#9B59B6' : 'var(--blue)'; }
+          if (isLeave) { bg = jenisMeta.bg; color = jenisMeta.color; }
           return (
             <div key={i} title={holiday ? `${holiday.keterangan} — klik untuk hapus` : (clickable ? 'Klik untuk tandai hari libur' : '')}
               onClick={() => clickable && onDayClick(iso, holiday || null)}
@@ -115,10 +141,11 @@ function MiniCalendar({ year, month, onMonthChange, holidaysByDate, leaveDatesMa
           );
         })}
       </div>
-      <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 10, color: 'var(--muted)', flexWrap: 'wrap' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: 'rgba(224,69,69,.5)' }} /> Minggu / Hari Libur</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: 'var(--blue)' }} /> Cuti Tahunan</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: '#9B59B6' }} /> Izin (Tanpa Potong)</span>
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, fontSize: 9.5, color: 'var(--muted)', flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 3, background: 'rgba(224,69,69,.5)' }} /> Libur</span>
+        {Object.entries(JENIS_META).map(([key, m]) => (
+          <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 3, background: m.color }} /> {m.label}</span>
+        ))}
       </div>
     </div>
   );
@@ -129,6 +156,7 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
   const [form, setForm] = useState({
     employee_id: defaultEmployeeId || employees[0]?.id || '',
     jenis: 'cuti_tahunan',
+    kategori_izin: 'lainnya',
     tanggal_mulai: '', tanggal_selesai: '', keterangan: '',
   });
   const [loading, setLoading] = useState(false);
@@ -161,26 +189,40 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
             </div>
             <div>
               <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Jenis</label>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {[
-                  { key: 'cuti_tahunan', label: 'Cuti Tahunan', color: 'var(--blue)', bg: 'rgba(58,143,224,.12)', border: 'rgba(58,143,224,.3)' },
-                  { key: 'izin_tanpa_potong', label: 'Izin (Tanpa Potong Cuti)', color: '#9B59B6', bg: 'rgba(155,89,182,.12)', border: 'rgba(155,89,182,.35)' },
-                ].map(opt => (
-                  <div key={opt.key} onClick={() => setForm(p => ({ ...p, jenis: opt.key }))}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {Object.entries(JENIS_META).map(([key, m]) => (
+                  <div key={key} onClick={() => setForm(p => ({ ...p, jenis: key }))}
                     style={{
-                      flex: 1, textAlign: 'center', padding: '6px 8px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                      border: `1px solid ${form.jenis === opt.key ? opt.border : 'var(--border)'}`,
-                      background: form.jenis === opt.key ? opt.bg : 'transparent',
-                      color: form.jenis === opt.key ? opt.color : 'var(--muted)',
+                      padding: '6px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                      border: `1px solid ${form.jenis === key ? m.color : 'var(--border)'}`,
+                      background: form.jenis === key ? m.bg : 'transparent',
+                      color: form.jenis === key ? m.color : 'var(--muted)',
                     }}>
-                    {opt.label}
+                    {m.label}
                   </div>
                 ))}
               </div>
-              {form.jenis === 'izin_tanpa_potong' && (
-                <div style={{ fontSize: 10.5, color: '#9B59B6', marginTop: 6 }}>Izin jenis ini tidak akan mengurangi sisa jatah Cuti Tahunan karyawan.</div>
+              {form.jenis !== 'cuti_tahunan' && (
+                <div style={{ fontSize: 10.5, color: JENIS_META[form.jenis].color, marginTop: 6 }}>
+                  {form.jenis === 'izin_tanpa_upah'
+                    ? 'Tidak berbayar & tidak memotong Cuti Tahunan — maksimal 5 hari kerja/tahun.'
+                    : form.jenis === 'cuti_haji' || form.jenis === 'cuti_umroh'
+                    ? 'Berbayar, tidak memotong Cuti Tahunan — cuma bisa dipakai 1 kali seumur bekerja, maksimal 15 hari kerja.'
+                    : 'Berbayar & tidak mengurangi sisa jatah Cuti Tahunan karyawan.'}
+                </div>
               )}
             </div>
+
+            {form.jenis === 'izin_tanpa_potong' && (
+              <div>
+                <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Kategori Izin (Pasal 26)</label>
+                <select style={inp} value={form.kategori_izin} onChange={e => setForm(p => ({ ...p, kategori_izin: e.target.value }))}>
+                  {Object.entries(KATEGORI_IZIN_META).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Tanggal Mulai</label>
@@ -192,6 +234,7 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
               </div>
             </div>
             {errors.tanggal_selesai && <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: '#E04545' }}><TriangleAlert size={12} />{errors.tanggal_selesai}</div>}
+            {errors.jenis && <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: '#E04545' }}><TriangleAlert size={12} />{errors.jenis}</div>}
             <div>
               <label style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>Keterangan (opsional)</label>
               <input type="text" style={inp} value={form.keterangan} onChange={e => setForm(p => ({ ...p, keterangan: e.target.value }))} placeholder="cth: Acara keluarga" />
@@ -232,9 +275,11 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
   const employeesById = {};
   employees.forEach(e => { employeesById[e.id] = e; });
 
+  // Cuma jenis 'cuti_tahunan' yang memotong jatah — semua jenis lain (Haji, Umroh, Izin
+  // Tanpa Upah, Bersalin, Haid, Izin Tanpa Potong) tidak ikut mengurangi sisa cuti tahunan.
   const usageByEmployee = {};
   leaves.forEach(l => {
-    if (l.jenis === 'izin_tanpa_potong') return; // tidak memotong jatah cuti
+    if (l.jenis !== 'cuti_tahunan') return;
     usageByEmployee[l.employee_id] = (usageByEmployee[l.employee_id] || 0) + l.jumlah_hari;
   });
 
@@ -348,15 +393,19 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
                   <tr><td colSpan={canEdit ? 5 : 4} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada karyawan.</td></tr>
                 )}
                 {pagedEmployees.map(e => {
+                  const jatahEfektif = e.jatah_efektif ?? jatah;
                   const terpakai = usageByEmployee[e.id] || 0;
-                  const sisa = jatah - terpakai;
+                  const sisa = jatahEfektif - terpakai;
                   const active = e.id === selected?.id;
                   const sisaColor = sisa <= 0 ? '#E04545' : sisa <= 3 ? '#E8A020' : '#22C97A';
                   return (
                     <tr key={e.id} onClick={() => setSelectedId(e.id)} style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', background: active ? 'rgba(232,160,32,.08)' : 'transparent' }}>
                       <td style={{ padding: '10px 14px', fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>{e.nama_lengkap}</td>
                       <td style={{ padding: '10px 14px', color: 'var(--muted2)' }}>{e.jabatan}</td>
-                      <td style={{ padding: '10px 14px', textAlign: 'center' }}>{terpakai} hari</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                        {terpakai} hari
+                        {jatahEfektif !== jatah && <div title="Jatah berkurang karena kelebihan pemakaian cuti tahun lalu" style={{ fontSize: 9.5, color: '#E8A020' }}>dari {jatahEfektif} hari</div>}
+                      </td>
                       <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: sisaColor }}>{sisa} hari</td>
                       {canEdit && (
                         <td style={{ padding: '8px 14px', textAlign: 'right' }}>
@@ -394,15 +443,18 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
               {leaves.map(l => {
                 const owner = employeesById[l.employee_id];
-                const isIzin = l.jenis === 'izin_tanpa_potong';
+                const meta = JENIS_META[l.jenis] || JENIS_META.izin_tanpa_potong;
                 return (
                   <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <div style={{ fontSize: 12, fontWeight: 700 }}>{owner?.nama_lengkap || '—'}</div>
-                        <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: isIzin ? 'rgba(155,89,182,.15)' : 'rgba(58,143,224,.15)', color: isIzin ? '#9B59B6' : 'var(--blue)' }}>
-                          {isIzin ? 'Izin (Tanpa Potong)' : 'Cuti Tahunan'}
+                        <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: meta.bg, color: meta.color }}>
+                          {meta.label}
                         </span>
+                        {l.kategori_izin && (
+                          <span style={{ fontSize: 9.5, color: 'var(--muted)' }}>· {KATEGORI_IZIN_META[l.kategori_izin] || l.kategori_izin}</span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11.5, color: 'var(--text)', marginTop: 2 }}>{fmtDate(l.tanggal_mulai)} – {fmtDate(l.tanggal_selesai)}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{l.jumlah_hari} hari kerja{l.keterangan ? ` · ${l.keterangan}` : ''}</div>
