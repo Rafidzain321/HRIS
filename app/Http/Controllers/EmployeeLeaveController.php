@@ -294,6 +294,20 @@ class EmployeeLeaveController extends Controller
             }
         }
 
+        // "Cuti Berlebih" — karyawan boleh "meminjam" jatah cuti tahunan tahun depan kalau jatah
+        // tahun ini sudah habis, TAPI totalnya (jatah tahun ini + pinjaman) dibatasi supaya tidak
+        // sampai menembus jatah 2 tahun ke depan sekaligus.
+        if ($data['jenis'] === 'cuti_tahunan') {
+            $tahun = (int) date('Y', strtotime($data['tanggal_mulai']));
+            $jatahEfektifTahunIni = EmployeeLeave::jatahEfektif((int) $data['employee_id'], $tahun, self::JATAH_TAHUNAN, self::MAKS_BAWA_KE_DEPAN);
+            $terpakaiTahunIni = EmployeeLeave::totalHariTahunIni((int) $data['employee_id'], 'cuti_tahunan', $tahun);
+            $batasMaksimal = $jatahEfektifTahunIni + self::MAKS_BAWA_KE_DEPAN; // jatah tahun ini + maks pinjaman dari jatah tahun depan
+            if ($terpakaiTahunIni + $jumlahHari > $batasMaksimal) {
+                $sisaBisaDiambil = max(0, $batasMaksimal - $terpakaiTahunIni);
+                return back()->withErrors(['tanggal_selesai' => "Cuti Tahunan {$tahun} sudah termasuk pinjam dari jatah tahun depan, maksimal {$batasMaksimal} hari (jatah {$jatahEfektifTahunIni} hari + maks pinjam " . self::MAKS_BAWA_KE_DEPAN . " hari). Sisa yang bisa diambil: {$sisaBisaDiambil} hari."]);
+            }
+        }
+
         $leave = EmployeeLeave::create([
             ...$data,
             'jumlah_hari'  => $jumlahHari,

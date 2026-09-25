@@ -202,15 +202,15 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
                   </div>
                 ))}
               </div>
-              {form.jenis !== 'cuti_tahunan' && (
-                <div style={{ fontSize: 10.5, color: JENIS_META[form.jenis].color, marginTop: 6 }}>
-                  {form.jenis === 'izin_tanpa_upah'
-                    ? 'Tidak berbayar & tidak memotong Cuti Tahunan — maksimal 5 hari kerja/tahun.'
-                    : form.jenis === 'cuti_haji' || form.jenis === 'cuti_umroh'
-                    ? 'Berbayar, tidak memotong Cuti Tahunan — cuma bisa dipakai 1 kali seumur bekerja, maksimal 15 hari kerja.'
-                    : 'Berbayar & tidak mengurangi sisa jatah Cuti Tahunan karyawan.'}
-                </div>
-              )}
+              <div style={{ fontSize: 10.5, color: form.jenis === 'cuti_tahunan' ? 'var(--muted)' : JENIS_META[form.jenis].color, marginTop: 6 }}>
+                {form.jenis === 'cuti_tahunan'
+                  ? 'Kalau jatah tahun ini sudah habis, sistem otomatis mengizinkan "pinjam" dari jatah tahun depan — maksimal 1 tahun jatah ke depan (tidak bisa sampai menembus 2 tahun ke depan).'
+                  : form.jenis === 'izin_tanpa_upah'
+                  ? 'Tidak berbayar & tidak memotong Cuti Tahunan — maksimal 5 hari kerja/tahun.'
+                  : form.jenis === 'cuti_haji' || form.jenis === 'cuti_umroh'
+                  ? 'Berbayar, tidak memotong Cuti Tahunan — cuma bisa dipakai 1 kali seumur bekerja, maksimal 15 hari kerja.'
+                  : 'Berbayar & tidak mengurangi sisa jatah Cuti Tahunan karyawan.'}
+              </div>
             </div>
 
             {form.jenis === 'izin_tanpa_potong' && (
