@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Holiday;
 use App\Models\Project;
 use App\Models\Timesheet;
@@ -77,6 +78,8 @@ class PayrollExportController extends Controller
     // ════════════════════════════════════════════════════════════
     public function dataGaji(Request $request, PayrollController $payroll)
     {
+        ActivityLog::record('export', 'Data Gaji', null, 'Export Excel data gaji ' . $request->get('bulan', now()->month) . '/' . $request->get('tahun', now()->year));
+
         $tahun     = (int) $request->get('tahun', now()->year);
         $bulan     = (int) $request->get('bulan', now()->month);
         $projectId = $this->activeProjectId();

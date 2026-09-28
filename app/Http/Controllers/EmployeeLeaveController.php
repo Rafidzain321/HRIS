@@ -96,6 +96,7 @@ class EmployeeLeaveController extends Controller
     {
         $tahun     = (int) $request->get('tahun', now()->year);
         $semester  = (int) $request->get('semester', now()->month <= 6 ? 1 : 2);
+        ActivityLog::record('export', 'Cuti & Kehadiran', null, "Export Excel cuti semester {$semester}/{$tahun}");
         $bulanAwal = $semester === 1 ? 1 : 7;
         $bulanAkhir = $semester === 1 ? 6 : 12;
 

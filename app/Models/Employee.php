@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Employee extends Model
 {
@@ -55,6 +56,9 @@ class Employee extends Model
     public function documents(): HasMany     { return $this->hasMany(EmployeeDocument::class); }
     public function timesheets(): HasMany    { return $this->hasMany(Timesheet::class); }
     public function project() { return $this->belongsTo(Project::class); }
+    // Project riil (kode kontrak/pekerjaan, mis. "AKM-PP") — beda dari project() di atas yang
+    // sebenarnya kantor/entitas payroll. Satu karyawan bisa pegang beberapa sekaligus.
+    public function clientProjects(): BelongsToMany { return $this->belongsToMany(ClientProject::class, 'employee_client_project'); }
     public function hoDetail(): HasOne       { return $this->hasOne(EmployeeHoDetail::class); }
     public function kpiIndicators(): HasMany { return $this->hasMany(EmployeeKpiIndicator::class); }
     public function goals(): HasMany         { return $this->hasMany(EmployeeGoal::class); }

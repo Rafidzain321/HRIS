@@ -909,6 +909,8 @@ class PayrollController extends Controller
     // ════════════════════════════════════════════════════════════
     public function exportSlipExcel(Request $request)
     {
+        ActivityLog::record('export', 'Slip Gaji', Employee::find($request->get('employee_id'))?->nama_lengkap, 'Export Excel slip gaji ' . $request->get('bulan', now()->month) . '/' . $request->get('tahun', now()->year));
+
         $tahun      = (int) $request->get('tahun', now()->year);
         $bulan      = (int) $request->get('bulan', now()->month);
         $employeeId = $request->get('employee_id');

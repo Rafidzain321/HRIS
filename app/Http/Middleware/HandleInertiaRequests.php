@@ -46,13 +46,13 @@ class HandleInertiaRequests extends Middleware
 
         // Sama persis dengan logika di CheckMenuPermission middleware — dipakai frontend
         // supaya tombol Tambah/Edit/Hapus otomatis disembunyikan (bukan cuma gagal 403)
-        // saat user multi-project sedang melihat project selain project asalnya.
+        // saat user multi-project sedang melihat project selain project asal/full-edit-nya.
         $isProjectReadonly = false;
         if ($user && !$user->hasRole('super-admin') && !$user->hasRole('viewer')) {
             $projectIds = $user->project_ids ? json_decode($user->project_ids, true) : null;
             if (is_array($projectIds) && count($projectIds) > 1) {
                 $activeProjectId = session('active_project_kode') ?: ($projectIds[0] ?? null);
-                $isProjectReadonly = (int) $activeProjectId !== (int) $user->project_id;
+                $isProjectReadonly = !in_array((int) $activeProjectId, $user->fullEditProjectIds());
             }
         }
 

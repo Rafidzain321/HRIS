@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\EmployeePayroll;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,6 +13,8 @@ class SlipGajiExportController extends Controller
     // gaji, sama dengan yang dipakai halaman Data Gaji & Slip Gaji.
     public function print(Request $request, $payrollId, PayrollController $payrollController)
     {
+        ActivityLog::record('export', 'Slip Gaji', EmployeePayroll::find($payrollId)?->employee?->nama_lengkap, 'Cetak slip gaji');
+
         $payroll = EmployeePayroll::findOrFail($payrollId);
         $slip    = $payrollController->getSlipData($payroll->employee_id, $payroll->tahun, $payroll->bulan);
 

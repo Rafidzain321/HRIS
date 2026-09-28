@@ -23,7 +23,7 @@ class CheckMenuPermission
             $projectIds = $user->project_ids ? json_decode($user->project_ids, true) : null;
             if (is_array($projectIds) && count($projectIds) > 1) {
                 $activeProjectId = session('active_project_kode') ?: ($projectIds[0] ?? null);
-                if ((int) $activeProjectId !== (int) $user->project_id) {
+                if (!in_array((int) $activeProjectId, $user->fullEditProjectIds())) {
                     abort(403, 'Anda hanya memiliki akses lihat (bukan edit) untuk project ini.');
                 }
             }

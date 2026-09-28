@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\SioSimOperator;
@@ -202,20 +203,34 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function karyawan(Request $request)
     {
+        ActivityLog::record('export', 'Data Karyawan', null, 'Export Excel data karyawan aktif' . ($request->get('client_project') ? ' (filter Data Project: ' . (\App\Models\ClientProject::find($request->get('client_project'))?->kode ?? '-') . ')' : ''));
+
         $pid   = $this->getProjectId();
         $isHo  = $pid && Project::find($pid)?->tipe_gaji === 'ho';
 
         if ($isHo) {
-            return $this->karyawanHo($pid);
+            return $this->karyawanHo($pid, $request);
         }
 
-        $employees = Employee::aktif()->with(['position','ppe'])
+        $search  = $request->get('search', '');
+        $jabatan = $request->get('jabatan', '');
+        $clientProjectId = $request->get('client_project', '');
+
+        $employees = Employee::aktif()->with(['position','ppe','clientProjects'])
             ->when($pid, fn($q) => $q->where('project_id', $pid))
+            ->when($search, fn($q) => $q->where(fn($q2) => $q2
+                ->where('nama_lengkap', 'like', "%$search%")
+                ->orWhere('no_ktp', 'like', "%$search%")
+                ->orWhere('id_badge', 'like', "%$search%")
+                ->orWhereHas('position', fn($q3) => $q3->where('nama_jabatan', 'like', "%$search%"))
+            ))
+            ->when($jabatan, fn($q) => $q->whereHas('position', fn($q2) => $q2->where('nama_jabatan', $jabatan)))
+            ->when($clientProjectId, fn($q) => $q->whereHas('clientProjects', fn($q2) => $q2->where('client_projects.id', $clientProjectId)))
             ->orderBy('nama_lengkap')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('Data Karyawan');
 
-        $this->makeTitle($sheet, 'Data Karyawan Aktif', 'AH', $employees->count());
+        $this->makeTitle($sheet, 'Data Karyawan Aktif', 'AI', $employees->count());
 
         $headers = [
             'A'=>['No.',4],'B'=>['Nama Lengkap',28],'C'=>['NIK / KTP',20],'D'=>['ID Badge',14],
@@ -228,6 +243,7 @@ class ExportController extends Controller
             'Y'=>['Expire Badge',13],'Z'=>['Status KP',15],'AA'=>['Exp KP',13],'AB'=>['RFID',13],
             'AC'=>['FRC',7],'AD'=>['Sepatu',8],
             'AE'=>['Start PKWT',13],'AF'=>['End PKWT',13],'AG'=>['No. Kontrak',22],'AH'=>['Bln PKWT',9],
+            'AI'=>['Data Project',24],
         ];
 
         $hRow = 4;
@@ -263,6 +279,7 @@ class ExportController extends Controller
                 'V'=>$emp->status_mcu,'W'=>$emp->derajat_kesehatan,'X'=>$emp->lokasi_mcu,
                 'Z'=>$emp->status_kp,'AB'=>$emp->rfid,'AC'=>$emp->ppe?->frc,'AD'=>$emp->ppe?->safety_shoes,
                 'AG'=>$emp->no_contract,'AH'=>$emp->bln_pkwt,
+                'AI'=>$emp->clientProjects->pluck('kode')->implode(', ') ?: null,
             ];
 
             foreach ($textData as $col => $val) {
@@ -294,7 +311,7 @@ class ExportController extends Controller
         foreach ($dateCols as $col) $this->addDateConditional($sheet, $col, $startRow, $lastRow);
 
         $this->makeLegend($sheet, $lastRow + 2);
-        $this->printSettings($sheet, 'E5', "A{$hRow}:AH{$hRow}");
+        $this->printSettings($sheet, 'E5', "A{$hRow}:AI{$hRow}");
 
         return $this->streamExcel($wb, 'DataKaryawan_'.now()->format('Ymd_His').'.xlsx');
     }
@@ -302,10 +319,13 @@ class ExportController extends Controller
     // ── Export Data Karyawan khusus HO — kolomnya beda dari project lapangan:
     // tidak ada SIM/SIO/MCU/Badge/PPE (tidak relevan untuk staf kantor pusat),
     // diganti kolom EmployeeHoDetail (unit, NIK HO, alamat KTP, dsb).
-    private function karyawanHo(int $pid)
+    private function karyawanHo(int $pid, ?Request $request = null)
     {
-        $employees = Employee::aktif()->with(['position', 'hoDetail'])
+        $clientProjectId = $request?->get('client_project', '');
+
+        $employees = Employee::aktif()->with(['position', 'hoDetail', 'clientProjects'])
             ->where('project_id', $pid)
+            ->when($clientProjectId, fn($q) => $q->whereHas('clientProjects', fn($q2) => $q2->where('client_projects.id', $clientProjectId)))
             ->orderBy('nama_lengkap')->get();
 
         // Kelompokkan per unit (HO-1 dulu, baru HO-2, lalu yang belum ada unit-nya)
@@ -317,7 +337,7 @@ class ExportController extends Controller
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('Data Karyawan HO');
 
-        $this->makeTitle($sheet, 'Data Karyawan HO Aktif', 'AA', $employees->count());
+        $this->makeTitle($sheet, 'Data Karyawan HO Aktif', 'AB', $employees->count());
 
         $headers = [
             'A'=>['No.',4],'B'=>['Nama Lengkap',28],'C'=>['NIK / KTP',20],
@@ -328,7 +348,7 @@ class ExportController extends Controller
             'O'=>['Status Karyawan',16],'P'=>['Nama (KTP)',26],'Q'=>['No. KK',20],'R'=>['RT/RW',10],
             'S'=>['Kelurahan',18],'T'=>['Kecamatan',18],'U'=>['Propinsi',18],'V'=>['NPWP',20],'W'=>['Email',24],
             'X'=>['Lokasi Kerja',20],
-            'Y'=>['Start PKWT',13],'Z'=>['End PKWT',13],'AA'=>['No. Kontrak',22],
+            'Y'=>['Start PKWT',13],'Z'=>['End PKWT',13],'AA'=>['No. Kontrak',22],'AB'=>['Data Project',24],
         ];
 
         $hRow = 4;
@@ -340,7 +360,7 @@ class ExportController extends Controller
 
         foreach ($groups as $unit => $group) {
             // Baris judul section per unit
-            $sheet->mergeCells("A{$row}:AA{$row}");
+            $sheet->mergeCells("A{$row}:AB{$row}");
             $sheet->setCellValue("A{$row}", "{$unit} ({$group->count()} karyawan)");
             $sheet->getStyle("A{$row}")->applyFromArray([
                 'font' => ['bold' => true, 'size' => 11],
@@ -372,6 +392,7 @@ class ExportController extends Controller
                     'S'=>$ho?->kelurahan,'T'=>$ho?->kecamatan,'U'=>$ho?->propinsi,'W'=>$ho?->email,
                     'X'=>$ho?->lokasi_kerja,
                     'AA'=>$emp->no_contract,
+                    'AB'=>$emp->clientProjects->pluck('kode')->implode(', ') ?: null,
                 ];
 
                 foreach ($textData as $col => $val) {
@@ -399,7 +420,7 @@ class ExportController extends Controller
         foreach ($dateCols as $col) $this->addDateConditional($sheet, $col, 5, $lastRow);
 
         $this->makeLegend($sheet, $lastRow + 2);
-        $this->printSettings($sheet, 'E5', "A{$hRow}:AA{$hRow}");
+        $this->printSettings($sheet, 'E5', "A{$hRow}:AB{$hRow}");
 
         return $this->streamExcel($wb, 'DataKaryawanHO_'.now()->format('Ymd_His').'.xlsx');
     }
@@ -409,6 +430,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function mcu()
     {
+        ActivityLog::record('export', 'MCU', null, 'Export Excel data MCU');
+
         $pid = $this->getProjectId();
         $employees = Employee::aktif()->with('position')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
@@ -458,6 +481,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function badge()
     {
+        ActivityLog::record('export', 'Badge & KP', null, 'Export Excel data Badge');
+
         $pid = $this->getProjectId();
         $employees = Employee::aktif()->with('position')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
@@ -506,6 +531,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function sim()
     {
+        ActivityLog::record('export', 'SIM', null, 'Export Excel data SIM');
+
         $pid = $this->getProjectId();
         $employees = Employee::aktif()->with('position')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
@@ -553,6 +580,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function siosim()
     {
+        ActivityLog::record('export', 'GOI Operator', null, 'Export Excel data GOI Operator (SIO/SIM)');
+
         $operators = SioSimOperator::orderBy('nama')->get();
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('GOI Operator');
@@ -596,6 +625,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function driver()
     {
+        ActivityLog::record('export', 'Driver', null, 'Export Excel data Driver');
+
         $pid = $this->getProjectId();
         $drivers = DriverDetail::when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('name')->get();
@@ -649,6 +680,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function equipmentUnit()
     {
+        ActivityLog::record('export', 'Equipment', null, 'Export Excel data Equipment Unit');
+
         $pid = $this->getProjectId();
         $equipments = Equipment::when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('no_unit')->get();
@@ -725,6 +758,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function equipmentOperator()
     {
+        ActivityLog::record('export', 'Equipment', null, 'Export Excel data Equipment Operator');
+
         $pid = $this->getProjectId();
         $operators = EquipmentOperator::with('equipment')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
@@ -789,6 +824,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function ccpm()
     {
+        ActivityLog::record('export', 'CCPM', null, 'Export Excel data CCPM Manpower');
+
         $pid = $this->getProjectId();
         $manpower = CcpmManpower::when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('name')->get();
@@ -842,6 +879,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function training()
     {
+        ActivityLog::record('export', 'Training', null, 'Export Excel data Training');
+
         $pid = $this->getProjectId();
         $trainings = EmployeeTraining::with(['employee.position','trainingType'])
             ->when($pid, fn($q) => $q->whereHas('employee', fn($eq) => $eq->where('project_id', $pid)))
@@ -897,6 +936,8 @@ class ExportController extends Controller
     // ═══════════════════════════════════════════════════
     public function ppe()
     {
+        ActivityLog::record('export', 'PPE', null, 'Export Excel data PPE');
+
         $employees = Employee::aktif()
             ->with(['position','ppe'])
             ->orderBy('nama_lengkap')

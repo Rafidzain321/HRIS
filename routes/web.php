@@ -21,6 +21,7 @@ use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\PositionController;
+use App\Http\Controllers\ClientProjectController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\TimesheetMemberController;
@@ -176,6 +177,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pengaturan/positions', [PositionController::class, 'store'])->name('positions.store');
     Route::put('/pengaturan/positions/{position}', [PositionController::class, 'update'])->name('positions.update');
     Route::delete('/pengaturan/positions/{position}', [PositionController::class, 'destroy'])->name('positions.destroy');
+
+    Route::post('/pengaturan/client-projects', [ClientProjectController::class, 'store'])->name('client-projects.store');
+    Route::put('/pengaturan/client-projects/{clientProject}', [ClientProjectController::class, 'update'])->name('client-projects.update');
+    Route::delete('/pengaturan/client-projects/{clientProject}', [ClientProjectController::class, 'destroy'])->name('client-projects.destroy');
 
     Route::post('/pengaturan/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::put('/pengaturan/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');

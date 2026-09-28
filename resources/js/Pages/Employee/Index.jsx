@@ -58,6 +58,7 @@ const OPTIONAL_COLS = [
   { key:'agama',     label:'Agama' },
   { key:'alamat',    label:'Alamat' },
   { key:'umur',      label:'Umur' },
+  { key:'client_project', label:'Data Project' },
   ...DOC_TIPES.map(d => ({ key: d.key, label: d.label })),
   ...HO_COLS,
 ];
@@ -99,7 +100,7 @@ function ColPickerModal({ selected, onClose, onApply, hideCompliance=false }) {
           )}
           <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><User size={12}/> Data Pribadi</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
-            {OPTIONAL_COLS.filter(c=>['tgl_masuk','agama','alamat'].includes(c.key) || (c.key==='masa_kerja' && hideCompliance)).map(col=>(
+            {OPTIONAL_COLS.filter(c=>['tgl_masuk','agama','alamat','client_project'].includes(c.key) || (c.key==='masa_kerja' && hideCompliance)).map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
                 style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',display:'flex',alignItems:'center',gap:5,
                   background:selectedCols.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
@@ -177,7 +178,7 @@ function ImportModal({ onClose, isHo=false }) {
         setLoading(false);
         const importResult = page.props?.flash?.import_result;
         if (importResult) setResult(importResult);
-        else setResult({ imported: 0, skipped: 0, errors: ['Tidak ada response dari server.'], skipped_list: [] });
+        else setResult({ imported: 0, updated: 0, skipped: 0, errors: ['Tidak ada response dari server.'], skipped_list: [] });
       },
       onError: (errors) => {
         setLoading(false);
@@ -203,14 +204,18 @@ function ImportModal({ onClose, isHo=false }) {
         {error && <div style={{margin:'14px 20px 0',padding:'10px 14px',borderRadius:9,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.25)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><XCircle size={13}/> {error}</div>}
         {result && (
           <div style={{margin:'16px 20px 0',display:'flex',flexDirection:'column',gap:10}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
               <div style={{textAlign:'center',padding:'12px',borderRadius:9,background:'rgba(34,201,122,.1)',border:'1px solid rgba(34,201,122,.25)'}}>
                 <div style={{fontFamily:'Syne,sans-serif',fontSize:26,fontWeight:700,color:'#22C97A'}}>{result.imported}</div>
-                <div style={{fontSize:11,color:'var(--muted)',marginTop:3}}>Berhasil Import</div>
+                <div style={{fontSize:11,color:'var(--muted)',marginTop:3}}>Karyawan Baru</div>
+              </div>
+              <div style={{textAlign:'center',padding:'12px',borderRadius:9,background:'rgba(58,143,224,.1)',border:'1px solid rgba(58,143,224,.25)'}}>
+                <div style={{fontFamily:'Syne,sans-serif',fontSize:26,fontWeight:700,color:'var(--blue)'}}>{result.updated || 0}</div>
+                <div style={{fontSize:11,color:'var(--muted)',marginTop:3}}>Diupdate</div>
               </div>
               <div style={{textAlign:'center',padding:'12px',borderRadius:9,background:'rgba(232,160,32,.1)',border:'1px solid rgba(232,160,32,.25)'}}>
                 <div style={{fontFamily:'Syne,sans-serif',fontSize:26,fontWeight:700,color:'var(--accent)'}}>{result.skipped}</div>
-                <div style={{fontSize:11,color:'var(--muted)',marginTop:3}}>Di-skip (duplikat)</div>
+                <div style={{fontSize:11,color:'var(--muted)',marginTop:3}}>Di-skip</div>
               </div>
               <div style={{textAlign:'center',padding:'12px',borderRadius:9,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.25)'}}>
                 <div style={{fontFamily:'Syne,sans-serif',fontSize:26,fontWeight:700,color:'#E04545'}}>{result.errors?.length || 0}</div>
@@ -219,7 +224,7 @@ function ImportModal({ onClose, isHo=false }) {
             </div>
             {result.skipped_list?.length > 0 && (
               <div style={{background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',borderRadius:9,padding:'12px 14px'}}>
-                <div style={{fontSize:11.5,fontWeight:600,color:'var(--accent)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> Di-skip karena NIK/Badge sudah ada:</div>
+                <div style={{fontSize:11.5,fontWeight:600,color:'var(--accent)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> Di-skip:</div>
                 <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:120,overflowY:'auto'}}>
                   {result.skipped_list.map((s,i)=><div key={i} style={{fontSize:11,color:'var(--muted2)'}}>• {s}</div>)}
                 </div>
@@ -233,7 +238,7 @@ function ImportModal({ onClose, isHo=false }) {
                 </div>
               </div>
             )}
-            {result.imported > 0 && <div style={{background:'rgba(34,201,122,.08)',border:'1px solid rgba(34,201,122,.2)',borderRadius:9,padding:'10px 14px',fontSize:12,color:'#22C97A',fontWeight:600,display:'flex',alignItems:'center',gap:6}}><CheckCircle2 size={14}/> {result.imported} karyawan berhasil ditambahkan ke sistem!</div>}
+            {(result.imported > 0 || result.updated > 0) && <div style={{background:'rgba(34,201,122,.08)',border:'1px solid rgba(34,201,122,.2)',borderRadius:9,padding:'10px 14px',fontSize:12,color:'#22C97A',fontWeight:600,display:'flex',alignItems:'center',gap:6}}><CheckCircle2 size={14}/> {result.imported} karyawan baru ditambahkan, {result.updated || 0} karyawan diupdate!</div>}
           </div>
         )}
         <form onSubmit={handleSubmit}>
@@ -245,7 +250,7 @@ function ImportModal({ onClose, isHo=false }) {
                 <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Data diisi mulai baris ke-5</div>
                 <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Format tanggal: DD-MM-YYYY (ketik sebagai teks)</div>
                 <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Kolom wajib: {isHo ? 'Nama Lengkap, No. KTP' : 'ID Badge, Nama Lengkap, Status'}</div>
-                <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> NIK yang sudah ada akan otomatis di-skip</div>
+                <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> NIK yang sudah ada otomatis di-UPDATE (cuma kolom yang diisi di baris itu yang berubah, bukan ditambah baris baru)</div>
                 {isHo && <div style={{display:"flex",alignItems:"center",gap:5}}><Check size={11}/> Template ini khusus untuk karyawan HO (unit, NIK HO, data KTP, dll)</div>}
               </div>
               <a href="/employees/template-import" style={{display:'inline-flex',alignItems:'center',gap:6,marginTop:10,padding:'6px 14px',borderRadius:7,background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',fontSize:12,fontWeight:600,textDecoration:'none'}}>
@@ -948,7 +953,7 @@ function TabPindahProject({ isSuperAdmin, userProjectId, isViewer }) {
 }
 
 // ── TABEL AKTIF ──
-function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jabatan_list, projects, search, jabatan, stats, onTerminate, onPindah, isSuperAdmin, activeProjectId, project_info}) {
+function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jabatan_list, client_project_list=[], projects, search, jabatan, clientProject, stats, onTerminate, onPindah, isSuperAdmin, activeProjectId, project_info}) {
   const { auth } = usePage().props;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const isHo = project_info?.tipe_gaji === 'ho';
@@ -957,6 +962,7 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
   const [showImport, setShowImport] = useState(false);
   const [searchVal,  setSearchVal]  = useState(search);
   const [jabatanVal, setJabatanVal] = useState(jabatan);
+  const [clientProjectVal, setClientProjectVal] = useState(clientProject || '');
   const [hoUnitTab,  setHoUnitTab]  = useState('all');
   const [selectedIds,   setSelectedIds]   = useState([]);
   const [showBulkPindah, setShowBulkPindah] = useState(false);
@@ -984,7 +990,7 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
   const displayData = isHo && hoUnitTab !== 'all' ? data.filter(e => e.ho_unit === hoUnitTab) : data;
 
   function applyCols(cols) { setActiveCols(cols); localStorage.setItem(projectColsKey, JSON.stringify(cols)); }
-  function doFilter(s, j) { router.get('/employees', {search:s, jabatan:j}, {preserveState:true, replace:true}); }
+  function doFilter(s, j, cp=clientProjectVal) { router.get('/employees', {search:s, jabatan:j, client_project:cp}, {preserveState:true, replace:true}); }
   function toggleOne(id) { setSelectedIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]); }
   function toggleAll() {
     const pageIds = displayData.map(e=>e.id);
@@ -1030,6 +1036,17 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
       case 'agama':     return <td key={colKey} style={{fontSize:11.5,color:'var(--muted2)'}}>{e.agama||'—'}</td>;
       case 'alamat':    return <td key={colKey} style={{fontSize:11,color:'var(--muted)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.alamat||'—'}</td>;
       case 'umur':      return (<td key={colKey} style={{textAlign:'center',whiteSpace:'nowrap'}}>{e.umur!=null?(<span style={{fontSize:12,fontWeight:600,color:e.umur>=56?'#E04545':e.umur>=53?'var(--accent)':'var(--text)'}}>{e.umur} thn{e.umur>=56&&<span style={{marginLeft:4,display:'inline-flex'}}><TriangleAlert size={10}/></span>}</span>):<span style={{color:'var(--muted)'}}>—</span>}</td>);
+      case 'client_project': return (
+        <td key={colKey}>
+          {(e.client_projects||[]).length>0 ? (
+            <div style={{display:'flex',flexWrap:'wrap',gap:4,maxWidth:220}}>
+              {e.client_projects.map((cp,i)=>(
+                <span key={i} style={{fontSize:10.5,fontWeight:600,padding:'1px 7px',borderRadius:99,background:'rgba(232,160,32,.12)',color:'var(--accent)',whiteSpace:'nowrap'}}>{cp}</span>
+              ))}
+            </div>
+          ) : <span style={{color:'var(--muted)'}}>—</span>}
+        </td>
+      );
       default: {
         if (colKey.startsWith('ho_')) {
           return <td key={colKey} style={{fontSize:11.5,color:'var(--muted2)'}}>{e[colKey]||'—'}</td>;
@@ -1095,6 +1112,10 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
               <option value="">Semua Jabatan</option>
               {jabatan_list.map((j,i)=><option key={i} value={typeof j==='string'?j:j.nama_jabatan}>{typeof j==='string'?j:j.nama_jabatan}</option>)}
             </select>
+            <select value={clientProjectVal} onChange={e=>{setClientProjectVal(e.target.value);doFilter(searchVal,jabatanVal,e.target.value);}}>
+              <option value="">Semua Data Project</option>
+              {client_project_list.map(cp=><option key={cp.id} value={cp.id}>{cp.kode}</option>)}
+            </select>
             <button type="button" onClick={()=>setShowPicker(true)} style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Settings size={13}/> Kolom</button>
             {!isViewer && <button type="button" onClick={()=>setShowAdd(true)} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Plus size={13}/> Tambah</button>}
             {!isViewer && (!isSuperAdmin || activeProjectId) && (
@@ -1103,7 +1124,7 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
                 <Upload size={13}/> Import Excel
               </button>
             )}
-            <a href="/export/karyawan" style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Download size={13}/> Export</a>
+            <a href={`/export/karyawan?${new URLSearchParams({...(searchVal?{search:searchVal}:{}), ...(jabatanVal?{jabatan:jabatanVal}:{}), ...(clientProjectVal?{client_project:clientProjectVal}:{})}).toString()}`} style={{padding:'6px 14px',borderRadius:7,border:'1px solid rgba(58,143,224,.3)',background:'rgba(58,143,224,.08)',color:'var(--blue)',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Download size={13}/> Export</a>
           </div>
         </div>
         <div style={{padding:'14px 16px'}}>
@@ -1306,6 +1327,7 @@ export default function EmployeeIndex({
   employees = {data:[],total:0,links:[],current_page:1,last_page:1},
   terminated = [],
   jabatan_list = [],
+  client_project_list = [],
   stats = {},
   projects = [],
   auth = {},
@@ -1456,8 +1478,8 @@ export default function EmployeeIndex({
         <TabAktif
           data={data} prevUrl={prevUrl} nextUrl={nextUrl}
           links={links} curPage={curPage} lastPage={lastPage}
-          total={total} jabatan_list={jabatan_list} projects={projects}
-          search={''} jabatan={''} stats={stats}
+          total={total} jabatan_list={jabatan_list} client_project_list={client_project_list} projects={projects}
+          search={''} jabatan={''} clientProject={''} stats={stats}
           isSuperAdmin={isSuperAdmin}
           activeProjectId={usePage().props.active_project_id}
           project_info={project_info}

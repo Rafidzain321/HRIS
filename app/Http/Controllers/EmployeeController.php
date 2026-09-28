@@ -18,9 +18,10 @@ class EmployeeController extends Controller
         $pid     = $this->activeProjectId();
         $search  = $request->get('search', '');
         $jabatan = $request->get('jabatan', '');
+        $clientProjectId = $request->get('client_project', '');
 
         // Fungsi apply filter — dipakai di $query dan $freshQuery supaya konsisten
-        $applyFilters = function ($q) use ($pid, $search, $jabatan) {
+        $applyFilters = function ($q) use ($pid, $search, $jabatan, $clientProjectId) {
             $q->when($pid, fn($q) => $q->where('project_id', $pid));
             if ($search) {
                 $q->where(fn($q2) => $q2
@@ -33,13 +34,16 @@ class EmployeeController extends Controller
             if ($jabatan) {
                 $q->whereHas('position', fn($q2) => $q2->where('nama_jabatan', $jabatan));
             }
+            if ($clientProjectId) {
+                $q->whereHas('clientProjects', fn($q2) => $q2->where('client_projects.id', $clientProjectId));
+            }
             return $q;
         };
 
         $projectInfo = $pid ? Project::find($pid, ['id', 'kode', 'nama', 'tipe_gaji']) : null;
 
         // Query utama untuk paginate
-        $query = $applyFilters(Employee::aktif()->with(['position', 'documents', 'project', 'hoDetail']))
+        $query = $applyFilters(Employee::aktif()->with(['position', 'documents', 'project', 'hoDetail', 'clientProjects']))
             ->orderBy('nama_lengkap');
 
         // Highlight: cari halaman yang mengandung employee id
@@ -83,6 +87,7 @@ class EmployeeController extends Controller
             'masa_kerja' => $e->tanggal_masuk ? $this->formatMasaKerja($e->tanggal_masuk) : null,
             'project_id'   => $e->project_id,
             'project_nama' => $e->project?->nama ?? '-',
+            'client_projects' => $e->clientProjects->pluck('kode')->values(),
             'ho_unit'      => $e->hoDetail?->unit,
             'ho_nik'             => $e->hoDetail?->nik_ho,
             'ho_lokasi_kerja'    => $e->hoDetail?->lokasi_kerja,
@@ -144,10 +149,12 @@ class EmployeeController extends Controller
         }
 
         $jabatan_list = Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']);
+        $client_project_list = \App\Models\ClientProject::orderBy('kode')->get(['id', 'kode']);
         return Inertia::render('Employee/Index', [
             'employees'    => $employees,
             'terminated'   => $terminated,
             'jabatan_list' => $jabatan_list,
+            'client_project_list' => $client_project_list,
             'stats'        => $stats,
             'project_info' => $projectInfo,
         ]);
@@ -205,6 +212,8 @@ class EmployeeController extends Controller
             'status_mcu' => 'nullable|string|max:20',
             'lokasi_mcu' => 'nullable|string|max:100',
             'exp_mcu' => 'nullable|date',
+            'client_project_ids' => 'nullable|array',
+            'client_project_ids.*' => 'exists:client_projects,id',
             'ho_detail' => 'nullable|array',
             'ho_detail.unit' => 'nullable|in:HO-1,HO-2',
             'ho_detail.nik_ho' => 'nullable|string|max:40',
@@ -228,6 +237,8 @@ class EmployeeController extends Controller
 
         $hoDetailData = $data['ho_detail'] ?? null;
         unset($data['ho_detail']);
+        $clientProjectIds = $data['client_project_ids'] ?? [];
+        unset($data['client_project_ids']);
 
         if (!$user->hasRole('super-admin')) {
             $data['project_id'] = $user->project_id;
@@ -236,6 +247,7 @@ class EmployeeController extends Controller
         }
 
         $employee = Employee::create($data);
+        $employee->clientProjects()->sync($clientProjectIds);
 
         if ($isHoProject && $hoDetailData && array_filter($hoDetailData, fn ($v) => $v !== null)) {
             \App\Models\EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], $hoDetailData);
@@ -260,7 +272,7 @@ class EmployeeController extends Controller
             ? Carbon::parse($employee->tanggal_lahir)->age
             : null;
 
-        $employee->loadMissing('hoDetail', 'project');
+        $employee->loadMissing('hoDetail', 'project', 'clientProjects');
         $projectInfo = $employee->project
             ? Project::find($employee->project_id, ['id', 'kode', 'nama', 'tipe_gaji'])
             : null;
@@ -280,9 +292,11 @@ class EmployeeController extends Controller
                 'end_pkwt' => $employee->end_pkwt?->format('Y-m-d'),
                 'umur' => $umur,
                 'ho_detail' => $employee->hoDetail,
+                'client_project_ids' => $employee->clientProjects->pluck('id')->values(),
             ]),
             'positions' => \App\Models\Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']),
             'departments' => \App\Models\Department::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
+            'client_project_list' => \App\Models\ClientProject::orderBy('kode')->get(['id', 'kode']),
             'project_info' => $projectInfo,
             // Riwayat gaji mentah hasil import HO — arsip referensi, cuma relevan untuk karyawan HO.
             // Data gaji sensitif, jadi cuma dikirim ke frontend kalau yang buka super-admin —
@@ -383,6 +397,8 @@ class EmployeeController extends Controller
             'no_bpjs_tk'    => 'nullable|string|max:20',
             'no_bpjs_kes'   => 'nullable|string|max:20',
             'nama_bank'     => 'nullable|string|max:50',
+            'client_project_ids' => 'nullable|array',
+            'client_project_ids.*' => 'exists:client_projects,id',
         ]);
 
         // Deteksi field yang berubah untuk log
@@ -408,12 +424,18 @@ class EmployeeController extends Controller
 
         $hoDetailData = $data['ho_detail'] ?? null;
         unset($data['ho_detail']);
+        $clientProjectIds = $data['client_project_ids'] ?? null;
+        unset($data['client_project_ids']);
 
         if ($isHoProject) {
             $data['id_badge'] = $data['id_badge'] ?: null;
         }
 
         $employee->update($data);
+
+        if ($clientProjectIds !== null) {
+            $employee->clientProjects()->sync($clientProjectIds);
+        }
 
         if ($isHoProject && $hoDetailData) {
             \App\Models\EmployeeHoDetail::updateOrCreate(

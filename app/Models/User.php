@@ -18,6 +18,7 @@ class User extends Authenticatable
         'plain_password',
         'project_id',
         'project_ids',
+        'full_edit_project_ids',
         'employee_id',
         'is_active',
         'last_login_at',
@@ -61,5 +62,14 @@ class User extends Authenticatable
         if ($this->hasRole('viewer'))
             return true;
         return $this->project_id === $projectId;
+    }
+
+    // Gabungan project_id (project utama) + full_edit_project_ids (project tambahan yang juga
+    // boleh di-edit penuh) — dipakai buat cek readonly di HandleInertiaRequests & CheckMenuPermission
+    // supaya user yang memang mengelola lebih dari satu project tidak dibikin read-only.
+    public function fullEditProjectIds(): array
+    {
+        $extra = $this->full_edit_project_ids ? json_decode($this->full_edit_project_ids, true) : [];
+        return array_values(array_unique(array_filter([(int) $this->project_id, ...array_map('intval', $extra ?: [])])));
     }
 }

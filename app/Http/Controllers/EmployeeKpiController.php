@@ -489,6 +489,7 @@ class EmployeeKpiController extends Controller
         [$defYear, $defSemester] = $this->currentPeriod();
         $tahun    = (int) $request->get('tahun', $defYear);
         $semester = (int) $request->get('semester', $defSemester);
+        ActivityLog::record('export', 'Penilaian KPI', null, "Export Excel penilaian KPI semester {$semester}/{$tahun}");
 
         $employeesModel = Employee::aktif()->whereIn('id', $employees->pluck('id'))
             ->with('position')->orderBy('nama_lengkap')->get();

@@ -442,7 +442,7 @@ function RiwayatGajiSection({ items = [] }) {
 }
 
 // ── MAIN COMPONENT ──
-export default function EmployeeEdit({ employee, positions = [], departments = [], project_info = null, salary_history = [] }) {
+export default function EmployeeEdit({ employee, positions = [], departments = [], client_project_list = [], project_info = null, salary_history = [] }) {
   const isHo = project_info?.tipe_gaji === 'ho';
   const { data, setData, put, processing, isDirty } = useForm({
     id_badge:             employee.id_badge             || '',
@@ -458,6 +458,7 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
     tanggal_akhir_probation: employee.tanggal_akhir_probation || '',
     position_id:          employee.position_id           || '',
     department_id:        employee.department_id         || '',
+    client_project_ids:   employee.client_project_ids    || [],
     alamat:               employee.alamat               || '',
     agama:                employee.agama                || '',
     kota_asal:            employee.kota_asal            || '',
@@ -634,6 +635,32 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                   {departments.map(d=><option key={d.id} value={d.id}>{d.nama}</option>)}
                 </select>
               </Field>
+              <div style={{ marginBottom:16, gridColumn:'1 / -1' }}>
+                <label>Data Project (project riil yang dipegang, bisa lebih dari satu)</label>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:6}}>
+                  {client_project_list.map(cp=>{
+                    const active = data.client_project_ids.includes(cp.id);
+                    return (
+                      <button type="button" key={cp.id}
+                        onClick={()=>setData('client_project_ids', active
+                          ? data.client_project_ids.filter(id=>id!==cp.id)
+                          : [...data.client_project_ids, cp.id])}
+                        style={{
+                          padding:'4px 10px', borderRadius:99, fontSize:11.5, fontWeight:600, cursor:'pointer',
+                          fontFamily:"'Outfit',sans-serif",
+                          border: active ? '1px solid rgba(232,160,32,.45)' : '1px solid var(--border2)',
+                          background: active ? 'rgba(232,160,32,.14)' : 'var(--bg3)',
+                          color: active ? 'var(--accent)' : 'var(--muted)',
+                        }}>
+                        {cp.kode}
+                      </button>
+                    );
+                  })}
+                  {client_project_list.length===0 && (
+                    <span style={{fontSize:11.5,color:'var(--muted)'}}>Belum ada data project. Tambahkan dulu di menu Pengaturan.</span>
+                  )}
+                </div>
+              </div>
               <Field label="Kota Asal">
                 <input style={inputStyle} value={data.kota_asal} onChange={e=>setData('kota_asal',e.target.value)} />
               </Field>

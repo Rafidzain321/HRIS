@@ -5,7 +5,7 @@ import { router, usePage } from '@inertiajs/react';
 import {
   Pencil, X, TriangleAlert, Plus, Check, CheckCircle2, ClipboardList, Trash2,
   Save, Loader2, Briefcase, Search, Settings, User, Ban, Key, Lock, LogOut,
-  Eye, EyeOff, Building2, CircleSlash,
+  Eye, EyeOff, Building2, CircleSlash, FolderKanban,
 } from 'lucide-react';
 
 // ── CONFIRM MODAL (ganti window.confirm) ────────────────────
@@ -55,6 +55,7 @@ const ACTION_COLOR = {
   'delete':   { bg:'rgba(224,69,69,.1)',  color:'#E04545' },
   'upload':   { bg:'rgba(155,89,182,.1)', color:'#9B59B6' },
   'download': { bg:'rgba(34,201,122,.1)', color:'#22C97A' },
+  'export':   { bg:'rgba(0,180,200,.1)',  color:'#00A8BC' },
 };
 
 const INP = {
@@ -90,6 +91,7 @@ function UserModal({ mode, user, roles, projects, menus, onClose }) {
     role:       user?.role       || roles[0] || '',
     project_id: user?.project_id || '',
     project_ids: user?.project_ids || [],
+    full_edit_project_ids: user?.full_edit_project_ids || [],
   });
   const [checked, setChecked] = useState(initialChecked);
   const [loading, setLoading] = useState(false);
@@ -111,7 +113,7 @@ function UserModal({ mode, user, roles, projects, menus, onClose }) {
     setLoading(true); setErrors({});
     const url    = mode==='add' ? '/pengaturan/users' : `/pengaturan/users/${user.id}`;
     const method = mode==='add' ? 'post' : 'put';
-    router[method](url, {...form, project_id: form.project_id||null, project_ids: form.project_ids, permissions}, {
+    router[method](url, {...form, project_id: form.project_id||null, project_ids: form.project_ids, full_edit_project_ids: form.full_edit_project_ids, permissions}, {
       onSuccess: ()=>{ setLoading(false); onClose(); },
       onError:   (err)=>{ setLoading(false); setErrors(err); },
     });
@@ -182,7 +184,9 @@ function UserModal({ mode, user, roles, projects, menus, onClose }) {
                           const others = prev.project_ids.map(String).filter(x=>x!==home);
                           const has = others.includes(pid);
                           const nextOthers = has ? others.filter(x=>x!==pid) : [...others, pid];
-                          return {...prev, project_ids: nextOthers.length ? [home, ...nextOthers] : []};
+                          // Kalau dilepas dari "boleh lihat", otomatis lepas juga dari "boleh edit penuh".
+                          const nextFullEdit = has ? prev.full_edit_project_ids.map(String).filter(x=>x!==pid) : prev.full_edit_project_ids;
+                          return {...prev, project_ids: nextOthers.length ? [home, ...nextOthers] : [], full_edit_project_ids: nextFullEdit};
                         });
                       }}
                         style={{padding:'5px 12px',borderRadius:99,cursor:'pointer',fontSize:11.5,fontWeight:600,
@@ -190,6 +194,39 @@ function UserModal({ mode, user, roles, projects, menus, onClose }) {
                           background:isChecked?'rgba(58,143,224,.12)':'var(--bg3)',
                           color:isChecked?'var(--blue)':'var(--muted2)',
                           border:`1px solid ${isChecked?'var(--blue)':'var(--border)'}`}}>
+                        {isChecked && <Check size={11}/>} {p.nama}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!isSuperAdminRole && form.project_id && form.project_ids.length > 0 && (
+              <div>
+                <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>
+                  Boleh Edit Penuh di Project Lain (opsional)
+                </label>
+                <div style={{fontSize:10.5,color:'var(--muted)',marginBottom:6}}>
+                  Normalnya project di atas cuma bisa dilihat (view-only). Centang di sini kalau user ini memang bertanggung jawab mengelola project itu juga, bukan cuma memantau.
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                  {projects.filter(p=>String(p.id)!==String(form.project_id) && form.project_ids.map(String).includes(String(p.id))).map(p=>{
+                    const pid = String(p.id);
+                    const isChecked = form.full_edit_project_ids.map(String).includes(pid);
+                    return (
+                      <div key={p.id} onClick={()=>{
+                        setForm(prev=>{
+                          const cur = prev.full_edit_project_ids.map(String);
+                          const nextFullEdit = cur.includes(pid) ? cur.filter(x=>x!==pid) : [...cur, pid];
+                          return {...prev, full_edit_project_ids: nextFullEdit};
+                        });
+                      }}
+                        style={{padding:'5px 12px',borderRadius:99,cursor:'pointer',fontSize:11.5,fontWeight:600,
+                          display:'flex',alignItems:'center',gap:5,
+                          background:isChecked?'rgba(34,201,122,.12)':'var(--bg3)',
+                          color:isChecked?'#22C97A':'var(--muted2)',
+                          border:`1px solid ${isChecked?'#22C97A':'var(--border)'}`}}>
                         {isChecked && <Check size={11}/>} {p.nama}
                       </div>
                     );
@@ -404,6 +441,52 @@ function JabatanModal({ mode, position, onClose }) {
   );
 }
 
+// ── MODAL DATA PROJECT (project riil, mis. "AKM-PP" — beda dari kantor) ──
+function ClientProjectModal({ mode, clientProject, onClose }) {
+  const [kode,    setKode]    = useState(clientProject?.kode||'');
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+  function submit(e) {
+    e.preventDefault();
+    if (!kode.trim()) { setError('Kode project wajib diisi.'); return; }
+    setLoading(true); setError('');
+    const url    = mode==='add'?'/pengaturan/client-projects':`/pengaturan/client-projects/${clientProject.id}`;
+    const method = mode==='add'?'post':'put';
+    router[method](url, {kode}, {
+      onSuccess:()=>{ setLoading(false); onClose(); },
+      onError:(err)=>{ setLoading(false); setError(err.kode||'Gagal menyimpan.'); },
+    });
+  }
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(380px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}>
+            {mode==='add'?<><Plus size={15}/> Tambah Project</>:<><Pencil size={15}/> Edit Project</>}
+          </div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
+        </div>
+        <form onSubmit={submit}>
+          <div style={{padding:'18px 20px'}}>
+            <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Kode Project *</label>
+            <input type="text" style={{...INP,borderColor:error?'#E04545':'var(--border)'}}
+              value={kode} onChange={e=>setKode(e.target.value)} placeholder="cth: AKM-PP" autoFocus />
+            {error&&<div style={{display:'flex',alignItems:'center',gap:4,fontSize:10.5,color:'#E04545',marginTop:4}}><TriangleAlert size={12}/>{error}</div>}
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
+            <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
+            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1,display:'flex',alignItems:'center',gap:6,justifyContent:'center'}}>
+              {loading?<Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>:mode==='add'?<Plus size={14}/>:<Save size={14}/>}
+              {loading?'...':mode==='add'?'Tambah':'Simpan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── MODAL PROJECT ────────────────────────────────────────────
 function ProjectModal({ mode, project, onClose }) {
   const [form, setForm] = useState({
@@ -505,7 +588,7 @@ function ProjectModal({ mode, project, onClose }) {
 // ═══════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════
-export default function PengaturanIndex({ users=[], roles=[], projects=[], positions=[], logs=[], menus=[], is_admin_settings=true, profile=null }) {
+export default function PengaturanIndex({ users=[], roles=[], projects=[], positions=[], client_projects=[], logs=[], menus=[], is_admin_settings=true, profile=null }) {
   const { auth }     = usePage().props;
   const isSuperAdmin = auth?.user?.can?.is_super_admin;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
@@ -515,6 +598,8 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
   const [changePwModal,  setChangePwModal]  = useState(false);
   const [jabatanModal,   setJabatanModal]   = useState(null);
   const [jabatanSearch,  setJabatanSearch]  = useState('');
+  const [clientProjectModal,  setClientProjectModal]  = useState(null);
+  const [clientProjectSearch, setClientProjectSearch] = useState('');
   const [userSearch,     setUserSearch]     = useState('');
   const [projectModal,   setProjectModal]   = useState(null);
   const [confirmModal,   setConfirmModal]   = useState(null);
@@ -651,6 +736,10 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     !jabatanSearch || p.nama_jabatan.toLowerCase().includes(jabatanSearch.toLowerCase())
   );
 
+  const filteredClientProjects = client_projects.filter(p =>
+    !clientProjectSearch || p.kode.toLowerCase().includes(clientProjectSearch.toLowerCase())
+  );
+
   const filteredUsers = users.filter(u => {
     const q = userSearch.trim().toLowerCase();
     if (!q) return true;
@@ -684,6 +773,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     ...(isSuperAdmin ? [{key:'users', label:<><User size={14}/> Manajemen User</>, count:users.length}] : []),
     ...(isSuperAdmin ? [{key:'project', label:<><Building2 size={14}/> Project</>, count:projects.length}] : []),
     {key:'jabatan',        label:<><Briefcase size={14}/> Jabatan</>,        count:positions.length},
+    {key:'client-project', label:<><FolderKanban size={14}/> Data Project</>, count:client_projects.length},
     // Log Aktivitas cuma buat super-admin — standarnya user lain tidak perlu (dan tidak boleh)
     // memantau aktivitas user lain, jadi bukan lagi soal restrict_activity_log per-akun.
     ...(isSuperAdmin ? [{key:'log', label:<><ClipboardList size={14}/> Log Aktivitas</>, count:logs.length}] : []),
@@ -1002,6 +1092,68 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                   {filteredPositions.length===0&&(
                     <tr><td colSpan={3} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>
                       {positions.length===0?'Belum ada jabatan':'Tidak ada jabatan yang cocok dengan pencarian'}
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab==='client-project'&&(
+        <>
+          {clientProjectModal&&<ClientProjectModal mode={clientProjectModal.mode} clientProject={clientProjectModal.clientProject} onClose={()=>setClientProjectModal(null)}/>}
+          <div className="panel">
+            <div className="panel-head">
+              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><FolderKanban size={14}/> Daftar Project</div>
+              {!isViewer && <button onClick={()=>setClientProjectModal({mode:'add'})} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah Project</button>}
+            </div>
+            <div style={{padding:'14px 16px'}}>
+              <div style={{fontSize:11,color:'var(--muted)',marginBottom:10}}>
+                Project riil (kode kontrak/pekerjaan) yang dipegang karyawan — beda dari "Project" di tab lain yang sebenarnya kantor/entitas payroll. Satu karyawan bisa pegang beberapa project sekaligus, diatur lewat form Tambah/Edit Karyawan.
+              </div>
+              <div style={{position:'relative',marginBottom:14,maxWidth:320}}>
+                <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={14}/></span>
+                <input type="text" value={clientProjectSearch} placeholder="Cari kode project..."
+                  onChange={e=>setClientProjectSearch(e.target.value)}
+                  style={{...INP,paddingLeft:32,width:'100%',boxSizing:'border-box'}} />
+              </div>
+              <div style={{overflowX:'auto'}}>
+              <table className="kar-table">
+                <thead><tr><th>Kode Project</th><th style={{textAlign:'center'}}>Jumlah Karyawan</th><th style={{textAlign:'center'}}>Aksi</th></tr></thead>
+                <tbody>
+                  {filteredClientProjects.map((p,i)=>(
+                    <tr key={i}
+                      onMouseEnter={ev=>Array.from(ev.currentTarget.cells).forEach(c=>c.style.background='rgba(232,160,32,.04)')}
+                      onMouseLeave={ev=>Array.from(ev.currentTarget.cells).forEach(c=>c.style.background='')}>
+                      <td style={{fontWeight:500}}>{p.kode}</td>
+                      <td style={{textAlign:'center'}}>
+                        <span style={{background:p.employees_count>0?'rgba(58,143,224,.1)':'var(--bg3)',color:p.employees_count>0?'var(--blue)':'var(--muted)',padding:'2px 10px',borderRadius:99,fontSize:11,fontWeight:600}}>{p.employees_count} karyawan</span>
+                      </td>
+                      <td>
+                        <div style={{display:'flex',gap:5,justifyContent:'center'}}>
+                          {!isViewer && <button onClick={()=>setClientProjectModal({mode:'edit',clientProject:p})} style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><Pencil size={12}/></button>}
+                          {!isViewer && p.employees_count===0&&(
+                            <button onClick={()=>setConfirmModal({
+                              title: 'Hapus Project',
+                              icon: <Trash2 size={24} color="#E04545"/>,
+                              message: `Project "${p.kode}" akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`,
+                              confirmLabel: <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Trash2 size={14}/>Hapus Permanen</span>,
+                              confirmColor: '#E04545',
+                              confirmBg: 'rgba(224,69,69,.12)',
+                              onConfirm: () => router.delete(`/pengaturan/client-projects/${p.id}`,{preserveScroll:true}),
+                            })}
+                              style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><Trash2 size={12}/></button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredClientProjects.length===0&&(
+                    <tr><td colSpan={3} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>
+                      {client_projects.length===0?'Belum ada project':'Tidak ada project yang cocok dengan pencarian'}
                     </td></tr>
                   )}
                 </tbody>

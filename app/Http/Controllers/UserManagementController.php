@@ -27,7 +27,7 @@ class UserManagementController extends Controller
                     'name'  => auth()->user()->name,
                     'email' => auth()->user()->email,
                 ],
-                'users' => [], 'roles' => [], 'projects' => [], 'positions' => [],
+                'users' => [], 'roles' => [], 'projects' => [], 'positions' => [], 'client_projects' => [],
                 'training_types' => [], 'logs' => [], 'menus' => [],
             ]);
         }
@@ -43,6 +43,7 @@ class UserManagementController extends Controller
                 'role'           => $u->roles->first()?->name ?? '—',
                 'project_id'     => $u->project_id,
                 'project_ids'    => $u->project_ids ? json_decode($u->project_ids, true) : null,
+                'full_edit_project_ids' => $u->full_edit_project_ids ? json_decode($u->full_edit_project_ids, true) : [],
                 'project_nama'   => $u->project?->nama ?? 'Semua',
                 'is_active'      => $u->is_active ?? true,
                 'created_at'     => $u->created_at->format('d M Y'),
@@ -74,6 +75,14 @@ class UserManagementController extends Controller
                 'id'              => $p->id,
                 'nama_jabatan'    => $p->nama_jabatan,
                 'employees_count' => $p->employees_count,
+            ]);
+
+        $client_projects = \App\Models\ClientProject::orderBy('kode')
+            ->withCount('employees')->get()
+            ->map(fn($cp) => [
+                'id'              => $cp->id,
+                'kode'            => $cp->kode,
+                'employees_count' => $cp->employees_count,
             ]);
 
         // ── Activity Log — cuma super-admin. Standarnya user lain tidak perlu (dan tidak boleh)
@@ -108,7 +117,7 @@ class UserManagementController extends Controller
 
         return Inertia::render('Pengaturan/Index', [
             'is_admin_settings' => true,
-            ...compact('users', 'roles', 'projects', 'positions', 'training_types', 'logs', 'menus'),
+            ...compact('users', 'roles', 'projects', 'positions', 'client_projects', 'training_types', 'logs', 'menus'),
         ]);
     }
 
@@ -139,6 +148,8 @@ class UserManagementController extends Controller
             'project_id'            => 'nullable|exists:projects,id',
             'project_ids'           => 'nullable|array',
             'project_ids.*'         => 'exists:projects,id',
+            'full_edit_project_ids' => 'nullable|array',
+            'full_edit_project_ids.*' => 'exists:projects,id',
             'permissions'           => 'array',
             'permissions.*.menu'    => 'required|string',
             'permissions.*.action'  => 'required|in:view,edit',
@@ -151,6 +162,7 @@ class UserManagementController extends Controller
             'plain_password' => $data['password'],
             'project_id'     => $data['project_id'] ?? null,
             'project_ids'    => !empty($data['project_ids']) ? json_encode(array_map('intval', $data['project_ids'])) : null,
+            'full_edit_project_ids' => !empty($data['full_edit_project_ids']) ? json_encode(array_map('intval', $data['full_edit_project_ids'])) : null,
             'is_active'      => true,
         ]);
         $user->assignRole($data['role']);
@@ -174,6 +186,8 @@ class UserManagementController extends Controller
             'project_id'            => 'nullable|exists:projects,id',
             'project_ids'           => 'nullable|array',
             'project_ids.*'         => 'exists:projects,id',
+            'full_edit_project_ids' => 'nullable|array',
+            'full_edit_project_ids.*' => 'exists:projects,id',
             'permissions'           => 'array',
             'permissions.*.menu'    => 'required|string',
             'permissions.*.action'  => 'required|in:view,edit',
@@ -184,6 +198,7 @@ class UserManagementController extends Controller
             'email'       => $data['email'],
             'project_id'  => $data['project_id'] ?? null,
             'project_ids' => !empty($data['project_ids']) ? json_encode(array_map('intval', $data['project_ids'])) : null,
+            'full_edit_project_ids' => !empty($data['full_edit_project_ids']) ? json_encode(array_map('intval', $data['full_edit_project_ids'])) : null,
             ...(isset($data['password']) && $data['password']
                 ? ['password' => Hash::make($data['password']), 'plain_password' => $data['password']]
                 : []),

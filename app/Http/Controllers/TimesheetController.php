@@ -2,6 +2,7 @@
 // TimesheetController.php
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\Timesheet;
 use App\Models\TimesheetMember;
@@ -538,6 +539,8 @@ class TimesheetController extends Controller
 
     public function export(Request $request)
     {
+        ActivityLog::record('export', 'Timesheet', null, 'Export Excel timesheet ' . $request->get('bulan', now()->month) . '/' . $request->get('tahun', now()->year));
+
         $tahun = (int) $request->get('tahun', now()->year);
         $bulan = (int) $request->get('bulan', now()->month);
         $ttdHr = $request->get('ttd_hr', '');

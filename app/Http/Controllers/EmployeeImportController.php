@@ -13,6 +13,41 @@ use Carbon\Carbon;
 
 class EmployeeImportController extends Controller
 {
+    // Nilai-nilai yang dianggap "sengaja dikosongkan" (bukan kolom yang cuma tidak ikut diisi ulang).
+    private const NULL_TOKENS = ['-', '—', 'n/a', 'null'];
+
+    // Dipakai waktu re-import (NIK sudah ada di sistem) — cuma kolom yang benar-benar diisi di
+    // Excel yang ikut di-update, kolom yang dikosongkan di baris itu TIDAK menimpa data lama
+    // (supaya import ulang buat 1 perubahan kecil tidak menghapus data lain yang sudah ada).
+    // Isi eksplisit "-"/"n/a"/dst tetap dianggap niat mengosongkan field itu.
+    private function buildUpdateData(array $row, array $colMap, array $fields): array
+    {
+        $data = [];
+        foreach ($fields as $field) {
+            if (!isset($colMap[$field])) continue;
+            $raw = trim((string) ($row[$colMap[$field]] ?? ''));
+            if ($raw === '') continue;
+            $data[$field] = in_array(strtolower($raw), self::NULL_TOKENS) ? null : $raw;
+        }
+        return $data;
+    }
+
+    // Sama seperti buildUpdateData() tapi untuk kolom tanggal — sel kosong dilewati (tidak
+    // menimpa), sel yang gagal di-parse juga dilewati (jangan sampai mengosongkan tanggal lama
+    // cuma karena format di baris re-import salah ketik).
+    private function buildUpdateDateData(array $row, array $colMap, array $dateFields): array
+    {
+        $data = [];
+        foreach ($dateFields as $field) {
+            if (!isset($colMap[$field])) continue;
+            $raw = $row[$colMap[$field]] ?? null;
+            if ($raw === null || trim((string) $raw) === '') continue;
+            $parsed = self::parseDate($raw);
+            if ($parsed !== null) $data[$field] = $parsed;
+        }
+        return $data;
+    }
+
     private static function friendlyError(\Exception $e, string $context = ''): string
     {
         $msg = $e->getMessage();
@@ -127,8 +162,21 @@ class EmployeeImportController extends Controller
         // Cache semua jabatan
         $positions = Position::pluck('id', 'nama_jabatan');
 
+        // Field string biasa (dipakai baik waktu bikin baru maupun waktu update data lama)
+        $stringFields = [
+            'nama_ibu', 'no_telepon', 'tempat_lahir', 'kota_asal',
+            'alamat', 'agama', 'tamatan', 'ptkp', 'ccpm', 'group',
+            'rfid', 'status_kp', 'type_sim', 'no_sim', 'sim_kota_keluar',
+            'sio_k3', 'no_sio', 'tipe_sio', 'nama_perusahaan_sio',
+            'status_mcu', 'lokasi_mcu', 'derajat_kesehatan',
+            'ukuran_baju', 'ukuran_sepatu', 'no_contract', 'no_bpjs',
+            'no_rekening',
+        ];
+        $nullValues = ['-', '—', 'n/a', 'null', 'NULL', ''];
+
         $results = [
             'imported'     => 0,
+            'updated'      => 0,
             'skipped'      => 0,
             'errors'       => [],
             'skipped_list' => [],
@@ -141,10 +189,11 @@ class EmployeeImportController extends Controller
             $rowNum++;
             if ($rowIndex < 5) continue; // skip baris 1-4 (header)
 
-            $nama    = trim($row[$colMap['nama_lengkap']] ?? '');
-            $noKtp   = trim($row[$colMap['no_ktp']] ?? '');
-            $idBadge = trim($row[$colMap['id_badge']] ?? '');
-            $status  = strtoupper(trim($row[$colMap['status']] ?? 'AKTIF'));
+            $nama       = trim($row[$colMap['nama_lengkap']] ?? '');
+            $noKtp      = trim($row[$colMap['no_ktp']] ?? '');
+            $idBadge    = trim($row[$colMap['id_badge']] ?? '');
+            $statusRaw  = trim($row[$colMap['status']] ?? '');
+            $statusNorm = strtoupper($statusRaw ?: 'AKTIF');
 
             // Skip baris kosong
             if (empty($nama) && empty($noKtp) && empty($idBadge)) continue;
@@ -163,24 +212,20 @@ class EmployeeImportController extends Controller
             $user = auth()->user();
             $projectId = $pid ?? ($user->hasRole('super-admin') ? null : $user->project_id);
 
-            // Skip jika NIK sudah ada di project yang sama
-            $nikExists = Employee::where('no_ktp', $noKtp)
+            // NIK yang sama di project yang sama = karyawan yang sama → update data yang berubah
+            // saja (bukan bikin baris baru, bukan di-skip begitu saja).
+            $existing = Employee::where('no_ktp', $noKtp)
                 ->when($projectId, fn($q) => $q->where('project_id', $projectId))
-                ->exists();
-            if ($nikExists) {
-                $results['skipped']++;
-                $results['skipped_list'][] = "{$nama} (NIK: {$noKtp} sudah ada)";
-                continue;
-            }
+                ->first();
 
-            // Skip jika ID Badge sudah ada (hanya jika diisi)
+            // Skip kalau ID Badge sudah dipakai karyawan LAIN (bukan dirinya sendiri kalau ini update)
             if (!empty($idBadge)) {
-                $badgeExists = Employee::where('id_badge', $idBadge)
+                $badgeOwner = Employee::where('id_badge', $idBadge)
                     ->when($projectId, fn($q) => $q->where('project_id', $projectId))
-                    ->exists();
-                if ($badgeExists) {
+                    ->first();
+                if ($badgeOwner && (!$existing || $badgeOwner->id !== $existing->id)) {
                     $results['skipped']++;
-                    $results['skipped_list'][] = "{$nama} (Badge: {$idBadge} sudah ada)";
+                    $results['skipped_list'][] = "{$nama} (Badge: {$idBadge} sudah dipakai karyawan lain)";
                     continue;
                 }
             }
@@ -199,28 +244,39 @@ class EmployeeImportController extends Controller
                 }
             }
 
-            // Build data array
+            if ($existing) {
+                // ── UPDATE: cuma kolom yang benar-benar diisi di baris ini yang ikut ditimpa ──
+                $updateData = $this->buildUpdateData($row, $colMap, $stringFields);
+                $updateData += $this->buildUpdateDateData($row, $colMap, $dateCols);
+                if ($nama !== $existing->nama_lengkap) $updateData['nama_lengkap'] = $nama;
+                if (!empty($idBadge)) $updateData['id_badge'] = $idBadge;
+                if ($statusRaw !== '' && in_array($statusNorm, ['AKTIF', 'NONAKTIF'])) $updateData['status'] = $statusNorm;
+                if ($jabatan) $updateData['position_id'] = $positionId;
+
+                if (empty($updateData)) {
+                    $results['skipped']++;
+                    $results['skipped_list'][] = "{$nama} (NIK: {$noKtp} — tidak ada perubahan)";
+                    continue;
+                }
+
+                try {
+                    $existing->update($updateData);
+                    $results['updated']++;
+                } catch (\Exception $e) {
+                    $results['errors'][] = "Baris {$rowNum}: " . self::friendlyError($e, $nama);
+                }
+                continue;
+            }
+
+            // ── BARU: karyawan dengan NIK ini belum ada, buat baris baru ──
             $data = [
                 'nama_lengkap' => $nama,
                 'no_ktp'       => $noKtp,
                 'id_badge'     => $idBadge ?: null,
-                'status'       => in_array($status, ['AKTIF', 'NONAKTIF']) ? $status : 'AKTIF',
+                'status'       => in_array($statusNorm, ['AKTIF', 'NONAKTIF']) ? $statusNorm : 'AKTIF',
                 'position_id'  => $positionId,
                 'project_id'   => $projectId,
             ];
-
-            // Field string biasa
-            $stringFields = [
-                'nama_ibu', 'no_telepon', 'tempat_lahir', 'kota_asal',
-                'alamat', 'agama', 'tamatan', 'ptkp', 'ccpm', 'group',
-                'rfid', 'status_kp', 'type_sim', 'no_sim', 'sim_kota_keluar',
-                'sio_k3', 'no_sio', 'tipe_sio', 'nama_perusahaan_sio',
-                'status_mcu', 'lokasi_mcu', 'derajat_kesehatan',
-                'ukuran_baju', 'ukuran_sepatu', 'no_contract', 'no_bpjs',
-                'no_rekening',
-            ];
-
-            $nullValues = ['-', '—', 'n/a', 'null', 'NULL', ''];
 
             foreach ($stringFields as $field) {
                 if (!isset($colMap[$field])) continue;
@@ -230,7 +286,6 @@ class EmployeeImportController extends Controller
                     : ($val ?: null);
             }
 
-            // Field tanggal
             foreach ($dateCols as $field) {
                 if (!isset($colMap[$field])) continue;
                 $val        = $row[$colMap[$field]] ?? null;
@@ -245,8 +300,8 @@ class EmployeeImportController extends Controller
             }
         }
 
-        if ($results['imported'] > 0) {
-            ActivityLog::record('import', 'Data Karyawan', 'Import Excel', "Import karyawan: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
+        if ($results['imported'] > 0 || $results['updated'] > 0) {
+            ActivityLog::record('import', 'Data Karyawan', 'Import Excel', "Import karyawan: {$results['imported']} baru, {$results['updated']} diupdate, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
         }
 
         return redirect()->back()->with('import_result', $results);
@@ -294,24 +349,44 @@ class EmployeeImportController extends Controller
         ];
 
         $dateCols = ['tanggal_lahir', 'tanggal_masuk', 'start_pkwt', 'end_pkwt'];
+        $stringFields = ['no_telepon', 'tempat_lahir', 'alamat', 'agama', 'ptkp', 'no_contract', 'no_rekening'];
+        $hoFields = [
+            'unit', 'nik_ho', 'status_karyawan', 'nama_ktp', 'no_kk', 'rt_rw',
+            'kelurahan', 'kecamatan', 'propinsi', 'npwp', 'email', 'lokasi_kerja',
+        ];
+        $nullValues = ['-', '—', 'n/a', 'null', 'NULL', ''];
 
         $positions = Position::pluck('id', 'nama_jabatan');
 
         $results = [
             'imported'     => 0,
+            'updated'      => 0,
             'skipped'      => 0,
             'errors'       => [],
             'skipped_list' => [],
         ];
+
+        // Agama/PTKP/Unit/Status Karyawan cuma boleh salah satu dari daftar resmi — kalau isi
+        // Excel-nya tidak cocok, jangan sampai dipakai (biar tidak ada data "nyasar" yang tidak
+        // terbaca fitur lain). $forCreate=true → nilai tidak valid diganti null (perilaku lama).
+        // $forCreate=false (mode update) → nilai tidak valid cuma dilewati, tidak menimpa data lama.
+        $normalizeChoice = function (?string $val, array $valid, bool $caseInsensitive = false) {
+            if ($val === null || $val === '') return [false, null];
+            $match = $caseInsensitive
+                ? collect($valid)->first(fn ($o) => strcasecmp($o, $val) === 0)
+                : (in_array(strtoupper($val), $valid) ? strtoupper($val) : null);
+            return $match !== null ? [true, $match] : [false, null];
+        };
 
         $rowNum = 4;
         foreach ($rows as $rowIndex => $row) {
             $rowNum++;
             if ($rowIndex < 5) continue;
 
-            $nama   = trim($row[$colMap['nama_lengkap']] ?? '');
-            $noKtp  = trim($row[$colMap['no_ktp']] ?? '');
-            $status = strtoupper(trim($row[$colMap['status']] ?? 'AKTIF'));
+            $nama       = trim($row[$colMap['nama_lengkap']] ?? '');
+            $noKtp      = trim($row[$colMap['no_ktp']] ?? '');
+            $statusRaw  = trim($row[$colMap['status']] ?? '');
+            $statusNorm = strtoupper($statusRaw ?: 'AKTIF');
 
             if (empty($nama) && empty($noKtp)) continue;
 
@@ -324,12 +399,8 @@ class EmployeeImportController extends Controller
                 continue;
             }
 
-            $nikExists = Employee::where('no_ktp', $noKtp)->where('project_id', $pid)->exists();
-            if ($nikExists) {
-                $results['skipped']++;
-                $results['skipped_list'][] = "{$nama} (NIK: {$noKtp} sudah ada)";
-                continue;
-            }
+            // NIK yang sama = karyawan yang sama → update kolom yang berubah saja.
+            $existing = Employee::where('no_ktp', $noKtp)->where('project_id', $pid)->first();
 
             $jabatan    = trim($row[$colMap['jabatan']] ?? '');
             $positionId = null;
@@ -343,16 +414,57 @@ class EmployeeImportController extends Controller
                 }
             }
 
+            if ($existing) {
+                // ── UPDATE: cuma kolom yang benar-benar diisi di baris ini yang ikut ditimpa ──
+                $updateData = $this->buildUpdateData($row, $colMap, $stringFields);
+                $updateData += $this->buildUpdateDateData($row, $colMap, $dateCols);
+                if ($nama !== $existing->nama_lengkap) $updateData['nama_lengkap'] = $nama;
+                if ($statusRaw !== '' && in_array($statusNorm, ['AKTIF', 'NONAKTIF'])) $updateData['status'] = $statusNorm;
+                if ($jabatan) $updateData['position_id'] = $positionId;
+
+                if (isset($updateData['agama'])) {
+                    [$ok, $val] = $normalizeChoice($updateData['agama'], ['Islam', 'Kristen Protestan', 'Kristen Katolik', 'Hindu', 'Buddha', 'Konghucu'], true);
+                    if ($ok) $updateData['agama'] = $val; else unset($updateData['agama']);
+                }
+                if (isset($updateData['ptkp'])) {
+                    [$ok, $val] = $normalizeChoice($updateData['ptkp'], ['TK/0', 'TK/1', 'TK/2', 'TK/3', 'K/0', 'K/1', 'K/2', 'K/3']);
+                    if ($ok) $updateData['ptkp'] = $val; else unset($updateData['ptkp']);
+                }
+
+                $hoUpdateData = $this->buildUpdateData($row, $colMap, $hoFields);
+                if (isset($hoUpdateData['unit'])) {
+                    [$ok, $val] = $normalizeChoice($hoUpdateData['unit'], ['HO-1', 'HO-2']);
+                    if ($ok) $hoUpdateData['unit'] = $val; else unset($hoUpdateData['unit']);
+                }
+                if (isset($hoUpdateData['status_karyawan'])) {
+                    [$ok, $val] = $normalizeChoice($hoUpdateData['status_karyawan'], ['PKWT', 'PKWTT']);
+                    if ($ok) $hoUpdateData['status_karyawan'] = $val; else unset($hoUpdateData['status_karyawan']);
+                }
+
+                if (empty($updateData) && empty($hoUpdateData)) {
+                    $results['skipped']++;
+                    $results['skipped_list'][] = "{$nama} (NIK: {$noKtp} — tidak ada perubahan)";
+                    continue;
+                }
+
+                try {
+                    if (!empty($updateData)) $existing->update($updateData);
+                    if (!empty($hoUpdateData)) EmployeeHoDetail::updateOrCreate(['employee_id' => $existing->id], $hoUpdateData);
+                    $results['updated']++;
+                } catch (\Exception $e) {
+                    $results['errors'][] = "Baris {$rowNum}: " . self::friendlyError($e, $nama);
+                }
+                continue;
+            }
+
+            // ── BARU: karyawan dengan NIK ini belum ada, buat baris baru ──
             $data = [
                 'nama_lengkap' => $nama,
                 'no_ktp'       => $noKtp,
-                'status'       => in_array($status, ['AKTIF', 'NONAKTIF']) ? $status : 'AKTIF',
+                'status'       => in_array($statusNorm, ['AKTIF', 'NONAKTIF']) ? $statusNorm : 'AKTIF',
                 'position_id'  => $positionId,
                 'project_id'   => $pid,
             ];
-
-            $stringFields = ['no_telepon', 'tempat_lahir', 'alamat', 'agama', 'ptkp', 'no_contract', 'no_rekening'];
-            $nullValues   = ['-', '—', 'n/a', 'null', 'NULL', ''];
 
             foreach ($stringFields as $field) {
                 $val          = trim($row[$colMap[$field]] ?? '');
@@ -361,17 +473,13 @@ class EmployeeImportController extends Controller
                     : ($val ?: null);
             }
 
-            // Agama & PTKP di form web berupa dropdown tetap — kalau isi Excel tidak cocok
-            // (mis. salah ketik atau nilai yang sistem tidak kenal), jangan ikut masuk DB
-            // supaya tidak ada data "nyasar" yang tidak terbaca fitur lain.
             if (!empty($data['agama'])) {
-                $agamaMatch = collect(['Islam', 'Kristen Protestan', 'Kristen Katolik', 'Hindu', 'Buddha', 'Konghucu'])
-                    ->first(fn ($o) => strcasecmp($o, $data['agama']) === 0);
-                $data['agama'] = $agamaMatch ?: null;
+                [, $val] = $normalizeChoice($data['agama'], ['Islam', 'Kristen Protestan', 'Kristen Katolik', 'Hindu', 'Buddha', 'Konghucu'], true);
+                $data['agama'] = $val;
             }
             if (!empty($data['ptkp'])) {
-                $ptkp = strtoupper($data['ptkp']);
-                $data['ptkp'] = in_array($ptkp, ['TK/0', 'TK/1', 'TK/2', 'TK/3', 'K/0', 'K/1', 'K/2', 'K/3']) ? $ptkp : null;
+                [, $val] = $normalizeChoice($data['ptkp'], ['TK/0', 'TK/1', 'TK/2', 'TK/3', 'K/0', 'K/1', 'K/2', 'K/3']);
+                $data['ptkp'] = $val;
             }
 
             foreach ($dateCols as $field) {
@@ -379,10 +487,6 @@ class EmployeeImportController extends Controller
                 $data[$field] = self::parseDate($val);
             }
 
-            $hoFields = [
-                'unit', 'nik_ho', 'status_karyawan', 'nama_ktp', 'no_kk', 'rt_rw',
-                'kelurahan', 'kecamatan', 'propinsi', 'npwp', 'email', 'lokasi_kerja',
-            ];
             $hoData = [];
             foreach ($hoFields as $field) {
                 $val = trim($row[$colMap[$field]] ?? '');
@@ -390,15 +494,13 @@ class EmployeeImportController extends Controller
                     ? null
                     : ($val ?: null);
             }
-            if (!empty($hoData['unit']) && !in_array(strtoupper($hoData['unit']), ['HO-1', 'HO-2'])) {
-                $hoData['unit'] = null;
-            } elseif (!empty($hoData['unit'])) {
-                $hoData['unit'] = strtoupper($hoData['unit']);
+            if (!empty($hoData['unit'])) {
+                [, $val] = $normalizeChoice($hoData['unit'], ['HO-1', 'HO-2']);
+                $hoData['unit'] = $val;
             }
-            if (!empty($hoData['status_karyawan']) && !in_array(strtoupper($hoData['status_karyawan']), ['PKWT', 'PKWTT'])) {
-                $hoData['status_karyawan'] = null;
-            } elseif (!empty($hoData['status_karyawan'])) {
-                $hoData['status_karyawan'] = strtoupper($hoData['status_karyawan']);
+            if (!empty($hoData['status_karyawan'])) {
+                [, $val] = $normalizeChoice($hoData['status_karyawan'], ['PKWT', 'PKWTT']);
+                $hoData['status_karyawan'] = $val;
             }
 
             try {
@@ -412,8 +514,8 @@ class EmployeeImportController extends Controller
             }
         }
 
-        if ($results['imported'] > 0) {
-            ActivityLog::record('import', 'Data Karyawan', 'Import Excel (HO)', "Import karyawan HO: {$results['imported']} berhasil, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
+        if ($results['imported'] > 0 || $results['updated'] > 0) {
+            ActivityLog::record('import', 'Data Karyawan', 'Import Excel (HO)', "Import karyawan HO: {$results['imported']} baru, {$results['updated']} diupdate, {$results['skipped']} di-skip, " . count($results['errors']) . ' error');
         }
 
         return redirect()->back()->with('import_result', $results);
