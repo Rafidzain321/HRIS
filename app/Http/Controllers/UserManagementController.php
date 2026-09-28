@@ -77,11 +77,14 @@ class UserManagementController extends Controller
                 'employees_count' => $p->employees_count,
             ]);
 
-        $client_projects = \App\Models\ClientProject::orderBy('kode')
+        $client_projects = \App\Models\ClientProject::with('kantor:id,nama')->orderBy('kode')
             ->withCount('employees')->get()
             ->map(fn($cp) => [
                 'id'              => $cp->id,
                 'kode'            => $cp->kode,
+                'project_id'      => $cp->project_id,
+                'kantor_nama'     => $cp->kantor?->nama,
+                'is_active'       => $cp->is_active,
                 'employees_count' => $cp->employees_count,
             ]);
 

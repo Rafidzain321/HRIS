@@ -830,12 +830,17 @@ function SidebarContent({ url, authUser, onLogout }) {
 
       <nav style={{ flex:1, padding:'12px 8px', display:'flex', flexDirection:'column', gap:2, overflowY:'auto' }}>
         {navItems.map((item, i) => {
+          // Aktif kalau URL diawali href-nya, kecuali ada menu lain dengan href lebih spesifik yang juga cocok
+          // (mis. /timesheet/slip-gaji tidak ikut menyalakan menu Timesheet).
+          const matches = h => h && (url === h || (h !== '/' && url.startsWith(h)));
+          const isActive = (matches(item.href) && !navItems.some(o => o.href && o.href.length > item.href.length && o.href.startsWith(item.href) && matches(o.href)))
+            || (item.key === 'cuti' && url.startsWith('/kehadiran'));
 
           return item.section ? (
             <div key={i} style={{fontSize:9.5,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.1em',fontWeight:600,padding:'10px 8px 4px'}}>{item.section}</div>
           ) : (
             <Link key={item.key} href={item.href}
-              className={`nav-item ${url===item.href||(item.href!=='/'&&url.startsWith(item.href))||(item.key==='cuti'&&url.startsWith('/kehadiran'))?'active':''}`}>
+              className={`nav-item ${isActive?'active':''}`}>
               <span style={{width:18,display:'flex',justifyContent:'center',flexShrink:0}}><item.icon size={15}/></span>
               {item.label}
               {item.badge && <span style={{marginLeft:'auto',background:'var(--red)',color:'#fff',fontSize:9.5,fontWeight:700,borderRadius:99,padding:'1px 6px'}}>{item.badge}</span>}

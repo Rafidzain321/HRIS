@@ -149,7 +149,14 @@ class EmployeeController extends Controller
         }
 
         $jabatan_list = Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']);
-        $client_project_list = \App\Models\ClientProject::orderBy('kode')->get(['id', 'kode']);
+        // Dropdown filter: project milik kantor yang sedang dibuka (diatur di Pengaturan > Data Project),
+        // plus project lain yang kebetulan dipegang karyawan kantor ini.
+        $client_project_list = \App\Models\ClientProject::orderBy('kode')
+            ->withCount(['employees' => fn($q) => $q->where('status', 'AKTIF')->when($pid, fn($q2) => $q2->where('project_id', $pid))])
+            ->get(['id', 'kode', 'project_id', 'is_active'])
+            ->filter(fn($cp) => !$pid || $cp->project_id == $pid || $cp->employees_count > 0 || (string) $cp->id === (string) $clientProjectId)
+            ->map(fn($cp) => ['id' => $cp->id, 'kode' => $cp->kode, 'jumlah' => $cp->employees_count, 'is_active' => $cp->is_active])
+            ->values();
         return Inertia::render('Employee/Index', [
             'employees'    => $employees,
             'terminated'   => $terminated,
@@ -296,7 +303,14 @@ class EmployeeController extends Controller
             ]),
             'positions' => \App\Models\Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']),
             'departments' => \App\Models\Department::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
-            'client_project_list' => \App\Models\ClientProject::orderBy('kode')->get(['id', 'kode']),
+            // Pilihan = project AKTIF milik kantor karyawan ini, plus project yang sudah terpasang
+            // (walau sudah nonaktif/pindah kantor) supaya tidak hilang diam-diam saat disimpan.
+            'client_project_list' => \App\Models\ClientProject::orderBy('kode')
+                ->where(fn($q) => $q
+                    ->where(fn($q2) => $q2->where('project_id', $employee->project_id)->where('is_active', true))
+                    ->orWhereIn('id', $employee->clientProjects->pluck('id')))
+                ->get(['id', 'kode', 'is_active']),
+            'can_manage_client_project' => $this->isAdminSettings(),
             'project_info' => $projectInfo,
             // Riwayat gaji mentah hasil import HO — arsip referensi, cuma relevan untuk karyawan HO.
             // Data gaji sensitif, jadi cuma dikirim ke frontend kalau yang buka super-admin —

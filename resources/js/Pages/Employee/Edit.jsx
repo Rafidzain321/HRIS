@@ -442,7 +442,7 @@ function RiwayatGajiSection({ items = [] }) {
 }
 
 // ── MAIN COMPONENT ──
-export default function EmployeeEdit({ employee, positions = [], departments = [], client_project_list = [], project_info = null, salary_history = [] }) {
+export default function EmployeeEdit({ employee, positions = [], departments = [], client_project_list = [], can_manage_client_project = false, project_info = null, salary_history = [] }) {
   const isHo = project_info?.tipe_gaji === 'ho';
   const { data, setData, put, processing, isDirty } = useForm({
     id_badge:             employee.id_badge             || '',
@@ -636,8 +636,11 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                 </select>
               </Field>
               <div style={{ marginBottom:16, gridColumn:'1 / -1' }}>
-                <label>Data Project (project riil yang dipegang, bisa lebih dari satu)</label>
-                <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:6}}>
+                <label>Project yang Dipegang</label>
+                <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>
+                  Klik project tempat karyawan ini bekerja (boleh lebih dari satu). Pilihan di bawah adalah project aktif milik kantor <b>{project_info?.nama || '-'}</b>{can_manage_client_project ? ', diatur di Pengaturan → Data Project' : ', diatur oleh HR/admin'}. Dipakai untuk filter & export per project di Data Karyawan.
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>
                   {client_project_list.map(cp=>{
                     const active = data.client_project_ids.includes(cp.id);
                     return (
@@ -652,12 +655,17 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                           background: active ? 'rgba(232,160,32,.14)' : 'var(--bg3)',
                           color: active ? 'var(--accent)' : 'var(--muted)',
                         }}>
-                        {cp.kode}
+                        {active && '✓ '}{cp.kode}{!cp.is_active && ' (nonaktif)'}
                       </button>
                     );
                   })}
                   {client_project_list.length===0 && (
-                    <span style={{fontSize:11.5,color:'var(--muted)'}}>Belum ada data project. Tambahkan dulu di menu Pengaturan.</span>
+                    <span style={{fontSize:11.5,color:'var(--muted)'}}>
+                      Kantor {project_info?.nama || 'ini'} belum punya project aktif.{' '}
+                      {can_manage_client_project
+                        ? <>Hubungkan project ke kantor ini dulu di <Link href="/pengaturan" style={{color:'var(--accent)',fontWeight:600}}>Pengaturan → Data Project</Link>.</>
+                        : 'Minta HR/admin menghubungkan project ke kantor ini.'}
+                    </span>
                   )}
                 </div>
               </div>

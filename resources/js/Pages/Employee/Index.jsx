@@ -1114,7 +1114,7 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
             </select>
             <select value={clientProjectVal} onChange={e=>{setClientProjectVal(e.target.value);doFilter(searchVal,jabatanVal,e.target.value);}}>
               <option value="">Semua Data Project</option>
-              {client_project_list.map(cp=><option key={cp.id} value={cp.id}>{cp.kode}</option>)}
+              {client_project_list.map(cp=><option key={cp.id} value={cp.id}>{cp.kode} ({cp.jumlah} org){!cp.is_active && ' - nonaktif'}</option>)}
             </select>
             <button type="button" onClick={()=>setShowPicker(true)} style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Settings size={13}/> Kolom</button>
             {!isViewer && <button type="button" onClick={()=>setShowAdd(true)} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><Plus size={13}/> Tambah</button>}

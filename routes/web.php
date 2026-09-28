@@ -180,6 +180,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/pengaturan/client-projects', [ClientProjectController::class, 'store'])->name('client-projects.store');
     Route::put('/pengaturan/client-projects/{clientProject}', [ClientProjectController::class, 'update'])->name('client-projects.update');
+    Route::put('/pengaturan/client-projects/{clientProject}/toggle', [ClientProjectController::class, 'toggleActive'])->name('client-projects.toggle');
+    Route::put('/pengaturan/kantor/{project}/client-projects', [ClientProjectController::class, 'syncKantor'])->name('client-projects.sync-kantor');
     Route::delete('/pengaturan/client-projects/{clientProject}', [ClientProjectController::class, 'destroy'])->name('client-projects.destroy');
 
     Route::post('/pengaturan/projects', [ProjectController::class, 'store'])->name('projects.store');

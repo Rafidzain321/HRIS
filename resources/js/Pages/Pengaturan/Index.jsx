@@ -442,19 +442,100 @@ function JabatanModal({ mode, position, onClose }) {
 }
 
 // ── MODAL DATA PROJECT (project riil, mis. "AKM-PP" — beda dari kantor) ──
-function ClientProjectModal({ mode, clientProject, onClose }) {
+// "Edit Kantor → Pilih Project": pilih banyak project sekaligus untuk satu kantor.
+function KantorProjectModal({ kantor, clientProjects=[], onClose }) {
+  const [selected, setSelected] = useState(clientProjects.filter(p=>p.project_id===kantor.id).map(p=>p.id));
+  const [search,   setSearch]   = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const toggle = id => setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
+  const list = clientProjects.filter(p => !search || p.kode.toLowerCase().includes(search.toLowerCase()));
+  const pindahan = clientProjects.filter(p => selected.includes(p.id) && p.project_id && p.project_id!==kantor.id);
+  function save() {
+    setLoading(true);
+    router.put(`/pengaturan/kantor/${kantor.id}/client-projects`, {client_project_ids:selected}, {
+      preserveScroll:true,
+      onSuccess:()=>{ setLoading(false); onClose(); },
+      onError:()=>setLoading(false),
+    });
+  }
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(560px, calc(100vw - 24px))',maxHeight:'88vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Building2 size={15}/> Edit Kantor — Pilih Project</div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
+        </div>
+        <div style={{padding:'16px 20px',overflowY:'auto'}}>
+          <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Nama Kantor</label>
+          <input style={{...INP,opacity:.8}} value={kantor.nama} readOnly />
+          <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,marginTop:14,display:'block'}}>Pilih Project ({selected.length} dipilih)</label>
+          <div style={{border:'1px solid var(--border)',borderRadius:8,background:'var(--bg3)',padding:6}}>
+            <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:selected.length?6:0}}>
+              {clientProjects.filter(p=>selected.includes(p.id)).map(p=>(
+                <span key={p.id} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:11.5,fontWeight:600,padding:'3px 6px 3px 9px',borderRadius:99,background:'rgba(232,160,32,.14)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.35)'}}>
+                  {p.kode}<span onClick={()=>toggle(p.id)} style={{cursor:'pointer',display:'flex'}}><X size={12}/></span>
+                </span>
+              ))}
+            </div>
+            <div style={{position:'relative'}}>
+              <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={13}/></span>
+              <input autoFocus value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ketik untuk cari project..."
+                style={{...INP,paddingLeft:28,background:'var(--bg2)'}} />
+            </div>
+            <div style={{maxHeight:260,overflowY:'auto',marginTop:6}}>
+              {list.map(p=>{
+                const on = selected.includes(p.id);
+                const milikLain = p.project_id && p.project_id!==kantor.id;
+                return (
+                  <div key={p.id} onClick={()=>toggle(p.id)}
+                    style={{display:'flex',alignItems:'center',gap:8,padding:'7px 8px',borderRadius:6,cursor:'pointer',fontSize:12.5,
+                      background:on?'rgba(232,160,32,.1)':'transparent'}}>
+                    <span style={{width:15,height:15,borderRadius:4,border:`1.5px solid ${on?'var(--accent)':'var(--border2)'}`,background:on?'var(--accent)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      {on && <Check size={11} color="#0C0F14"/>}
+                    </span>
+                    <span style={{fontWeight:on?600:400,opacity:p.is_active?1:.55}}>{p.kode}</span>
+                    {!p.is_active && <span style={{fontSize:10,color:'var(--muted)'}}>(nonaktif)</span>}
+                    {milikLain && <span style={{marginLeft:'auto',fontSize:10.5,color:'var(--muted)'}}>saat ini: {p.kantor_nama}</span>}
+                  </div>
+                );
+              })}
+              {list.length===0 && <div style={{padding:12,textAlign:'center',fontSize:12,color:'var(--muted)'}}>Tidak ada project yang cocok. Tambah project baru lewat tombol "Tambah Project".</div>}
+            </div>
+          </div>
+          {pindahan.length>0 && (
+            <div style={{display:'flex',gap:6,alignItems:'flex-start',fontSize:11,color:'var(--accent)',marginTop:10}}>
+              <TriangleAlert size={13} style={{flexShrink:0,marginTop:1}}/>
+              <span>{pindahan.map(p=>`${p.kode} (dari ${p.kantor_nama})`).join(', ')} akan dipindah ke kantor {kantor.nama}.</span>
+            </div>
+          )}
+        </div>
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
+          <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
+          <button type="button" onClick={save} disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1,display:'flex',alignItems:'center',gap:6}}>
+            {loading?<Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>:<Save size={14}/>} Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientProjectModal({ mode, clientProject, kantorList=[], defaultKantor='', onClose }) {
   const [kode,    setKode]    = useState(clientProject?.kode||'');
+  const [kantor,  setKantor]  = useState(String(clientProject?.project_id || defaultKantor || ''));
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
   function submit(e) {
     e.preventDefault();
     if (!kode.trim()) { setError('Kode project wajib diisi.'); return; }
+    if (!kantor) { setError('Kantor wajib dipilih.'); return; }
     setLoading(true); setError('');
     const url    = mode==='add'?'/pengaturan/client-projects':`/pengaturan/client-projects/${clientProject.id}`;
     const method = mode==='add'?'post':'put';
-    router[method](url, {kode}, {
+    router[method](url, {kode, project_id:kantor}, {
       onSuccess:()=>{ setLoading(false); onClose(); },
-      onError:(err)=>{ setLoading(false); setError(err.kode||'Gagal menyimpan.'); },
+      onError:(err)=>{ setLoading(false); setError(err.kode||err.project_id||'Gagal menyimpan.'); },
     });
   }
   return (
@@ -472,6 +553,11 @@ function ClientProjectModal({ mode, clientProject, onClose }) {
             <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Kode Project *</label>
             <input type="text" style={{...INP,borderColor:error?'#E04545':'var(--border)'}}
               value={kode} onChange={e=>setKode(e.target.value)} placeholder="cth: AKM-PP" autoFocus />
+            <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,marginTop:12,display:'block'}}>Kantor *</label>
+            <select style={INP} value={kantor} onChange={e=>setKantor(e.target.value)}>
+              <option value="">— Pilih Kantor —</option>
+              {kantorList.map(k=><option key={k.id} value={k.id}>{k.nama}</option>)}
+            </select>
             {error&&<div style={{display:'flex',alignItems:'center',gap:4,fontSize:10.5,color:'#E04545',marginTop:4}}><TriangleAlert size={12}/>{error}</div>}
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
@@ -600,6 +686,8 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
   const [jabatanSearch,  setJabatanSearch]  = useState('');
   const [clientProjectModal,  setClientProjectModal]  = useState(null);
   const [clientProjectSearch, setClientProjectSearch] = useState('');
+  const [clientProjectKantor, setClientProjectKantor] = useState('');
+  const [kantorProjectModal,  setKantorProjectModal]  = useState(null);
   const [userSearch,     setUserSearch]     = useState('');
   const [projectModal,   setProjectModal]   = useState(null);
   const [confirmModal,   setConfirmModal]   = useState(null);
@@ -737,8 +825,10 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
   );
 
   const filteredClientProjects = client_projects.filter(p =>
-    !clientProjectSearch || p.kode.toLowerCase().includes(clientProjectSearch.toLowerCase())
+    (!clientProjectSearch || p.kode.toLowerCase().includes(clientProjectSearch.toLowerCase())) &&
+    (!clientProjectKantor || (clientProjectKantor==='none' ? !p.project_id : String(p.project_id)===clientProjectKantor))
   );
+  const projectTanpaKantor = client_projects.filter(p => !p.project_id);
 
   const filteredUsers = users.filter(u => {
     const q = userSearch.trim().toLowerCase();
@@ -1104,15 +1194,70 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
 
       {activeTab==='client-project'&&(
         <>
-          {clientProjectModal&&<ClientProjectModal mode={clientProjectModal.mode} clientProject={clientProjectModal.clientProject} onClose={()=>setClientProjectModal(null)}/>}
+          {clientProjectModal&&<ClientProjectModal mode={clientProjectModal.mode} clientProject={clientProjectModal.clientProject} kantorList={projects} defaultKantor={clientProjectKantor!=='none'?clientProjectKantor:''} onClose={()=>setClientProjectModal(null)}/>}
           <div className="panel">
             <div className="panel-head">
               <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><FolderKanban size={14}/> Daftar Project</div>
               {!isViewer && <button onClick={()=>setClientProjectModal({mode:'add'})} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah Project</button>}
             </div>
             <div style={{padding:'14px 16px'}}>
-              <div style={{fontSize:11,color:'var(--muted)',marginBottom:10}}>
-                Project riil (kode kontrak/pekerjaan) yang dipegang karyawan — beda dari "Project" di tab lain yang sebenarnya kantor/entitas payroll. Satu karyawan bisa pegang beberapa project sekaligus, diatur lewat form Tambah/Edit Karyawan.
+              <div style={{fontSize:11,color:'var(--muted)',marginBottom:12,padding:'8px 12px',background:'var(--bg3)',borderRadius:8,lineHeight:1.5}}>
+                <b>Kantor</b> (Giam, Khawista, Purnama, MD, dst) bisa punya banyak <b>project</b> (AKM-BKP, AKM-WUR EW, dst). Hubungkan tiap project ke kantornya di sini — nanti di Edit Karyawan cuma muncul project <b>aktif</b> milik kantor karyawan tersebut. Project yang sudah selesai cukup dinonaktifkan (data karyawan yang pernah memegangnya tetap tersimpan).
+              </div>
+              {kantorProjectModal && <KantorProjectModal kantor={kantorProjectModal} clientProjects={client_projects} onClose={()=>setKantorProjectModal(null)}/>}
+              <div style={{fontSize:11,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><Building2 size={12}/> Project per Kantor</div>
+              <div style={{border:'1px solid var(--border)',borderRadius:10,overflow:'hidden',marginBottom:20}}>
+                {projects.map((k,i)=>{
+                  const list = client_projects.filter(p=>p.project_id===k.id);
+                  return (
+                    <div key={k.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderTop:i?'1px solid var(--border)':'none',flexWrap:'wrap'}}>
+                      <div style={{width:180,flexShrink:0}}>
+                        <div style={{fontSize:12.5,fontWeight:700}}>{k.nama}</div>
+                        <div style={{fontSize:10.5,color:'var(--muted)'}}>{list.length} project · {list.filter(p=>p.is_active).length} aktif</div>
+                      </div>
+                      <div style={{flex:1,display:'flex',flexWrap:'wrap',gap:5,minWidth:200}}>
+                        {list.map(p=>(
+                          <span key={p.id} title={p.is_active?'Aktif':'Nonaktif'} style={{fontSize:11,fontWeight:600,padding:'2px 9px',borderRadius:99,
+                            background:p.is_active?'rgba(232,160,32,.12)':'var(--bg3)',color:p.is_active?'var(--accent)':'var(--muted)',
+                            textDecoration:p.is_active?'none':'line-through'}}>{p.kode}</span>
+                        ))}
+                        {list.length===0 && <span style={{fontSize:11.5,color:'var(--muted)'}}>Belum ada project</span>}
+                      </div>
+                      <div style={{display:'flex',gap:6}}>
+                        <button onClick={()=>setClientProjectKantor(clientProjectKantor===String(k.id)?'':String(k.id))}
+                          style={{padding:'5px 10px',borderRadius:7,fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
+                            border:`1px solid ${clientProjectKantor===String(k.id)?'var(--accent)':'var(--border)'}`,
+                            background:clientProjectKantor===String(k.id)?'rgba(232,160,32,.12)':'var(--bg3)',
+                            color:clientProjectKantor===String(k.id)?'var(--accent)':'var(--muted2)'}}>
+                          <Eye size={12} style={{verticalAlign:'-2px'}}/> Lihat
+                        </button>
+                        {!isViewer && <button onClick={()=>setKantorProjectModal(k)}
+                          style={{padding:'5px 12px',borderRadius:7,fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",border:'1px solid rgba(232,160,32,.35)',background:'rgba(232,160,32,.1)',color:'var(--accent)',display:'flex',alignItems:'center',gap:5}}>
+                          <Pencil size={12}/> Atur Project
+                        </button>}
+                      </div>
+                    </div>
+                  );
+                })}
+                {projectTanpaKantor.length>0 && (
+                  <div style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderTop:'1px solid var(--border)',background:'rgba(224,69,69,.04)',flexWrap:'wrap'}}>
+                    <div style={{width:180,flexShrink:0}}>
+                      <div style={{fontSize:12.5,fontWeight:700,color:'#E04545',display:'flex',alignItems:'center',gap:5}}><TriangleAlert size={13}/> Belum ada kantor</div>
+                      <div style={{fontSize:10.5,color:'var(--muted)'}}>{projectTanpaKantor.length} project</div>
+                    </div>
+                    <div style={{flex:1,fontSize:11.5,color:'var(--muted)',minWidth:200}}>{projectTanpaKantor.map(p=>p.kode).join(', ')}</div>
+                    <button onClick={()=>setClientProjectKantor(clientProjectKantor==='none'?'':'none')}
+                      style={{padding:'5px 10px',borderRadius:7,fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)'}}>
+                      <Eye size={12} style={{verticalAlign:'-2px'}}/> Lihat
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+                <FolderKanban size={12}/> Semua Project
+                {clientProjectKantor && <span onClick={()=>setClientProjectKantor('')} style={{textTransform:'none',letterSpacing:0,fontWeight:600,fontSize:11,color:'var(--muted2)',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:3,marginLeft:6,padding:'1px 8px',borderRadius:99,background:'var(--bg3)'}}>
+                  filter: {clientProjectKantor==='none'?'Belum ada kantor':projects.find(k=>String(k.id)===clientProjectKantor)?.nama} <X size={11}/>
+                </span>}
               </div>
               <div style={{position:'relative',marginBottom:14,maxWidth:320}}>
                 <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',display:'flex'}}><Search size={14}/></span>
@@ -1122,15 +1267,29 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
               </div>
               <div style={{overflowX:'auto'}}>
               <table className="kar-table">
-                <thead><tr><th>Kode Project</th><th style={{textAlign:'center'}}>Jumlah Karyawan</th><th style={{textAlign:'center'}}>Aksi</th></tr></thead>
+                <thead><tr><th>Kode Project</th><th>Kantor</th><th style={{textAlign:'center'}}>Jumlah Karyawan</th><th style={{textAlign:'center'}}>Status</th><th style={{textAlign:'center'}}>Aksi</th></tr></thead>
                 <tbody>
                   {filteredClientProjects.map((p,i)=>(
                     <tr key={i}
                       onMouseEnter={ev=>Array.from(ev.currentTarget.cells).forEach(c=>c.style.background='rgba(232,160,32,.04)')}
                       onMouseLeave={ev=>Array.from(ev.currentTarget.cells).forEach(c=>c.style.background='')}>
-                      <td style={{fontWeight:500}}>{p.kode}</td>
+                      <td style={{fontWeight:500,opacity:p.is_active?1:.55}}>{p.kode}</td>
+                      <td>{p.kantor_nama
+                        ? <span style={{fontSize:12}}>{p.kantor_nama}</span>
+                        : <span style={{fontSize:11,color:'#E04545',display:'inline-flex',alignItems:'center',gap:4}}><TriangleAlert size={11}/>Belum dihubungkan</span>}
+                      </td>
                       <td style={{textAlign:'center'}}>
                         <span style={{background:p.employees_count>0?'rgba(58,143,224,.1)':'var(--bg3)',color:p.employees_count>0?'var(--blue)':'var(--muted)',padding:'2px 10px',borderRadius:99,fontSize:11,fontWeight:600}}>{p.employees_count} karyawan</span>
+                      </td>
+                      <td style={{textAlign:'center'}}>
+                        <button disabled={isViewer} title={isViewer?'':p.is_active?'Klik untuk nonaktifkan':'Klik untuk aktifkan'}
+                          onClick={()=>router.put(`/pengaturan/client-projects/${p.id}/toggle`,{},{preserveScroll:true})}
+                          style={{padding:'2px 10px',borderRadius:99,fontSize:11,fontWeight:700,cursor:isViewer?'default':'pointer',fontFamily:"'Outfit',sans-serif",
+                            border:`1px solid ${p.is_active?'rgba(34,201,122,.35)':'var(--border)'}`,
+                            background:p.is_active?'rgba(34,201,122,.1)':'var(--bg3)',
+                            color:p.is_active?'#22C97A':'var(--muted)'}}>
+                          {p.is_active?'● Aktif':'○ Nonaktif'}
+                        </button>
                       </td>
                       <td>
                         <div style={{display:'flex',gap:5,justifyContent:'center'}}>
@@ -1152,7 +1311,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                     </tr>
                   ))}
                   {filteredClientProjects.length===0&&(
-                    <tr><td colSpan={3} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>
+                    <tr><td colSpan={5} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>
                       {client_projects.length===0?'Belum ada project':'Tidak ada project yang cocok dengan pencarian'}
                     </td></tr>
                   )}
