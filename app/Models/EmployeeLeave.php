@@ -75,8 +75,9 @@ class EmployeeLeave extends Model
         return $total;
     }
 
-    // "Cuti Berlebih" — kalau tahun lalu karyawan pakai cuti_tahunan melebihi jatah, kelebihannya
-    // mengurangi jatah tahun ini (dibatasi $maksBawaKeDepan supaya tidak minus tak terbatas).
+    // "Cuti Berlebih" — kalau tahun lalu karyawan pakai cuti_tahunan melebihi jatah (efektif) tahun lalu,
+    // kelebihannya mengurangi jatah tahun ini (dibatasi $maksBawaKeDepan supaya tidak minus tak terbatas).
+    // Dibandingkan ke jatah efektif (bukan 12 mentah) supaya pinjaman berturut-turut tidak "hilang".
     public static function jatahEfektif(int $employeeId, int $tahun, int $jatahTahunan, int $maksBawaKeDepan): int
     {
         $terpakaiTahunLalu = static::where('employee_id', $employeeId)
@@ -84,7 +85,10 @@ class EmployeeLeave extends Model
             ->whereYear('tanggal_mulai', $tahun - 1)
             ->sum('jumlah_hari');
 
-        $kelebihanTahunLalu = max(0, $terpakaiTahunLalu - $jatahTahunan);
+        if ($terpakaiTahunLalu == 0) return $jatahTahunan;
+
+        $jatahTahunLalu = static::jatahEfektif($employeeId, $tahun - 1, $jatahTahunan, $maksBawaKeDepan);
+        $kelebihanTahunLalu = max(0, $terpakaiTahunLalu - $jatahTahunLalu);
         $potongan = min($kelebihanTahunLalu, $maksBawaKeDepan);
 
         return $jatahTahunan - $potongan;
