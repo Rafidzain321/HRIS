@@ -47,12 +47,18 @@ class HandleInertiaRequests extends Middleware
         // Sama persis dengan logika di CheckMenuPermission middleware — dipakai frontend
         // supaya tombol Tambah/Edit/Hapus otomatis disembunyikan (bukan cuma gagal 403)
         // saat user multi-project sedang melihat project selain project asal/full-edit-nya.
+        // Kantor aktif yang di-share ke frontend dihitung sama seperti Controller::activeProjectId()
+        // (session kalau valid, kalau belum pilih -> kantor pertama/asal user) supaya penanda kantor
+        // di sidebar selalu cocok dengan data yang ditampilkan di semua halaman, bukan cuma Dashboard.
         $isProjectReadonly = false;
+        $resolvedProjectId = session('active_project_kode');
         if ($user && !$user->hasRole('super-admin') && !$user->hasRole('viewer')) {
             $projectIds = $user->project_ids ? json_decode($user->project_ids, true) : null;
             if (is_array($projectIds) && count($projectIds) > 1) {
-                $activeProjectId = session('active_project_kode') ?: ($projectIds[0] ?? null);
-                $isProjectReadonly = !in_array((int) $activeProjectId, $user->fullEditProjectIds());
+                $resolvedProjectId = ($resolvedProjectId && in_array($resolvedProjectId, $projectIds)) ? $resolvedProjectId : ($projectIds[0] ?? null);
+                $isProjectReadonly = !in_array((int) $resolvedProjectId, $user->fullEditProjectIds());
+            } else {
+                $resolvedProjectId = $user->project_id;
             }
         }
 
@@ -111,7 +117,7 @@ class HandleInertiaRequests extends Middleware
                 'error' => session('error'),
                 'import_result' => session('import_result'),
             ],
-            'active_project_id' => session('active_project_kode'),
+            'active_project_id' => $resolvedProjectId ? (int) $resolvedProjectId : null,
             'projects' => \App\Models\Project::where('is_active', true)
                 ->orderBy('nama')
                 ->get(['id', 'kode', 'nama', 'warna', 'tipe_gaji'])
