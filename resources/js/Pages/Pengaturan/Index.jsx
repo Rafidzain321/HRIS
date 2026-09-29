@@ -828,7 +828,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     (!clientProjectSearch || p.kode.toLowerCase().includes(clientProjectSearch.toLowerCase())) &&
     (!clientProjectKantor || (clientProjectKantor==='none' ? !p.project_id : String(p.project_id)===clientProjectKantor))
   );
-  const projectTanpaKantor = client_projects.filter(p => !p.project_id);
 
   const filteredUsers = users.filter(u => {
     const q = userSearch.trim().toLowerCase();
@@ -1239,19 +1238,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                     </div>
                   );
                 })}
-                {projectTanpaKantor.length>0 && (
-                  <div style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderTop:'1px solid var(--border)',background:'rgba(224,69,69,.04)',flexWrap:'wrap'}}>
-                    <div style={{width:180,flexShrink:0}}>
-                      <div style={{fontSize:12.5,fontWeight:700,color:'#E04545',display:'flex',alignItems:'center',gap:5}}><TriangleAlert size={13}/> Belum ada kantor</div>
-                      <div style={{fontSize:10.5,color:'var(--muted)'}}>{projectTanpaKantor.length} project</div>
-                    </div>
-                    <div style={{flex:1,fontSize:11.5,color:'var(--muted)',minWidth:200}}>{projectTanpaKantor.map(p=>p.kode).join(', ')}</div>
-                    <button onClick={()=>setClientProjectKantor(clientProjectKantor==='none'?'':'none')}
-                      style={{padding:'5px 10px',borderRadius:7,fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)'}}>
-                      <Eye size={12} style={{verticalAlign:'-2px'}}/> Lihat
-                    </button>
-                  </div>
-                )}
               </div>
               <div style={{fontSize:11,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
                 <FolderKanban size={12}/> Semua Project

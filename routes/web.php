@@ -220,6 +220,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/kehadiran', [EmployeeAttendanceController::class, 'index'])->middleware('menu:kehadiran,view')->name('kehadiran');
     Route::post('/kehadiran', [EmployeeAttendanceController::class, 'store'])->middleware('menu:kehadiran,edit')->name('kehadiran.store');
     Route::get('/kehadiran/semester', [EmployeeAttendanceController::class, 'semester'])->middleware('menu:kehadiran,view')->name('kehadiran.semester');
+    Route::get('/kehadiran/mesin', [\App\Http\Controllers\AttendanceScanController::class, 'data'])->middleware('menu:kehadiran,view');
+    Route::get('/kehadiran/mesin/export', [\App\Http\Controllers\AttendanceScanController::class, 'export'])->middleware('menu:kehadiran,view');
+    Route::post('/kehadiran/mesin/import', [\App\Http\Controllers\AttendanceScanController::class, 'import'])->middleware('menu:kehadiran,edit');
+    Route::get('/kehadiran/mesin/{machineUser}/detail', [\App\Http\Controllers\AttendanceScanController::class, 'detail'])->middleware('menu:kehadiran,view');
+    Route::put('/kehadiran/mesin/{machineUser}/mapping', [\App\Http\Controllers\AttendanceScanController::class, 'mapping'])->middleware('menu:kehadiran,edit');
+    Route::put('/kehadiran/mesin/{machineUser}/hari', [\App\Http\Controllers\AttendanceScanController::class, 'updateDay'])->middleware('menu:kehadiran,edit');
 
     // ── Konseling (pembinaan karyawan) — HR/super-admin atau atasan langsung saja ──
     Route::get('/konseling', [EmployeeCounselingController::class, 'index'])->middleware('menu:konseling,view')->name('konseling');
