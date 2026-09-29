@@ -437,7 +437,7 @@ class EmployeeImportController extends Controller
                     if ($ok) $hoUpdateData['unit'] = $val; else unset($hoUpdateData['unit']);
                 }
                 if (isset($hoUpdateData['status_karyawan'])) {
-                    [$ok, $val] = $normalizeChoice($hoUpdateData['status_karyawan'], ['PKWT', 'PKWTT']);
+                    [$ok, $val] = $normalizeChoice($hoUpdateData['status_karyawan'], ['PKWT', 'PKWTT', 'PROBATION']);
                     if ($ok) $hoUpdateData['status_karyawan'] = $val; else unset($hoUpdateData['status_karyawan']);
                 }
 
@@ -499,7 +499,7 @@ class EmployeeImportController extends Controller
                 $hoData['unit'] = $val;
             }
             if (!empty($hoData['status_karyawan'])) {
-                [, $val] = $normalizeChoice($hoData['status_karyawan'], ['PKWT', 'PKWTT']);
+                [, $val] = $normalizeChoice($hoData['status_karyawan'], ['PKWT', 'PKWTT', 'PROBATION']);
                 $hoData['status_karyawan'] = $val;
             }
 

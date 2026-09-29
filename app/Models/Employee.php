@@ -21,7 +21,7 @@ class Employee extends Model
         'sio_k3','no_sio','expire_sio','nama_perusahaan_sio','tipe_sio',
         'ccpm','hes_passport',
         'tgl_mcu','exp_mcu','status_mcu','lokasi_mcu',
-        'ukuran_baju','ukuran_sepatu', 'nama_ibu', 'ptkp', 'tanggal_masuk', 'tanggal_akhir_probation',
+        'ukuran_baju','ukuran_sepatu', 'nama_ibu', 'ptkp', 'tanggal_masuk', 'status_kerja', 'tanggal_akhir_probation',
         'tanggal_keluar', 'alasan_keluar', 'catatan_keluar',
         'derajat_kesehatan', 'insentif',
         'tanggal_hi','nama_trainer_hi','swp_pt_ha','nama_trainer_swp',

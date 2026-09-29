@@ -63,6 +63,7 @@ const OPTIONAL_COLS = [
   ...HO_COLS,
 ];
 const DEFAULT_COLS = ['sim','sio_k3','mcu','kp','badge'];
+const COMPLIANCE_KEYS = ['sim','sio_k3','mcu','kp','badge'];
 
 // ── COLUMN PICKER MODAL ──
 function ColPickerModal({ selected, onClose, onApply, hideCompliance=false }) {
@@ -86,7 +87,7 @@ function ColPickerModal({ selected, onClose, onApply, hideCompliance=false }) {
           <>
           <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><Shield size={12}/> Compliance</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
-            {OPTIONAL_COLS.filter(c=>!c.key.startsWith('doc_')&&!['tgl_masuk','agama','alamat'].includes(c.key)).map(col=>(
+            {OPTIONAL_COLS.filter(c=>COMPLIANCE_KEYS.includes(c.key)).map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
                 style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',display:'flex',alignItems:'center',gap:5,
                   background:selectedCols.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
@@ -100,7 +101,7 @@ function ColPickerModal({ selected, onClose, onApply, hideCompliance=false }) {
           )}
           <div style={{fontSize:10.5,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><User size={12}/> Data Pribadi</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
-            {OPTIONAL_COLS.filter(c=>['tgl_masuk','agama','alamat','client_project'].includes(c.key) || (c.key==='masa_kerja' && hideCompliance)).map(col=>(
+            {OPTIONAL_COLS.filter(c=>['tgl_masuk',...(hideCompliance?['masa_kerja']:[]),'umur','agama','alamat','client_project'].includes(c.key)).map(col=>(
               <div key={col.key} onClick={()=>toggle(col.key)}
                 style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .15s',display:'flex',alignItems:'center',gap:5,
                   background:selectedCols.includes(col.key)?'rgba(232,160,32,.15)':'var(--bg3)',
@@ -986,7 +987,7 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
   // HO tidak punya compliance (SIM/SIO/MCU/KP/Badge) — sembunyikan kolom itu meski tersimpan di preferensi user.
   const visibleCols = isHo
     ? activeCols.filter(k => !['sim','sio_k3','mcu','kp','badge'].includes(k))
-    : activeCols.filter(k => k !== 'masa_kerja');
+    : activeCols.filter(k => k !== 'masa_kerja' && !k.startsWith('ho_'));
   const displayData = isHo && hoUnitTab !== 'all' ? data.filter(e => e.ho_unit === hoUnitTab) : data;
 
   function applyCols(cols) { setActiveCols(cols); localStorage.setItem(projectColsKey, JSON.stringify(cols)); }

@@ -400,6 +400,7 @@ class EmployeeController extends Controller
             'position_id' => 'nullable|exists:positions,id',
             'department_id' => 'nullable|exists:departments,id',
             'tanggal_masuk' => 'nullable|date',
+            'status_kerja' => 'nullable|in:PKWT,PKWTT,PROBATION',
             'tanggal_akhir_probation' => 'nullable|date',
             'agama' => 'nullable|string|max:50',
             'tgl_mcu' => 'nullable|date',
@@ -443,6 +444,12 @@ class EmployeeController extends Controller
 
         if ($isHoProject) {
             $data['id_badge'] = $data['id_badge'] ?: null;
+        }
+
+        // Tanggal akhir probation cuma berlaku kalau statusnya Probation (HO: dari ho_detail.status_karyawan).
+        $statusKerja = $isHoProject ? ($hoDetailData['status_karyawan'] ?? $employee->hoDetail?->status_karyawan) : ($data['status_kerja'] ?? null);
+        if ($statusKerja !== 'PROBATION') {
+            $data['tanggal_akhir_probation'] = null;
         }
 
         $employee->update($data);

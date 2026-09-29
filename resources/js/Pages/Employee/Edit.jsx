@@ -116,6 +116,53 @@ function ComboBox({ value, onChange, options, placeholder, inputStyle }) {
   );
 }
 
+// Pilih banyak: nilai terpilih jadi chip (× untuk hapus) di dalam kotak, ketik untuk cari.
+function MultiSelect({ options, value, onChange, placeholder, inputStyle, disabled=false }) {
+  const [open,   setOpen]   = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  const selected = options.filter(o => value.includes(o.value));
+  const rest = options.filter(o => !value.includes(o.value) && o.label.toLowerCase().includes(search.toLowerCase()));
+  return (
+    <div ref={ref} style={{ position:'relative' }}>
+      <div onClick={() => !disabled && setOpen(true)}
+        style={{ ...inputStyle, display:'flex', flexWrap:'wrap', alignItems:'center', gap:5, minHeight:40, height:'auto', padding:'5px 8px', cursor:disabled?'default':'text' }}>
+        {selected.map(o => (
+          <span key={o.value} style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, padding:'2px 8px', borderRadius:4, background:'var(--bg2)', border:'1px solid var(--border2)' }}>
+            <span onClick={e => { e.stopPropagation(); onChange(value.filter(v => v !== o.value)); }}
+              style={{ cursor:'pointer', color:'var(--muted)', display:'flex' }}><X size={11}/></span>
+            {o.label}
+          </span>
+        ))}
+        {!disabled && (
+          <input value={search} onChange={e => { setSearch(e.target.value); setOpen(true); }}
+            onKeyDown={e => { if (e.key === 'Backspace' && !search && value.length) onChange(value.slice(0, -1)); }}
+            placeholder={selected.length ? '' : placeholder}
+            style={{ flex:1, minWidth:90, border:'none', outline:'none', background:'transparent', color:'var(--text)', fontSize:12.5, fontFamily:'inherit', padding:'3px 2px' }} />
+        )}
+      </div>
+      {open && !disabled && (
+        <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:8, boxShadow:'0 8px 24px rgba(0,0,0,.25)', zIndex:100, maxHeight:220, overflowY:'auto' }}>
+          {rest.map(o => (
+            <div key={o.value} onClick={() => { onChange([...value, o.value]); setSearch(''); }}
+              style={{ padding:'8px 12px', cursor:'pointer', fontSize:12.5 }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(232,160,32,.1)'}
+              onMouseLeave={e => e.currentTarget.style.background = ''}>
+              {o.label}
+            </div>
+          ))}
+          {rest.length === 0 && <div style={{ padding:'10px 12px', fontSize:12, color:'var(--muted)' }}>{options.length ? 'Tidak ada pilihan lain' : 'Belum ada pilihan'}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom:16 }}>
@@ -455,6 +502,7 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
     tempat_lahir:         employee.tempat_lahir          || '',
     tanggal_lahir:        employee.tanggal_lahir         || '',
     tanggal_masuk:        employee.tanggal_masuk         || '',
+    status_kerja:         employee.status_kerja          || '',
     tanggal_akhir_probation: employee.tanggal_akhir_probation || '',
     position_id:          employee.position_id           || '',
     department_id:        employee.department_id         || '',
@@ -514,6 +562,12 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
   });
 
   const setHo = (key, value) => setData('ho_detail', { ...data.ho_detail, [key]: value });
+  // Status kerja: HO disimpan di ho_detail.status_karyawan, kantor lapangan di employees.status_kerja.
+  const statusKerja = isHo ? data.ho_detail.status_karyawan : data.status_kerja;
+  const setStatusKerja = (value) => {
+    if (isHo) setHo('status_karyawan', value); else setData('status_kerja', value);
+    if (value !== 'PROBATION') setData('tanggal_akhir_probation', '');
+  };
 
   const [badgeWarning, setBadgeWarning] = useState('');
 
@@ -620,9 +674,19 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
               <Field label="Tanggal Masuk / Bergabung">
                 <input type="date" style={inputStyle} value={data.tanggal_masuk} onChange={e=>setData('tanggal_masuk',e.target.value)} />
               </Field>
-              <Field label="Tanggal Akhir Probation (opsional)">
-                <input type="date" style={inputStyle} value={data.tanggal_akhir_probation} onChange={e=>setData('tanggal_akhir_probation',e.target.value)} />
+              <Field label="Status Kerja">
+                <select style={selectStyle} value={statusKerja} onChange={e=>setStatusKerja(e.target.value)}>
+                  <option value="">— Pilih —</option>
+                  <option value="PKWT">PKWT (Kontrak)</option>
+                  <option value="PKWTT">PKWTT (Tetap)</option>
+                  <option value="PROBATION">Probation (Masa Percobaan)</option>
+                </select>
               </Field>
+              {statusKerja === 'PROBATION' && (
+                <Field label="Tanggal Akhir Probation">
+                  <input type="date" style={inputStyle} value={data.tanggal_akhir_probation} onChange={e=>setData('tanggal_akhir_probation',e.target.value)} />
+                </Field>
+              )}
               <Field label="Jabatan">
                 <select style={selectStyle} value={data.position_id} onChange={e=>setData('position_id',e.target.value)}>
                   <option value="">— Pilih Jabatan —</option>
@@ -635,40 +699,20 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                   {departments.map(d=><option key={d.id} value={d.id}>{d.nama}</option>)}
                 </select>
               </Field>
-              <div style={{ marginBottom:16, gridColumn:'1 / -1' }}>
-                <label>Project yang Dipegang</label>
-                <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>
-                  Klik project tempat karyawan ini bekerja (boleh lebih dari satu). Pilihan di bawah adalah project aktif milik kantor <b>{project_info?.nama || '-'}</b>{can_manage_client_project ? ', diatur di Pengaturan → Data Project' : ', diatur oleh HR/admin'}. Dipakai untuk filter & export per project di Data Karyawan.
-                </div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>
-                  {client_project_list.map(cp=>{
-                    const active = data.client_project_ids.includes(cp.id);
-                    return (
-                      <button type="button" key={cp.id}
-                        onClick={()=>setData('client_project_ids', active
-                          ? data.client_project_ids.filter(id=>id!==cp.id)
-                          : [...data.client_project_ids, cp.id])}
-                        style={{
-                          padding:'4px 10px', borderRadius:99, fontSize:11.5, fontWeight:600, cursor:'pointer',
-                          fontFamily:"'Outfit',sans-serif",
-                          border: active ? '1px solid rgba(232,160,32,.45)' : '1px solid var(--border2)',
-                          background: active ? 'rgba(232,160,32,.14)' : 'var(--bg3)',
-                          color: active ? 'var(--accent)' : 'var(--muted)',
-                        }}>
-                        {active && '✓ '}{cp.kode}{!cp.is_active && ' (nonaktif)'}
-                      </button>
-                    );
-                  })}
-                  {client_project_list.length===0 && (
-                    <span style={{fontSize:11.5,color:'var(--muted)'}}>
-                      Kantor {project_info?.nama || 'ini'} belum punya project aktif.{' '}
-                      {can_manage_client_project
-                        ? <>Hubungkan project ke kantor ini dulu di <Link href="/pengaturan" style={{color:'var(--accent)',fontWeight:600}}>Pengaturan → Data Project</Link>.</>
-                        : 'Minta HR/admin menghubungkan project ke kantor ini.'}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <Field label="Project">
+                <MultiSelect inputStyle={inputStyle} placeholder="Pilih project..."
+                  options={client_project_list.map(cp=>({ value:cp.id, label:cp.kode + (cp.is_active ? '' : ' (nonaktif)') }))}
+                  value={data.client_project_ids}
+                  onChange={v=>setData('client_project_ids', v)} />
+                {client_project_list.length===0 && (
+                  <div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>
+                    Kantor {project_info?.nama || 'ini'} belum punya project aktif.{' '}
+                    {can_manage_client_project
+                      ? <>Hubungkan dulu di <Link href="/pengaturan" style={{color:'var(--accent)',fontWeight:600}}>Pengaturan → Data Project</Link>.</>
+                      : 'Minta HR/admin menghubungkan project ke kantor ini.'}
+                  </div>
+                )}
+              </Field>
               <Field label="Kota Asal">
                 <input style={inputStyle} value={data.kota_asal} onChange={e=>setData('kota_asal',e.target.value)} />
               </Field>
@@ -829,13 +873,6 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                 <Field label="Lokasi Kerja">
                   <input style={inputStyle} value={data.ho_detail.lokasi_kerja} onChange={e=>setHo('lokasi_kerja',e.target.value)} />
                 </Field>
-                <Field label="Status Karyawan">
-                  <select style={selectStyle} value={data.ho_detail.status_karyawan} onChange={e=>setHo('status_karyawan',e.target.value)}>
-                    <option value="">— Pilih —</option>
-                    <option value="PKWT">PKWT</option>
-                    <option value="PKWTT">PKWTT</option>
-                  </select>
-                </Field>
                 <Field label="No. KK">
                   <input style={inputStyle} value={data.ho_detail.no_kk} onChange={e=>setHo('no_kk',e.target.value)} />
                 </Field>
@@ -860,10 +897,9 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
               </Section>
             )}
 
-            {/* PKWT — khusus HO, form ini cuma muncul kalau Status Karyawan-nya PKWT (bukan
-                PKWTT). Karyawan non-HO belum punya field Status Karyawan sama sekali, jadi
-                formnya tetap selalu tampil seperti sebelumnya buat mereka. */}
-            {(!isHo || data.ho_detail.status_karyawan === 'PKWT') && (
+            {/* Form PKWT cuma untuk status PKWT. Kantor lapangan yang status kerjanya belum diisi (data lama)
+                tetap ditampilkan supaya data kontrak yang sudah ada tidak tersembunyi. */}
+            {(statusKerja === 'PKWT' || (!isHo && !statusKerja)) && (
             <Section title={<span style={{display:'flex',alignItems:'center',gap:6}}><FileText size={12}/> PKWT</span>}>
               <Field label="Start PKWT">
                 <input type="date" style={inputStyle} value={data.start_pkwt} onChange={e=>setData('start_pkwt',e.target.value)} />
