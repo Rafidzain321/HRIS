@@ -226,6 +226,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/kehadiran/mesin/{machineUser}/detail', [\App\Http\Controllers\AttendanceScanController::class, 'detail'])->middleware('menu:kehadiran,view');
     Route::put('/kehadiran/mesin/{machineUser}/mapping', [\App\Http\Controllers\AttendanceScanController::class, 'mapping'])->middleware('menu:kehadiran,edit');
     Route::put('/kehadiran/mesin/{machineUser}/hari', [\App\Http\Controllers\AttendanceScanController::class, 'updateDay'])->middleware('menu:kehadiran,edit');
+    Route::put('/kehadiran/mesin/{machineUser}/jam-sabtu', [\App\Http\Controllers\AttendanceScanController::class, 'updateJamSabtu'])->middleware('menu:kehadiran,edit');
 
     // ── Konseling (pembinaan karyawan) — HR/super-admin atau atasan langsung saja ──
     Route::get('/konseling', [EmployeeCounselingController::class, 'index'])->middleware('menu:konseling,view')->name('konseling');

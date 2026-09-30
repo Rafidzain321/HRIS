@@ -15,7 +15,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'plain_password',
         'project_id',
         'project_ids',
         'full_edit_project_ids',
@@ -71,5 +70,19 @@ class User extends Authenticatable
     {
         $extra = $this->full_edit_project_ids ? json_decode($this->full_edit_project_ids, true) : [];
         return array_values(array_unique(array_filter([(int) $this->project_id, ...array_map('intval', $extra ?: [])])));
+    }
+
+    // Kantor yang data karyawannya boleh diakses user. null = semua kantor.
+    // $edit=true: cuma kantor full-edit (kantor lihat-saja tidak boleh diubah).
+    public function aksesKantor(bool $edit = false): ?array
+    {
+        if ($this->hasRole('super-admin')) return null;
+        if ($this->hasRole('viewer')) return $edit ? [] : null;
+
+        $lihat = $this->project_ids ? array_map('intval', json_decode($this->project_ids, true) ?: []) : [];
+        // Akun tanpa kantor sama sekali (mis. HR Staff) = semua kantor, konsisten dengan Controller::activeProjectId().
+        if (!$this->project_id && !$lihat) return null;
+
+        return $edit ? $this->fullEditProjectIds() : array_values(array_unique([...$this->fullEditProjectIds(), ...$lihat]));
     }
 }

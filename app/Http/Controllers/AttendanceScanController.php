@@ -185,8 +185,12 @@ class AttendanceScanController extends Controller
             'hari'             => self::HARI[$d['tanggal']->dayOfWeek],
             'pink'             => $d['pink'],
             'ada_data'         => $d['ada_data'],
+            'sabtu'            => $d['tanggal']->dayOfWeek === Carbon::SATURDAY,
             'masuk'            => $d['masuk'],
             'pulang'           => $d['pulang'],
+            'masuk_mesin'      => $d['masuk_mesin'],
+            'pulang_mesin'     => $d['pulang_mesin'],
+            'jam_diedit'       => $d['jam_diedit'],
             'jumlah'           => $fmt($d['jumlah']),
             'kurang'           => $fmt($d['kurang']),
             'lebih'            => $fmt($d['lebih']),
@@ -213,6 +217,28 @@ class AttendanceScanController extends Controller
         );
         ActivityLog::record('update', 'Absensi Mesin', $machineUser->nama_mesin,
             "Keterangan {$data['tanggal']}: " . ($data['kategori'] ?? 'otomatis') . ($data['keterangan'] ? " - {$data['keterangan']}" : ''));
+        return response()->json(['ok' => true]);
+    }
+
+    // Edit jam masuk/pulang — khusus hari Sabtu (aktivitas dinamis: absen bisa di kajian maupun kantor).
+    // Kosongkan = kembali pakai jam dari mesin.
+    public function updateJamSabtu(Request $request, AttendanceMachineUser $machineUser)
+    {
+        $data = $request->validate([
+            'tanggal' => 'required|date',
+            'masuk'   => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'pulang'  => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+        ], ['masuk.regex' => 'Format jam masuk harus JJ:MM.', 'pulang.regex' => 'Format jam pulang harus JJ:MM.']);
+        if (Carbon::parse($data['tanggal'])->dayOfWeek !== Carbon::SATURDAY) {
+            return response()->json(['message' => 'Jam absensi hanya bisa diedit untuk hari Sabtu.'], 422);
+        }
+        $scan = AttendanceScan::firstOrNew(['machine_user_id' => $machineUser->id, 'tanggal' => $data['tanggal']]);
+        $scan->scan_masuk_manual  = ($data['masuk'] ?? null) && $data['masuk'] !== $scan->scan_masuk ? $data['masuk'] : null;
+        $scan->scan_pulang_manual = ($data['pulang'] ?? null) && $data['pulang'] !== $scan->scan_pulang ? $data['pulang'] : null;
+        $scan->save();
+        ActivityLog::record('update', 'Absensi Mesin', $machineUser->nama_mesin,
+            "Edit jam Sabtu {$data['tanggal']}: masuk " . ($data['masuk'] ?? '-') . ', pulang ' . ($data['pulang'] ?? '-') .
+            " (mesin: " . ($scan->scan_masuk ?? '-') . ' / ' . ($scan->scan_pulang ?? '-') . ')');
         return response()->json(['ok' => true]);
     }
 
@@ -366,7 +392,9 @@ class AttendanceScanController extends Controller
         $minggu = $dow === Carbon::SUNDAY;
         $normal    = $minggu ? null : ($dow === Carbon::SATURDAY ? 240 : 420);
         $istirahat = $minggu ? null : ($dow === Carbon::SATURDAY ? 0 : 120);
-        $masuk = $scan?->scan_masuk; $pulang = $scan?->scan_pulang;
+        // Jam editan manual (Sabtu) menggantikan scan mesin.
+        $masuk  = $scan?->scan_masuk_manual  ?: $scan?->scan_masuk;
+        $pulang = $scan?->scan_pulang_manual ?: $scan?->scan_pulang;
 
         // Prioritas kategori: input manual > hari libur > cuti/izin HRIS > pengecualian mesin > otomatis alfa.
         $kategori = null; $sumber = null; $ket = null;
@@ -408,6 +436,8 @@ class AttendanceScanController extends Controller
         return [
             'tanggal' => $tgl, 'minggu' => $minggu, 'pink' => $minggu || $kategori === 'LN', 'ada_data' => (bool) $scan,
             'masuk' => $masuk, 'pulang' => $pulang,
+            'masuk_mesin' => $scan?->scan_masuk, 'pulang_mesin' => $scan?->scan_pulang,
+            'jam_diedit' => (bool) ($scan?->scan_masuk_manual || $scan?->scan_pulang_manual),
             'total' => $total, 'istirahat' => $istirahat, 'normal' => $normal, 'jumlah' => $jumlah, 'kurang' => $kurang, 'lebih' => $lebih,
             'kategori' => $kategori, 'sumber' => $sumber, 'kategori_manual' => $scan?->kategori,
             'keterangan' => $scan?->keterangan ?: $ket, 'keterangan_manual' => $scan?->keterangan,

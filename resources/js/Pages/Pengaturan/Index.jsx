@@ -691,7 +691,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
   const [userSearch,     setUserSearch]     = useState('');
   const [projectModal,   setProjectModal]   = useState(null);
   const [confirmModal,   setConfirmModal]   = useState(null);
-  const [showPw, setShowPw] = useState({});
   const [profilePw,        setProfilePw]        = useState('');
   const [profilePwLoading, setProfilePwLoading] = useState(false);
   const [profilePwError,   setProfilePwError]   = useState('');
@@ -969,7 +968,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                       <th>Email</th>
                       <th>Role</th>
                       <th>Project</th>
-                      <th>Password</th>
                       <th>Terdaftar</th>
                       <th>Last Login</th>
                       <th>Status</th>
@@ -978,7 +976,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                   </thead>
               <tbody>
                 {filteredUsers.length===0 && (
-                  <tr><td colSpan={9} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Tidak ada user yang cocok.</td></tr>
+                  <tr><td colSpan={8} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Tidak ada user yang cocok.</td></tr>
                 )}
                 {filteredUsers.map((u,i)=>{
                   const rc   = ROLE_COLOR[u.role]||ROLE_COLOR['viewer'];
@@ -994,17 +992,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                       <td style={{fontSize:12,color:'var(--muted2)'}}>{u.email}</td>
                       <td><span style={{background:rc.bg,color:rc.color,padding:'2px 10px',borderRadius:99,fontSize:11,fontWeight:600}}>{u.role}</span></td>
                       <td style={{fontSize:12,color:'var(--muted2)'}}>{u.project_nama}</td>
-                      <td>
-                        <div style={{display:'flex',alignItems:'center',gap:5}}>
-                          <span style={{fontSize:12,fontFamily:'monospace',color:'var(--text)',letterSpacing:showPw[u.id]?'normal':'2px'}}>
-                            {showPw[u.id] ? (u.plain_password||'—') : '••••••'}
-                          </span>
-                          <button onClick={()=>setShowPw(p=>({...p,[u.id]:!p[u.id]}))}
-                            style={{padding:'1px 6px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted)',fontSize:10,cursor:'pointer',fontFamily:"'Outfit',sans-serif",flexShrink:0}}>
-                            <i className={`fa-solid ${showPw[u.id]?'fa-eye-slash':'fa-eye'}`}/>
-                          </button>
-                        </div>
-                      </td>
                       <td style={{fontSize:12,color:'var(--muted2)'}}>{u.created_at}</td>
                       <td style={{fontSize:12,color:'var(--muted2)'}}>{u.last_login}</td>
                       <td>

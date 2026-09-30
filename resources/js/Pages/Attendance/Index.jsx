@@ -234,6 +234,30 @@ function DetailMesinModal({ user, tahun, bulan, kategoriList, canEdit, onClose }
   function load() { axios.get(`/kehadiran/mesin/${user.id}/detail`, { params: { tahun, bulan } }).then(r => setDays(r.data.days)); }
   useEffect(load, [user.id, tahun, bulan]);
 
+  async function saveJam(d, masuk, pulang) {
+    if ((masuk || '') === (d.masuk || '') && (pulang || '') === (d.pulang || '')) return;
+    setSaving(d.tanggal);
+    await axios.put(`/kehadiran/mesin/${user.id}/jam-sabtu`, { tanggal: d.tanggal, masuk: masuk || null, pulang: pulang || null }, { headers: { 'X-CSRF-TOKEN': csrf() } })
+      .catch(e => alert(e.response?.data?.message || Object.values(e.response?.data?.errors || {}).flat()[0] || 'Gagal menyimpan jam.'));
+    setSaving(''); load();
+  }
+
+  // Sabtu: jam bisa diedit (absen bisa di kajian maupun kantor).
+  function jamCell(d, key) {
+    const val = d[key]; const mesin = d[`${key}_mesin`];
+    const diedit = d.jam_diedit && (val || '') !== (mesin || '');
+    if (canEdit && d.sabtu) {
+      return (
+        <td style={td} title={diedit ? `Diedit manual — jam mesin: ${mesin || 'kosong'}` : 'Sabtu: jam bisa diedit'}>
+          <input type="time" defaultValue={val || ''} key={`${d.tanggal}-${key}-${val}`} disabled={saving === d.tanggal}
+            onBlur={e => key === 'masuk' ? saveJam(d, e.target.value, d.pulang) : saveJam(d, d.masuk, e.target.value)}
+            style={{ ...inp, padding: '4px 6px', fontSize: 11.5, width: 92, borderColor: diedit ? '#3A8FE0' : undefined, color: diedit ? '#3A8FE0' : undefined }} />
+        </td>
+      );
+    }
+    return <td style={{ ...td, color: !val && d.tidak_lengkap ? '#E04545' : diedit ? '#3A8FE0' : undefined }} title={diedit ? `Diedit manual — jam mesin: ${mesin || 'kosong'}` : undefined}>{val || '—'}</td>;
+  }
+
   async function save(d, kategori, keterangan) {
     setSaving(d.tanggal);
     await axios.put(`/kehadiran/mesin/${user.id}/hari`, { tanggal: d.tanggal, kategori: kategori || null, keterangan: keterangan || null }, { headers: { 'X-CSRF-TOKEN': csrf() } }).catch(() => {});
@@ -267,8 +291,8 @@ function DetailMesinModal({ user, tahun, bulan, kategoriList, canEdit, onClose }
                   <tr key={d.tanggal} style={{ background: d.pink ? 'rgba(218,150,148,.18)' : d.tidak_lengkap ? 'rgba(224,69,69,.05)' : undefined }}>
                     <td style={td}>{d.tgl}</td>
                     <td style={{ ...td, textAlign: 'left' }}>{d.hari}</td>
-                    <td style={{ ...td, color: !d.masuk && d.tidak_lengkap ? '#E04545' : undefined }}>{d.masuk || '—'}</td>
-                    <td style={{ ...td, color: !d.pulang && d.tidak_lengkap ? '#E04545' : undefined }}>{d.pulang || '—'}</td>
+                    {jamCell(d, 'masuk')}
+                    {jamCell(d, 'pulang')}
                     <td style={td}>{d.jumlah ?? '—'}</td>
                     <td style={{ ...td, color: d.kurang && d.kurang !== '00:00' ? '#E04545' : undefined }}>{d.kurang ?? '—'}</td>
                     <td style={{ ...td, color: d.lebih && d.lebih !== '00:00' ? '#22C97A' : undefined }}>{d.lebih ?? '—'}</td>
@@ -295,7 +319,7 @@ function DetailMesinModal({ user, tahun, bulan, kategoriList, canEdit, onClose }
           )}
         </div>
         <div style={{ padding: '10px 18px', borderTop: '1px solid var(--border)', fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-          "Otomatis" = diambil dari hari libur, data Cuti Tahunan, kolom Pengecualian mesin, atau Alfa kalau hari kerja tanpa scan. Pilih status lain untuk menimpa (mis. Sakit, Dinas Luar, "Hadir" untuk yang masuk tapi lupa scan). Catatan tampil di kolom KETERANGAN Excel.
+          "Otomatis" = diambil dari hari libur, data Cuti Tahunan, kolom Pengecualian mesin, atau Alfa kalau hari kerja tanpa scan. Pilih status lain untuk menimpa (mis. Sakit, Dinas Luar, "Hadir" untuk yang masuk tapi lupa scan). Catatan tampil di kolom KETERANGAN Excel. <b>Hari Sabtu</b>: jam masuk/pulang bisa diedit (absen bisa di kajian maupun kantor) — jam yang diedit berwarna biru, kosongkan untuk kembali ke jam mesin.
         </div>
       </div>
     </div>

@@ -48,7 +48,6 @@ class UserManagementController extends Controller
                 'is_active'      => $u->is_active ?? true,
                 'created_at'     => $u->created_at->format('d M Y'),
                 'last_login'     => $u->last_login_at?->format('d M Y H:i') ?? '—',
-                'plain_password' => $u->plain_password ?? '—',
                 'permissions'    => $u->hasRole('super-admin') ? null : $u->permissions->pluck('name'),
             ])
             : collect();
@@ -162,7 +161,6 @@ class UserManagementController extends Controller
             'name'           => $data['name'],
             'email'          => $data['email'],
             'password'       => Hash::make($data['password']),
-            'plain_password' => $data['password'],
             'project_id'     => $data['project_id'] ?? null,
             'project_ids'    => !empty($data['project_ids']) ? json_encode(array_map('intval', $data['project_ids'])) : null,
             'full_edit_project_ids' => !empty($data['full_edit_project_ids']) ? json_encode(array_map('intval', $data['full_edit_project_ids'])) : null,
@@ -203,7 +201,7 @@ class UserManagementController extends Controller
             'project_ids' => !empty($data['project_ids']) ? json_encode(array_map('intval', $data['project_ids'])) : null,
             'full_edit_project_ids' => !empty($data['full_edit_project_ids']) ? json_encode(array_map('intval', $data['full_edit_project_ids'])) : null,
             ...(isset($data['password']) && $data['password']
-                ? ['password' => Hash::make($data['password']), 'plain_password' => $data['password']]
+                ? ['password' => Hash::make($data['password'])]
                 : []),
         ]);
         $user->syncRoles([$data['role']]);
@@ -222,7 +220,7 @@ class UserManagementController extends Controller
             'password' => 'required|string|min:6|confirmed',
         ]);
 
-        $user->update(['password' => Hash::make($data['password']), 'plain_password' => $data['password']]);
+        $user->update(['password' => Hash::make($data['password'])]);
         ActivityLog::record('update', 'User', $user->name, "Password di-reset oleh super admin");
         return back()->with('success', "Password {$user->name} berhasil direset.");
     }
@@ -245,7 +243,7 @@ class UserManagementController extends Controller
         }
 
         $user = auth()->user();
-        $user->update(['password' => Hash::make($data['password']), 'plain_password' => $data['password']]);
+        $user->update(['password' => Hash::make($data['password'])]);
         ActivityLog::record('update', 'User', $user->name, "Ganti password sendiri");
         return back()->with('success', "Password berhasil diubah.");
     }
