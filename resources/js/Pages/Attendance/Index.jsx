@@ -196,7 +196,7 @@ function ImportMesinModal({ onClose, onDone }) {
               {result.belum_cocok.length > 0 && (
                 <div style={{ fontSize: 11.5, marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(232,160,32,.08)', border: '1px solid rgba(232,160,32,.3)' }}>
                   <b>{result.belum_cocok.length} nama belum cocok</b> (tidak ada / ada lebih dari 1 karyawan yang mirip): {result.belum_cocok.join(', ')}.
-                  <div style={{ color: 'var(--muted)', marginTop: 4 }}>Pilih manual di kolom "Karyawan HRIS" supaya jabatan, atasan & cuti ikut terbaca.</div>
+                  <div style={{ color: 'var(--muted)', marginTop: 4 }}>Pilih manual di kolom "Data Karyawan" supaya jabatan, atasan & cuti ikut terbaca.</div>
                 </div>
               )}
             </div>
@@ -247,8 +247,10 @@ function DetailMesinModal({ user, tahun, bulan, kategoriList, canEdit, onClose }
       <div style={{ ...modalBox, width: 'min(1000px, 100%)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
           <div>
-            <div style={{ fontWeight: 700 }}>{user.nama_mesin} <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· {MONTH_NAMES[bulan - 1]} {tahun}</span></div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{user.employee_nama ? `Karyawan HRIS: ${user.employee_nama}` : 'Belum dipetakan ke karyawan HRIS'}</div>
+            <div style={{ fontWeight: 700 }}>{user.employee_nama || user.nama_mesin} <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· {MONTH_NAMES[bulan - 1]} {tahun}</span></div>
+            {!user.employee_nama
+              ? <div style={{ fontSize: 11, color: '#E8A020' }}>Belum dicocokkan dengan data karyawan</div>
+              : user.employee_nama.toLowerCase() !== user.nama_mesin.toLowerCase() && <div style={{ fontSize: 11, color: 'var(--muted)' }}>Nama di mesin: {user.nama_mesin}</div>}
           </div>
           <span onClick={onClose} style={{ cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}><X size={18} /></span>
         </div>
@@ -293,7 +295,7 @@ function DetailMesinModal({ user, tahun, bulan, kategoriList, canEdit, onClose }
           )}
         </div>
         <div style={{ padding: '10px 18px', borderTop: '1px solid var(--border)', fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-          "Otomatis" = diambil dari hari libur, Cuti Tahunan HRIS, kolom Pengecualian mesin, atau Alfa kalau hari kerja tanpa scan. Pilih status lain untuk menimpa (mis. Sakit, Dinas Luar, "Hadir" untuk yang masuk tapi lupa scan). Catatan tampil di kolom KETERANGAN Excel.
+          "Otomatis" = diambil dari hari libur, data Cuti Tahunan, kolom Pengecualian mesin, atau Alfa kalau hari kerja tanpa scan. Pilih status lain untuk menimpa (mis. Sakit, Dinas Luar, "Hadir" untuk yang masuk tapi lupa scan). Catatan tampil di kolom KETERANGAN Excel.
         </div>
       </div>
     </div>
@@ -374,7 +376,7 @@ function TabMesin({ tahunAwal, bulanAwal, canEdit, yearOptions }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead><tr style={{ background: 'var(--bg3)' }}>
-              <th style={th}>No. ID</th><th style={{ ...th, textAlign: 'left' }}>Nama di Mesin</th><th style={{ ...th, textAlign: 'left' }}>Lokasi</th><th style={{ ...th, textAlign: 'left' }}>Karyawan HRIS</th>
+              <th style={th}>No. ID</th><th style={{ ...th, textAlign: 'left' }}>Nama di Mesin</th><th style={{ ...th, textAlign: 'left' }}>Lokasi</th><th style={{ ...th, textAlign: 'left' }}>Data Karyawan</th>
               <th style={th}>Scan Lengkap</th><th style={th}>Scan Tdk Lengkap</th><th style={th}>Alfa</th><th style={th}>Sakit/Cuti/Izin/DL</th><th style={th} />
             </tr></thead>
             <tbody>
@@ -393,10 +395,10 @@ function TabMesin({ tahunAwal, bulanAwal, canEdit, yearOptions }) {
                     {canEdit ? (
                       <select value={u.employee_id || ''} onChange={e => mapEmployee(u, e.target.value)}
                         style={{ ...inp, padding: '5px 8px', width: 220, borderColor: u.employee_id ? 'var(--border)' : '#E8A020' }}>
-                        <option value="">— Belum dipetakan —</option>
+                        <option value="">— Belum dicocokkan —</option>
                         {data.employees.map(e => <option key={e.id} value={e.id}>{e.nama_lengkap}</option>)}
                       </select>
-                    ) : (u.employee_nama || <span style={{ color: 'var(--muted)' }}>Belum dipetakan</span>)}
+                    ) : (u.employee_nama || <span style={{ color: 'var(--muted)' }}>Belum dicocokkan</span>)}
                   </td>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{u.lengkap}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'center', color: u.tidak_lengkap ? '#E04545' : undefined, fontWeight: u.tidak_lengkap ? 700 : 400 }}>{u.tidak_lengkap}</td>
