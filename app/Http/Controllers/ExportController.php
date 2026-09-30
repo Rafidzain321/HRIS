@@ -100,7 +100,7 @@ class ExportController extends Controller
     private function makeTitle($sheet, string $title, string $lastCol, int $count): void
     {
         $sheet->mergeCells("A1:{$lastCol}1");
-        $projectId = session('active_project_kode');
+        $projectId = $this->activeProjectId();
         $projectLabel = $projectId
             ? strtoupper(Project::find($projectId)?->kode ?? 'UNKNOWN')
             : 'SEMUA PROJECT';
@@ -186,17 +186,6 @@ class ExportController extends Controller
         ]);
     }
 
-    // ── Helper: ambil active project id ──
-    private function getProjectId(): ?int
-    {
-        $user = auth()->user();
-        if (!$user) return null;
-        if ($user->hasRole('super-admin')) {
-            return session('active_project_kode') ?: null;
-        }
-        if ($user->hasRole('viewer')) return null;
-        return $user->project_id;
-    }
 
     // ═══════════════════════════════════════════════════
     // 1. DATA KARYAWAN
@@ -205,7 +194,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'Data Karyawan', null, 'Export Excel data karyawan aktif' . ($request->get('client_project') ? ' (filter Data Project: ' . (\App\Models\ClientProject::find($request->get('client_project'))?->kode ?? '-') . ')' : ''));
 
-        $pid   = $this->getProjectId();
+        $pid   = $this->activeProjectId();
         $isHo  = $pid && Project::find($pid)?->tipe_gaji === 'ho';
 
         if ($isHo) {
@@ -432,7 +421,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'MCU', null, 'Export Excel data MCU');
 
-        $pid = $this->getProjectId();
+        $pid = $this->activeProjectId();
         $employees = Employee::aktif()->with('position')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('exp_mcu')->get();
@@ -483,7 +472,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'Badge & KP', null, 'Export Excel data Badge');
 
-        $pid = $this->getProjectId();
+        $pid = $this->activeProjectId();
         $employees = Employee::aktif()->with('position')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('expire_badge')->get();
@@ -533,7 +522,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'SIM', null, 'Export Excel data SIM');
 
-        $pid = $this->getProjectId();
+        $pid = $this->activeProjectId();
         $employees = Employee::aktif()->with('position')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
             ->whereNotNull('type_sim')->orderBy('expired_sim')->get();
@@ -627,7 +616,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'Driver', null, 'Export Excel data Driver');
 
-        $pid = $this->getProjectId();
+        $pid = $this->activeProjectId();
         $drivers = DriverDetail::when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('name')->get();
         $wb    = new Spreadsheet();
@@ -682,7 +671,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'Equipment', null, 'Export Excel data Equipment Unit');
 
-        $pid = $this->getProjectId();
+        $pid = $this->activeProjectId();
         $equipments = Equipment::when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('no_unit')->get();
         $wb    = new Spreadsheet();
@@ -760,7 +749,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'Equipment', null, 'Export Excel data Equipment Operator');
 
-        $pid = $this->getProjectId();
+        $pid = $this->activeProjectId();
         $operators = EquipmentOperator::with('equipment')
             ->when($pid, fn($q) => $q->where('project_id', $pid))
             ->where('is_active',true)->orderBy('operator_name')->get();
@@ -826,7 +815,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'CCPM', null, 'Export Excel data CCPM Manpower');
 
-        $pid = $this->getProjectId();
+        $pid = $this->activeProjectId();
         $manpower = CcpmManpower::when($pid, fn($q) => $q->where('project_id', $pid))
             ->orderBy('name')->get();
         $wb    = new Spreadsheet();
@@ -881,7 +870,7 @@ class ExportController extends Controller
     {
         ActivityLog::record('export', 'Training', null, 'Export Excel data Training');
 
-        $pid = $this->getProjectId();
+        $pid = $this->activeProjectId();
         $trainings = EmployeeTraining::with(['employee.position','trainingType'])
             ->when($pid, fn($q) => $q->whereHas('employee', fn($eq) => $eq->where('project_id', $pid)))
             ->orderBy('employee_id')->get();
