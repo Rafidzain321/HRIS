@@ -462,6 +462,8 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
         .tab.active{background:rgba(232,160,32,.12);color:var(--accent);}
         .icon-btn{width:36px;height:36px;border-radius:8px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .18s;position:relative;}
         .icon-btn:hover{background:var(--bg3);border-color:var(--border2);}
+        .icon-btn-logout{color:var(--red);}
+        .icon-btn-logout:hover{background:rgba(224,69,69,.1);border-color:rgba(224,69,69,.35);}
         input[type="text"],input[type="email"],input[type="date"],input[type="password"],input[type="number"],textarea{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;font-family:'Outfit',sans-serif;outline:none;width:100%;transition:border .18s;}
         input:focus,textarea:focus{border-color:var(--accent);}
         label{font-size:11.5px;color:var(--muted);margin-bottom:4px;display:block;}
@@ -647,6 +649,9 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
               ) : notifData?.summary?.total > 0 ? (
                 <div style={{ position:'absolute', top:6, right:6, width:7, height:7, borderRadius:'50%', background:'var(--red)', animation:'blink 1.5s infinite' }}/>
               ) : null}
+            </div>
+            <div className="icon-btn icon-btn-logout" title="Keluar" onClick={()=>setConfirmLogout(true)}>
+              <LogOut size={17}/>
             </div>
           </div>
         </div>
