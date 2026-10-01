@@ -9,6 +9,9 @@ class HolidayController extends Controller
 {
     public function store(Request $request)
     {
+        // Hari libur berlaku untuk semua kantor (Timesheet, Cuti, Absensi Mesin, Gaji) —
+        // cuma user yang boleh edit Cuti/Timesheet (sama dengan syarat tombolnya muncul).
+        abort_unless(auth()->user()->canAny(['edit-cuti', 'edit-timesheet']), 403, 'Anda tidak memiliki izin mengubah hari libur.');
         $data = $request->validate([
             'tanggal'    => 'required|date|unique:holidays,tanggal',
             'keterangan' => 'required|string|max:200',
@@ -21,6 +24,7 @@ class HolidayController extends Controller
 
     public function destroy(Holiday $holiday)
     {
+        abort_unless(auth()->user()->canAny(['edit-cuti', 'edit-timesheet']), 403, 'Anda tidak memiliki izin mengubah hari libur.');
         $tanggal = $holiday->tanggal->format('Y-m-d');
         $keterangan = $holiday->keterangan;
         $holiday->delete();

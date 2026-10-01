@@ -378,7 +378,7 @@ class ExportController extends Controller
     public function ppe()
     {
         ActivityLog::record('export', 'PPE', null, 'Export Excel data PPE');
-        $employees = Employee::aktif()->with(['position', 'ppe'])->orderBy('nama_lengkap')->get();
+        $employees = $this->karyawanAktif()->with('ppe')->orderBy('nama_lengkap')->get();
 
         $wb    = new Spreadsheet();
         $sheet = $wb->getActiveSheet()->setTitle('PPE ' . now()->year);

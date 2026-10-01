@@ -677,13 +677,13 @@ class EmployeeKpiController extends Controller
 
         $old = OrgStructureDocument::latest()->first();
         if ($old) {
-            Storage::disk('public')->delete($old->path);
+            Storage::disk('local')->delete($old->path);
             $old->delete();
         }
 
         $file = $request->file('file');
         $name = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
-        $path = $file->storeAs('org_structure', $name, 'public');
+        $path = $file->storeAs('org_structure', $name, 'local');
 
         OrgStructureDocument::create([
             'nama_file'   => $file->getClientOriginalName(),
@@ -701,11 +701,11 @@ class EmployeeKpiController extends Controller
     public function previewOrgDocument()
     {
         $doc = OrgStructureDocument::latest()->first();
-        if (!$doc || !Storage::disk('public')->exists($doc->path)) {
+        if (!$doc || !Storage::disk('local')->exists($doc->path)) {
             abort(404, 'Dokumen tidak ditemukan.');
         }
 
-        $fullPath = Storage::disk('public')->path($doc->path);
+        $fullPath = Storage::disk('local')->path($doc->path);
         return response()->file($fullPath, [
             'Content-Type'        => $doc->mime_type,
             'Content-Disposition' => 'inline; filename="' . $doc->nama_file . '"',
@@ -720,7 +720,7 @@ class EmployeeKpiController extends Controller
 
         $doc = OrgStructureDocument::latest()->first();
         if ($doc) {
-            Storage::disk('public')->delete($doc->path);
+            Storage::disk('local')->delete($doc->path);
             $nama = $doc->nama_file;
             $doc->delete();
             ActivityLog::record('delete', 'Struktur Organisasi', null, "Hapus dokumen struktur organisasi: {$nama}");

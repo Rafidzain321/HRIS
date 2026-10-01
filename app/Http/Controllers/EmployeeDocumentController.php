@@ -45,10 +45,11 @@ class EmployeeDocumentController extends Controller
         $file     = $request->file('file');
         $badgeDir = Str::slug($employee->no_ktp ?? 'emp-'.$employee->id);
 
-        // Folder: storage/app/public/employee_docs/{badge}/{tipe}/
+        // Folder private (tidak bisa diakses lewat URL publik): storage/app/private/employee_docs/{badge}/{tipe}/
+        // Ekstensi ikut jenis file asli (foto bisa jpg/png), ditebak dari isi file — bukan dari nama.
         $dir  = "employee_docs/{$badgeDir}/{$tipe}";
-        $name = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.pdf';
-        $path = $file->storeAs($dir, $name, 'public');
+        $name = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . strtolower($file->extension());
+        $path = $file->storeAs($dir, $name, 'local');
 
         $doc = EmployeeDocument::create([
             'employee_id' => $employee->id,
@@ -79,32 +80,32 @@ class EmployeeDocumentController extends Controller
 
     public function preview(EmployeeDocument $document)
     {
-        if (!Storage::disk('public')->exists($document->path)) {
+        if (!Storage::disk('local')->exists($document->path)) {
             abort(404, 'File tidak ditemukan.');
         }
 
-        $fullPath = Storage::disk('public')->path($document->path);
+        $fullPath = Storage::disk('local')->path($document->path);
         return response()->file($fullPath, [
-            'Content-Type'        => 'application/pdf',
+            'Content-Type'        => Storage::disk('local')->mimeType($document->path) ?: 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $document->nama_file . '"',
         ]);
     }
 
     public function download(EmployeeDocument $document)
     {
-        if (!Storage::disk('public')->exists($document->path)) {
+        if (!Storage::disk('local')->exists($document->path)) {
             abort(404, 'File tidak ditemukan.');
         }
 
         ActivityLog::record('download', 'Dokumen', $document->employee?->nama_lengkap, "Download {$document->nama_file}");
-        return Storage::disk('public')->download($document->path, $document->nama_file);
+        return Storage::disk('local')->download($document->path, $document->nama_file);
     }
 
     public function destroy(EmployeeDocument $document)
     {
         $nama = $document->nama_file;
         $emp  = $document->employee?->nama_lengkap;
-        Storage::disk('public')->delete($document->path);
+        Storage::disk('local')->delete($document->path);
         $document->delete();
 
         ActivityLog::record('delete', 'Dokumen', $emp, "Hapus file {$nama}");
