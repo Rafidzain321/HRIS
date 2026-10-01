@@ -326,7 +326,7 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
           </div>
         )}
         <div style={{ padding: '7px 4px', marginRight: 18, fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', borderBottom: '2px solid var(--accent)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
-          <CalendarDays size={13} /> Cuti Tahunan
+          <CalendarDays size={13} /> Cuti dan Izin
         </div>
       </div>
 

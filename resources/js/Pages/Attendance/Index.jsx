@@ -438,7 +438,7 @@ function TabMesin({ tahunAwal, bulanAwal, canEdit, yearOptions }) {
         </div>
       </div>
       <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>
-        Aturan hitung: Senin–Jumat normal 07:00 + istirahat 02:00, Sabtu normal 04:00 tanpa istirahat, Minggu & hari libur kosong/pink (hari libur ditandai lewat kalender di tab Cuti Tahunan).
+        Aturan hitung: Senin–Jumat normal 07:00 + istirahat 02:00, Sabtu normal 04:00 tanpa istirahat, Minggu & hari libur kosong/pink (hari libur ditandai lewat kalender di tab Cuti dan Izin).
         Jumlah jam = (pulang − masuk) − istirahat; selisih dengan normal masuk ke kolom Kekurangan/Kelebihan. Hari kerja tanpa scan otomatis Alfa sampai diberi keterangan.
       </div>
     </div>
@@ -477,7 +477,7 @@ export default function AttendanceIndex({ employees = [], tahun, bulan, days_in_
         </div>
         {canViewCuti && (
           <div onClick={() => router.visit('/cuti')} style={{ padding: '7px 4px', marginRight: 18, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', borderBottom: '2px solid transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <CalendarDays size={13} /> Cuti Tahunan
+            <CalendarDays size={13} /> Cuti dan Izin
           </div>
         )}
       </div>
