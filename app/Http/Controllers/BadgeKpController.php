@@ -11,15 +11,11 @@ class BadgeKpController extends Controller
 {
     public function index(Request $request)
     {
-        $today = Carbon::today();
-        $in30  = $today->copy()->addDays(30);
-
-        $filter    = $request->get('filter', 'all');
+        $today     = Carbon::today();
         $search    = $request->get('search', '');
         $tab       = $request->get('tab', 'badge');
         $highlight = $request->get('highlight');
-
-        if ($highlight) $filter = 'all';
+        $filter    = $highlight ? 'all' : $request->get('filter', 'all');
 
         $query = Employee::aktif()->with('position');
         $this->applyProjectFilter($query);
@@ -31,30 +27,10 @@ class BadgeKpController extends Controller
             );
         }
 
-        if ($tab === 'badge') {
-            match ($filter) {
-                'expired' => $query->where('expire_badge', '<', $today),
-                'warning' => $query->whereBetween('expire_badge', [$today, $in30]),
-                'ok'      => $query->where('expire_badge', '>=', $in30),
-                default   => null,
-            };
-            $query->orderBy('expire_badge');
-        } else {
-            match ($filter) {
-                'expired' => $query->where('exp_kp', '<', $today),
-                'warning' => $query->whereBetween('exp_kp', [$today, $in30]),
-                'ok'      => $query->where('exp_kp', '>=', $in30),
-                default   => null,
-            };
-            $query->orderBy('exp_kp');
-        }
-
-        $page = $request->get('page', 1);
-        if ($highlight) {
-            $allIds = (clone $query)->pluck('id')->toArray();
-            $pos    = array_search((int) $highlight, $allIds);
-            if ($pos !== false) $page = (int) floor($pos / 50) + 1;
-        }
+        $col = $tab === 'badge' ? 'expire_badge' : 'exp_kp';
+        $this->filterExpiry($query, $col, $filter);
+        $query->orderBy($col);
+        $page = $this->highlightPage($query, $highlight, $request);
 
         $employees = $query->paginate(50, ['*'], 'page', $page)->appends($request->except('highlight'))
             ->through(fn($e) => [
@@ -76,17 +52,19 @@ class BadgeKpController extends Controller
 
         $pid  = $this->activeProjectId();
         $base = Employee::aktif()->when($pid, fn($q) => $q->where('project_id', $pid));
+        $badge = $this->expiryCounts($base, 'expire_badge');
+        $kp    = $this->expiryCounts($base, 'exp_kp');
         $stats = [
             'badge_total'   => (clone $base)->count(),
-            'badge_expired' => (clone $base)->whereNotNull('expire_badge')->where('expire_badge', '<', $today)->count(),
-            'badge_warning' => (clone $base)->whereNotNull('expire_badge')->whereBetween('expire_badge', [$today, $in30])->count(),
-            'badge_ok'      => (clone $base)->whereNotNull('expire_badge')->where('expire_badge', '>=', $in30)->count(),
-            'badge_nodata'  => (clone $base)->whereNull('expire_badge')->count(),
+            'badge_expired' => $badge['expired'],
+            'badge_warning' => $badge['warning'],
+            'badge_ok'      => $badge['ok'],
+            'badge_nodata'  => $badge['no_data'],
             'kp_ada'        => (clone $base)->where('status_kp', 'KP has been exist')->count(),
-            'kp_expired'    => (clone $base)->whereNotNull('exp_kp')->where('exp_kp', '<', $today)->count(),
-            'kp_warning'    => (clone $base)->whereNotNull('exp_kp')->whereBetween('exp_kp', [$today, $in30])->count(),
-            'kp_ok'         => (clone $base)->whereNotNull('exp_kp')->where('exp_kp', '>=', $in30)->count(),
-            'kp_nodata'     => (clone $base)->whereNull('exp_kp')->count(),
+            'kp_expired'    => $kp['expired'],
+            'kp_warning'    => $kp['warning'],
+            'kp_ok'         => $kp['ok'],
+            'kp_nodata'     => $kp['no_data'],
         ];
 
         return Inertia::render('Compliance/Badge', compact('employees', 'stats', 'filter', 'search', 'tab', 'highlight'));

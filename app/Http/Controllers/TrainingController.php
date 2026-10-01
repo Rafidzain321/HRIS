@@ -1,15 +1,25 @@
 <?php
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
-use App\Models\TrainingType;
-use App\Models\EmployeeTraining;
 use App\Models\ActivityLog;
+use App\Models\Employee;
+use App\Models\EmployeeTraining;
+use App\Models\TrainingType;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class TrainingController extends Controller
 {
+    const TRAINING_RULES = [
+        'tanggal'      => 'nullable|date',
+        'nama_trainer' => 'nullable|string|max:150',
+        'nilai'        => 'nullable|string|max:20',
+        'status'       => 'nullable|string|max:20',
+        'expired_date' => 'nullable|date',
+        'catatan'      => 'nullable|string|max:500',
+    ];
+
     public function index(Request $request)
     {
         $search = $request->get('search', '');
@@ -60,7 +70,7 @@ class TrainingController extends Controller
             'status' => $t->status,
             'expired_date' => $t->expired_date?->format('d M Y'),
             'auto_expired' => $t->auto_expired,
-            'auto_expired_fmt' => $t->auto_expired ? \Carbon\Carbon::parse($t->auto_expired)->format('d M Y') : null,
+            'auto_expired_fmt' => $t->auto_expired ? Carbon::parse($t->auto_expired)->format('d M Y') : null,
             'status_expired' => $t->status_expired,
             'sisa_hari' => $t->sisa_hari,
             'catatan' => $t->catatan,
@@ -103,7 +113,7 @@ class TrainingController extends Controller
                 'status' => $t->status,
                 'expired_date' => $t->expired_date?->format('Y-m-d'),
                 'auto_expired' => $t->auto_expired,
-                'auto_expired_fmt' => $t->auto_expired ? \Carbon\Carbon::parse($t->auto_expired)->format('d M Y') : null,
+                'auto_expired_fmt' => $t->auto_expired ? Carbon::parse($t->auto_expired)->format('d M Y') : null,
                 'status_expired' => $t->status_expired,
                 'sisa_hari' => $t->sisa_hari,
                 'catatan' => $t->catatan,
@@ -113,15 +123,7 @@ class TrainingController extends Controller
 
     public function store(Request $request, Employee $employee)
     {
-        $data = $request->validate([
-            'training_type_id' => 'required|exists:training_types,id',
-            'tanggal' => 'nullable|date',
-            'nama_trainer' => 'nullable|string|max:150',
-            'nilai' => 'nullable|string|max:20',
-            'status' => 'nullable|string|max:20',
-            'expired_date' => 'nullable|date',
-            'catatan' => 'nullable|string|max:500',
-        ]);
+        $data = $request->validate(['training_type_id' => 'required|exists:training_types,id', ...self::TRAINING_RULES]);
 
         $exists = EmployeeTraining::where('employee_id', $employee->id)
             ->where('training_type_id', $data['training_type_id'])->exists();
@@ -136,15 +138,7 @@ class TrainingController extends Controller
 
     public function update(Request $request, EmployeeTraining $training)
     {
-        $data = $request->validate([
-            'tanggal' => 'nullable|date',
-            'nama_trainer' => 'nullable|string|max:150',
-            'nilai' => 'nullable|string|max:20',
-            'status' => 'nullable|string|max:20',
-            'expired_date' => 'nullable|date',
-            'catatan' => 'nullable|string|max:500',
-        ]);
-        $training->update($data);
+        $training->update($request->validate(self::TRAINING_RULES));
         ActivityLog::record('update', 'Training', $training->employee?->nama_lengkap, "Update training: {$training->trainingType?->nama}");
         return response()->json(['message' => 'Training berhasil diperbarui.']);
     }
@@ -182,41 +176,29 @@ class TrainingController extends Controller
 
         $oldMasaBerlaku = $trainingType->masa_berlaku_tahun;
         $newMasaBerlaku = $data['masa_berlaku_tahun'] ?? null;
+        // Catatan: perbandingan ketat (nilai DB int vs input form string) sehingga hampir selalu dianggap berubah.
+        $berubah = $oldMasaBerlaku !== $newMasaBerlaku;
 
         $trainingType->update([...$data, 'has_expired' => isset($data['masa_berlaku_tahun'])]);
 
-        // Recalculate expired_date semua employee_trainings terkait
-        // kalau masa_berlaku_tahun berubah
-        if ($oldMasaBerlaku !== $newMasaBerlaku) {
-            $trainings = EmployeeTraining::where('training_type_id', $trainingType->id)
-                ->whereNotNull('tanggal')
-                ->get();
-
+        // Masa berlaku berubah -> hitung ulang expired_date semua training jenis ini
+        // (tanggal training + masa berlaku; kosong = seumur hidup).
+        if ($berubah) {
+            $trainings = EmployeeTraining::where('training_type_id', $trainingType->id)->whereNotNull('tanggal')->get();
             foreach ($trainings as $t) {
-                if ($newMasaBerlaku) {
-                    // Ada masa berlaku — hitung expired_date dari tanggal + tahun
-                    $expiredDate = \Carbon\Carbon::parse($t->tanggal)
-                        ->addYears((int) $newMasaBerlaku)
-                        ->format('Y-m-d');
-                    $t->update(['expired_date' => $expiredDate]);
-                } else {
-                    // Seumur hidup — kosongkan expired_date
-                    $t->update(['expired_date' => null]);
-                }
+                $t->update(['expired_date' => $newMasaBerlaku
+                    ? Carbon::parse($t->tanggal)->addYears((int) $newMasaBerlaku)->format('Y-m-d')
+                    : null]);
             }
         }
 
         ActivityLog::record('update', 'Jenis Training', $trainingType->nama,
             "Update jenis training: {$trainingType->nama}" .
-            ($oldMasaBerlaku !== $newMasaBerlaku
-                ? " | Masa berlaku: {$oldMasaBerlaku} → {$newMasaBerlaku} tahun ({$trainings->count()} record diperbarui)"
-                : "")
+            ($berubah ? " | Masa berlaku: {$oldMasaBerlaku} → {$newMasaBerlaku} tahun ({$trainings->count()} record diperbarui)" : "")
         );
 
         return back()->with('success', "Jenis training berhasil diperbarui." .
-            ($oldMasaBerlaku !== $newMasaBerlaku
-                ? " {$trainings->count()} data training karyawan telah diperbarui."
-                : "")
+            ($berubah ? " {$trainings->count()} data training karyawan telah diperbarui." : "")
         );
     }
 

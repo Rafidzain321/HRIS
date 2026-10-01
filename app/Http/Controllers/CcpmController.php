@@ -8,9 +8,23 @@ use Inertia\Inertia;
 
 class CcpmController extends Controller
 {
+    const RULES = [
+        'badge'            => 'nullable|string|max:30',
+        'id_card'          => 'nullable|string|max:20',
+        'hes_passport'     => 'nullable|string|max:50',
+        'name'             => 'required|string|max:200',
+        'birth_place'      => 'nullable|string|max:100',
+        'birth_date'       => 'nullable|date',
+        'ffd_valid_date'   => 'nullable|date',
+        'badge_valid_date' => 'nullable|date',
+        'job_title'        => 'nullable|string|max:150',
+        'team_assignment'  => 'nullable|string|max:100',
+        'status'           => 'nullable|string|max:100',
+        'status_medical'   => 'nullable|string|max:100',
+    ];
+
     public function index(Request $request)
     {
-        // ── PROJECT FILTER ──
         $pid   = $this->activeProjectId();
         $query = CcpmManpower::query()
             ->when($pid, fn($q) => $q->where('project_id', $pid));
@@ -55,7 +69,6 @@ class CcpmController extends Controller
 
         $manpower = $paginated->toArray();
 
-        // ── STATS juga difilter per project ──
         $base = CcpmManpower::when($pid, fn($q) => $q->where('project_id', $pid));
         $manpower['complete']    = (clone $base)->where('status', 'Complete')->count();
         $manpower['in_progress'] = (clone $base)->where('status', 'like', 'In Progress%')->count();
@@ -79,22 +92,7 @@ class CcpmController extends Controller
             return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
         }
 
-        $data = $request->validate([
-            'badge'            => 'nullable|string|max:30',
-            'id_card'          => 'nullable|string|max:20',
-            'hes_passport'     => 'nullable|string|max:50',
-            'name'             => 'required|string|max:200',
-            'birth_place'      => 'nullable|string|max:100',
-            'birth_date'       => 'nullable|date',
-            'ffd_valid_date'   => 'nullable|date',
-            'badge_valid_date' => 'nullable|date',
-            'job_title'        => 'nullable|string|max:150',
-            'team_assignment'  => 'nullable|string|max:100',
-            'status'           => 'nullable|string|max:100',
-            'status_medical'   => 'nullable|string|max:100',
-        ]);
-
-        // ── Set project_id otomatis ──
+        $data = $request->validate(self::RULES);
         $data['project_id'] = $this->activeProjectId() ?? auth()->user()->project_id;
 
         $ccpm = CcpmManpower::create($data);
@@ -108,22 +106,7 @@ class CcpmController extends Controller
             return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
         }
 
-        $data = $request->validate([
-            'badge'            => 'nullable|string|max:30',
-            'id_card'          => 'nullable|string|max:20',
-            'hes_passport'     => 'nullable|string|max:50',
-            'name'             => 'required|string|max:200',
-            'birth_place'      => 'nullable|string|max:100',
-            'birth_date'       => 'nullable|date',
-            'ffd_valid_date'   => 'nullable|date',
-            'badge_valid_date' => 'nullable|date',
-            'job_title'        => 'nullable|string|max:150',
-            'team_assignment'  => 'nullable|string|max:100',
-            'status'           => 'nullable|string|max:100',
-            'status_medical'   => 'nullable|string|max:100',
-        ]);
-
-        $ccpm->update($data);
+        $ccpm->update($request->validate(self::RULES));
         ActivityLog::record('update', 'CCPM', $ccpm->name, "Edit manpower CCPM: {$ccpm->name}");
         return redirect()->route('ccpm')->with('success', "Data {$ccpm->name} berhasil diperbarui.");
     }

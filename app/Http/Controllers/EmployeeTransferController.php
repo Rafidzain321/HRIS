@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/EmployeeTransferController.php
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
@@ -9,28 +8,19 @@ use App\Models\Project;
 use App\Models\TimesheetMember;
 use Illuminate\Http\Request;
 
+// Pindah kantor karyawan. Super-admin memindahkan langsung; akun kantor mengajukan dan
+// disetujui/ditolak oleh kantor tujuan (atau super-admin).
 class EmployeeTransferController extends Controller
 {
     public function index()
     {
-        $user         = auth()->user();
-        $isSuperAdmin = $user->hasRole('super-admin');
+        $user  = auth()->user();
+        $query = EmployeeTransfer::with(['employee.position', 'fromProject', 'toProject', 'requestedBy', 'approvedBy'])
+            ->orderByDesc('created_at');
 
-        $query = EmployeeTransfer::with([
-            'employee.position',
-            'fromProject',
-            'toProject',
-            'requestedBy',
-            'approvedBy',
-        ])->orderByDesc('created_at');
-
-        if (!$isSuperAdmin) {
-            // Project user lihat pengajuan yang KELUAR dari project mereka
-            // ATAU yang MASUK ke project mereka (supaya bisa tahu ada karyawan yang mau datang)
-            $query->where(function($q) use ($user) {
-                $q->where('from_project_id', $user->project_id)
-                  ->orWhere('to_project_id', $user->project_id);
-            });
+        // Akun kantor melihat pengajuan yang KELUAR dari kantornya ATAU yang MASUK ke kantornya.
+        if (!$user->hasRole('super-admin')) {
+            $query->where(fn($q) => $q->where('from_project_id', $user->project_id)->orWhere('to_project_id', $user->project_id));
         }
 
         $transfers = $query->get()->map(fn($t) => [
@@ -53,20 +43,16 @@ class EmployeeTransferController extends Controller
             'created_at'        => $t->created_at->format('d M Y H:i'),
         ]);
 
-        $projects     = Project::where('is_active', true)->orderBy('nama')->get(['id', 'kode', 'nama']);
-        $pendingCount = EmployeeTransfer::where('status', 'pending')->count();
-
         return response()->json([
             'transfers'     => $transfers,
-            'projects'      => $projects,
-            'pending_count' => $pendingCount,
+            'projects'      => Project::where('is_active', true)->orderBy('nama')->get(['id', 'kode', 'nama']),
+            'pending_count' => EmployeeTransfer::where('status', 'pending')->count(),
         ]);
     }
 
     public function pendingCount()
     {
-        $count = EmployeeTransfer::where('status', 'pending')->count();
-        return response()->json(['count' => $count]);
+        return response()->json(['count' => EmployeeTransfer::where('status', 'pending')->count()]);
     }
 
     public function transferDirect(Request $request, Employee $employee)
@@ -80,7 +66,6 @@ class EmployeeTransferController extends Controller
             'catatan'       => 'nullable|string|max:500',
         ]);
 
-        // ── GUARD 1: Karyawan sudah di project tujuan ──
         if ($employee->project_id == $data['to_project_id']) {
             $toProject = Project::find($data['to_project_id']);
             return response()->json([
@@ -89,13 +74,12 @@ class EmployeeTransferController extends Controller
             ], 422);
         }
 
-        // ── GUARD 2: Cegah double-submit dalam 30 detik ──
+        // Cegah double-submit: transfer yang sama sudah disetujui dalam 5 detik terakhir.
         $recentTransfer = EmployeeTransfer::where('employee_id', $employee->id)
             ->where('to_project_id', $data['to_project_id'])
             ->where('status', 'approved')
             ->where('approved_at', '>=', now()->subSeconds(5))
             ->exists();
-
         if ($recentTransfer) {
             return response()->json([
                 'ok'      => false,
@@ -103,47 +87,20 @@ class EmployeeTransferController extends Controller
             ], 422);
         }
 
-        $fromProjectId = $employee->project_id; // bisa null kalau belum punya project
-
-        $employee->update(['project_id' => $data['to_project_id']]);
-
-        // Pindahkan timesheet member hanya kalau ada project asal
-        if ($fromProjectId) {
-            TimesheetMember::where('id_badge', $employee->id_badge)
-                ->where('project_id', $fromProjectId)
-                ->update(['project_id' => $data['to_project_id']]);
-        }
-
-        EmployeeTransfer::create([
-            'employee_id'      => $employee->id,
-            'from_project_id'  => $fromProjectId, // nullable — karyawan baru tanpa project asal
-            'to_project_id'    => $data['to_project_id'],
-            'requested_by'     => auth()->id(),
-            'approved_by'      => auth()->id(),
-            'status'           => 'approved',
-            'catatan'          => $data['catatan'] ?? null,
-            'catatan_approval' => 'Transfer langsung oleh Super Admin',
-            'approved_at'      => now(),
-        ]);
+        $this->pindahLangsung($employee, $data['to_project_id'], $data['catatan'] ?? null, 'Transfer langsung oleh Super Admin');
 
         $toProject = Project::find($data['to_project_id']);
-        ActivityLog::record(
-            'update', 'Pindah Project',
-            $employee->nama_lengkap,
-            "Transfer langsung: {$employee->nama_lengkap} ke {$toProject?->nama}"
-        );
+        ActivityLog::record('update', 'Pindah Project', $employee->nama_lengkap, "Transfer langsung: {$employee->nama_lengkap} ke {$toProject?->nama}");
 
         return response()->json([
-            'ok'      => true,
-            'message' => "Karyawan berhasil dipindahkan ke {$toProject?->nama}.",
-            // Kembalikan project terbaru supaya frontend bisa update state
+            'ok'               => true,
+            'message'          => "Karyawan berhasil dipindahkan ke {$toProject?->nama}.",
             'new_project_id'   => (int) $data['to_project_id'],
             'new_project_nama' => $toProject?->nama,
         ]);
     }
 
-    // Pindah/ajukan mutasi banyak karyawan sekaligus. Super admin -> langsung pindah (seperti
-    // transferDirect); role lain -> kirim pengajuan massal (seperti requestTransfer), menunggu approval.
+    // Banyak karyawan sekaligus. Super admin -> langsung pindah; role lain -> pengajuan massal menunggu approval.
     public function transferBulk(Request $request)
     {
         $user         = auth()->user();
@@ -157,60 +114,26 @@ class EmployeeTransferController extends Controller
         ]);
 
         $toProject = Project::find($data['to_project_id']);
-        $employees = Employee::whereIn('id', $data['employee_ids'])->get();
-
+        $catatan   = $data['catatan'] ?? null;
         $moved = 0; $requested = 0; $skipped = 0;
 
-        foreach ($employees as $employee) {
+        foreach (Employee::whereIn('id', $data['employee_ids'])->get() as $employee) {
             if ($employee->project_id == $data['to_project_id']) { $skipped++; continue; }
 
             if ($isSuperAdmin) {
-                $fromProjectId = $employee->project_id;
-                $employee->update(['project_id' => $data['to_project_id']]);
-
-                if ($fromProjectId) {
-                    TimesheetMember::where('id_badge', $employee->id_badge)
-                        ->where('project_id', $fromProjectId)
-                        ->update(['project_id' => $data['to_project_id']]);
-                }
-
-                EmployeeTransfer::create([
-                    'employee_id'      => $employee->id,
-                    'from_project_id'  => $fromProjectId,
-                    'to_project_id'    => $data['to_project_id'],
-                    'requested_by'     => $user->id,
-                    'approved_by'      => $user->id,
-                    'status'           => 'approved',
-                    'catatan'          => $data['catatan'] ?? null,
-                    'catatan_approval' => 'Transfer massal oleh Super Admin',
-                    'approved_at'      => now(),
-                ]);
+                $this->pindahLangsung($employee, $data['to_project_id'], $catatan, 'Transfer massal oleh Super Admin');
                 $moved++;
-            } else {
-                if (!$employee->project_id) { $skipped++; continue; }
-
-                $existing = EmployeeTransfer::where('employee_id', $employee->id)
-                    ->where('status', 'pending')->exists();
-                if ($existing) { $skipped++; continue; }
-
-                EmployeeTransfer::create([
-                    'employee_id'     => $employee->id,
-                    'from_project_id' => $employee->project_id,
-                    'to_project_id'   => $data['to_project_id'],
-                    'requested_by'    => $user->id,
-                    'status'          => 'pending',
-                    'catatan'         => $data['catatan'] ?? null,
-                ]);
-                $requested++;
+                continue;
             }
+
+            if (!$employee->project_id || $this->adaPengajuanPending($employee)) { $skipped++; continue; }
+            $this->buatPengajuan($employee, $data['to_project_id'], $catatan);
+            $requested++;
         }
 
-        ActivityLog::record(
-            'update', 'Pindah Project', $toProject?->nama,
-            $isSuperAdmin
-                ? "Transfer massal {$moved} karyawan ke {$toProject?->nama}"
-                : "Pengajuan mutasi massal {$requested} karyawan ke {$toProject?->nama}"
-        );
+        ActivityLog::record('update', 'Pindah Project', $toProject?->nama, $isSuperAdmin
+            ? "Transfer massal {$moved} karyawan ke {$toProject?->nama}"
+            : "Pengajuan mutasi massal {$requested} karyawan ke {$toProject?->nama}");
 
         $message = $isSuperAdmin
             ? "{$moved} karyawan berhasil dipindahkan ke {$toProject?->nama}." . ($skipped ? " {$skipped} dilewati (sudah di project tujuan)." : '')
@@ -221,9 +144,7 @@ class EmployeeTransferController extends Controller
 
     public function requestTransfer(Request $request, Employee $employee)
     {
-        $user = auth()->user();
-
-        if ($user->hasRole('super-admin')) {
+        if (auth()->user()->hasRole('super-admin')) {
             return response()->json(['ok' => false, 'message' => 'Super admin gunakan transfer langsung.'], 422);
         }
 
@@ -233,111 +154,50 @@ class EmployeeTransferController extends Controller
         ]);
 
         if (!$employee->project_id) {
-            return response()->json([
-                'ok'      => false,
-                'message' => 'Karyawan ini belum memiliki project asal.',
-            ], 422);
+            return response()->json(['ok' => false, 'message' => 'Karyawan ini belum memiliki project asal.'], 422);
         }
-
-        $fromProjectId = $employee->project_id;
-
-        if ($fromProjectId == $data['to_project_id']) {
+        if ($employee->project_id == $data['to_project_id']) {
             return response()->json(['ok' => false, 'message' => 'Karyawan sudah di project tujuan.'], 422);
         }
-
-        $existing = EmployeeTransfer::where('employee_id', $employee->id)
-            ->where('status', 'pending')
-            ->first();
-
-        if ($existing) {
+        if ($this->adaPengajuanPending($employee)) {
             return response()->json(['ok' => false, 'message' => 'Sudah ada pengajuan pindah project yang belum diproses untuk karyawan ini.'], 422);
         }
 
-        EmployeeTransfer::create([
-            'employee_id'     => $employee->id,
-            'from_project_id' => $fromProjectId,
-            'to_project_id'   => $data['to_project_id'],
-            'requested_by'    => $user->id,
-            'status'          => 'pending',
-            'catatan'         => $data['catatan'] ?? null,
-        ]);
+        $this->buatPengajuan($employee, $data['to_project_id'], $data['catatan'] ?? null);
 
         $toProject = Project::find($data['to_project_id']);
-        ActivityLog::record(
-            'create', 'Pindah Project',
-            $employee->nama_lengkap,
-            "Pengajuan mutasi: {$employee->nama_lengkap} ke {$toProject?->nama}"
-        );
+        ActivityLog::record('create', 'Pindah Project', $employee->nama_lengkap, "Pengajuan mutasi: {$employee->nama_lengkap} ke {$toProject?->nama}");
 
         return response()->json(['ok' => true, 'message' => "Pengajuan mutasi berhasil dikirim. Menunggu persetujuan dari {$toProject?->nama} atau Super Admin."]);
     }
 
     public function approve(Request $request, EmployeeTransfer $transfer)
     {
-        $user = auth()->user();
-        $isSuperAdmin = $user->hasRole('super-admin');
+        if ($error = $this->cekBolehProses($transfer, 'menyetujui')) return $error;
 
-        // Boleh approve: super admin ATAU project user yang projectnya = project tujuan
-        $isDestinationUser = !$isSuperAdmin && $user->project_id == $transfer->to_project_id;
+        $data = $request->validate(['catatan_approval' => 'nullable|string|max:500']);
 
-        if (!$isSuperAdmin && !$isDestinationUser) {
-            return response()->json(['ok' => false, 'message' => 'Tidak memiliki akses untuk menyetujui pengajuan ini.'], 403);
-        }
-
-        if ($transfer->status !== 'pending') {
-            return response()->json(['ok' => false, 'message' => 'Pengajuan ini sudah diproses.'], 422);
-        }
-
-        $data = $request->validate([
-            'catatan_approval' => 'nullable|string|max:500',
-        ]);
-
-        $employee      = $transfer->employee;
-        $fromProjectId = $transfer->from_project_id;
-        $toProjectId   = $transfer->to_project_id;
-
+        $employee = $transfer->employee;
         $transfer->update([
             'status'           => 'approved',
             'approved_by'      => auth()->id(),
             'catatan_approval' => $data['catatan_approval'] ?? null,
             'approved_at'      => now(),
         ]);
+        $employee->update(['project_id' => $transfer->to_project_id]);
+        $this->pindahkanTimesheetMember($employee, $transfer->from_project_id, $transfer->to_project_id);
 
-        $employee->update(['project_id' => $toProjectId]);
-
-        TimesheetMember::where('id_badge', $employee->id_badge)
-            ->where('project_id', $fromProjectId)
-            ->update(['project_id' => $toProjectId]);
-
-        $toProject = Project::find($toProjectId);
-        ActivityLog::record(
-            'update', 'Pindah Project',
-            $employee->nama_lengkap,
-            "Approve mutasi: {$employee->nama_lengkap} ke {$toProject?->nama}"
-        );
+        $toProject = Project::find($transfer->to_project_id);
+        ActivityLog::record('update', 'Pindah Project', $employee->nama_lengkap, "Approve mutasi: {$employee->nama_lengkap} ke {$toProject?->nama}");
 
         return response()->json(['ok' => true, 'message' => "Pengajuan disetujui. {$employee->nama_lengkap} dipindahkan ke {$toProject?->nama}."]);
     }
 
     public function reject(Request $request, EmployeeTransfer $transfer)
     {
-        $user = auth()->user();
-        $isSuperAdmin = $user->hasRole('super-admin');
+        if ($error = $this->cekBolehProses($transfer, 'menolak')) return $error;
 
-        // Boleh reject: super admin ATAU project user yang projectnya = project tujuan
-        $isDestinationUser = !$isSuperAdmin && $user->project_id == $transfer->to_project_id;
-
-        if (!$isSuperAdmin && !$isDestinationUser) {
-            return response()->json(['ok' => false, 'message' => 'Tidak memiliki akses untuk menolak pengajuan ini.'], 403);
-        }
-
-        if ($transfer->status !== 'pending') {
-            return response()->json(['ok' => false, 'message' => 'Pengajuan ini sudah diproses.'], 422);
-        }
-
-        $data = $request->validate([
-            'catatan_approval' => 'nullable|string|max:500',
-        ]);
+        $data = $request->validate(['catatan_approval' => 'nullable|string|max:500']);
 
         $transfer->update([
             'status'           => 'rejected',
@@ -346,12 +206,67 @@ class EmployeeTransferController extends Controller
             'approved_at'      => now(),
         ]);
 
-        ActivityLog::record(
-            'update', 'Pindah Project',
-            $transfer->employee?->nama_lengkap,
-            "Reject mutasi: {$transfer->employee?->nama_lengkap}"
-        );
+        ActivityLog::record('update', 'Pindah Project', $transfer->employee?->nama_lengkap, "Reject mutasi: {$transfer->employee?->nama_lengkap}");
 
         return response()->json(['ok' => true, 'message' => 'Pengajuan ditolak.']);
+    }
+
+    // Yang boleh memproses pengajuan: super admin, atau akun kantor yang kantornya = kantor tujuan.
+    private function cekBolehProses(EmployeeTransfer $transfer, string $aksi): ?\Illuminate\Http\JsonResponse
+    {
+        $user = auth()->user();
+        if (!$user->hasRole('super-admin') && $user->project_id != $transfer->to_project_id) {
+            return response()->json(['ok' => false, 'message' => "Tidak memiliki akses untuk {$aksi} pengajuan ini."], 403);
+        }
+        if ($transfer->status !== 'pending') {
+            return response()->json(['ok' => false, 'message' => 'Pengajuan ini sudah diproses.'], 422);
+        }
+        return null;
+    }
+
+    // Pindah langsung (super admin): ubah kantor, ikut pindahkan anggota timesheet, catat riwayat sebagai approved.
+    private function pindahLangsung(Employee $employee, $toProjectId, ?string $catatan, string $catatanApproval): void
+    {
+        $fromProjectId = $employee->project_id; // bisa null kalau karyawan belum punya kantor
+        $employee->update(['project_id' => $toProjectId]);
+        if ($fromProjectId) {
+            $this->pindahkanTimesheetMember($employee, $fromProjectId, $toProjectId);
+        }
+
+        EmployeeTransfer::create([
+            'employee_id'      => $employee->id,
+            'from_project_id'  => $fromProjectId,
+            'to_project_id'    => $toProjectId,
+            'requested_by'     => auth()->id(),
+            'approved_by'      => auth()->id(),
+            'status'           => 'approved',
+            'catatan'          => $catatan,
+            'catatan_approval' => $catatanApproval,
+            'approved_at'      => now(),
+        ]);
+    }
+
+    private function pindahkanTimesheetMember(Employee $employee, $fromProjectId, $toProjectId): void
+    {
+        TimesheetMember::where('id_badge', $employee->id_badge)
+            ->where('project_id', $fromProjectId)
+            ->update(['project_id' => $toProjectId]);
+    }
+
+    private function adaPengajuanPending(Employee $employee): bool
+    {
+        return EmployeeTransfer::where('employee_id', $employee->id)->where('status', 'pending')->exists();
+    }
+
+    private function buatPengajuan(Employee $employee, $toProjectId, ?string $catatan): void
+    {
+        EmployeeTransfer::create([
+            'employee_id'     => $employee->id,
+            'from_project_id' => $employee->project_id,
+            'to_project_id'   => $toProjectId,
+            'requested_by'    => auth()->id(),
+            'status'          => 'pending',
+            'catatan'         => $catatan,
+        ]);
     }
 }

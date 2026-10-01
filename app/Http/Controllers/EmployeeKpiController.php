@@ -1,29 +1,33 @@
 <?php
-// app/Http/Controllers/EmployeeKpiController.php
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ExcelReport;
 use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\KpiAppraisal;
 use App\Models\KpiAppraisalScore;
 use App\Models\KpiCriteria;
+use App\Models\OrgStructureDocument;
 use App\Models\Project;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Chart\Chart;
 use PhpOffice\PhpSpreadsheet\Chart\DataSeries;
 use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
 use PhpOffice\PhpSpreadsheet\Chart\Legend;
 use PhpOffice\PhpSpreadsheet\Chart\PlotArea;
 use PhpOffice\PhpSpreadsheet\Chart\Title;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 
 class EmployeeKpiController extends Controller
 {
+    use ExcelReport;
+
     // HR (permission edit-kpi) atau super-admin boleh kelola penilaian siapa saja. Selain itu,
     // akun yang terhubung ke data karyawan sendiri (users.employee_id) cuma boleh kelola
     // penilaian dirinya sendiri DAN bawahan langsungnya (atasan_id).
@@ -63,35 +67,12 @@ class EmployeeKpiController extends Controller
         return array_values(array_unique([(int) $user->employee_id, ...$bawahanIds, ...$reviewOwnerIds]));
     }
 
-    private function employeesPayload()
+    // Karyawan aktif HO (id, nama, jabatan, atasan). $scopedIds null = semua.
+    private function hoEmployeeRows(?array $scopedIds = null)
     {
-        $hoProjectId = Project::where('kode', 'ho')->value('id');
-        $scopedIds   = $this->scopedEmployeeIds();
-
-        $employees = Employee::aktif()
-            ->where('project_id', $hoProjectId)
-            ->when($scopedIds !== null, fn ($q) => $q->whereIn('id', $scopedIds))
-            ->with('position')
-            ->orderBy('nama_lengkap')
-            ->get(['id', 'nama_lengkap', 'position_id', 'department_id', 'atasan_id'])
-            ->map(fn ($e) => [
-                'id'           => $e->id,
-                'nama_lengkap' => $e->nama_lengkap,
-                'jabatan'      => $e->position?->nama_jabatan ?? '-',
-                'atasan_id'    => $e->atasan_id,
-            ]);
-
-        return [$employees, $scopedIds !== null];
-    }
-
-    // Daftar penuh karyawan HO (tanpa dibatasi cakupan atasan-bawahan) — dipakai khusus buat
-    // pemilihan "Penilai / Reviewer", supaya penugasannya bebas tidak kaku ke struktur hierarki.
-    private function allEmployeesPayload()
-    {
-        $hoProjectId = Project::where('kode', 'ho')->value('id');
-
         return Employee::aktif()
-            ->where('project_id', $hoProjectId)
+            ->where('project_id', Project::where('kode', 'ho')->value('id'))
+            ->when($scopedIds !== null, fn ($q) => $q->whereIn('id', $scopedIds))
             ->with('position')
             ->orderBy('nama_lengkap')
             ->get(['id', 'nama_lengkap', 'position_id', 'atasan_id'])
@@ -103,10 +84,27 @@ class EmployeeKpiController extends Controller
             ]);
     }
 
-    // Periode berjalan sekarang — semester 1 = Jan-Jun, semester 2 = Jul-Des.
-    private function currentPeriod(): array
+    // Karyawan yang boleh dilihat user ini + flag apakah dibatasi (bukan HR).
+    private function employeesPayload(): array
     {
-        return [(int) now()->year, now()->month <= 6 ? 1 : 2];
+        $scopedIds = $this->scopedEmployeeIds();
+        return [$this->hoEmployeeRows($scopedIds), $scopedIds !== null];
+    }
+
+    // Daftar penuh karyawan HO (tanpa dibatasi cakupan atasan-bawahan) — dipakai buat pemilihan
+    // "Penilai / Reviewer" & Struktur Organisasi, supaya tidak kaku ke struktur hierarki.
+    private function allEmployeesPayload()
+    {
+        return $this->hoEmployeeRows();
+    }
+
+    // Periode dari query (?tahun=&semester=), default periode berjalan (semester 1 = Jan-Jun, 2 = Jul-Des).
+    private function periode(Request $request): array
+    {
+        return [
+            (int) $request->get('tahun', (int) now()->year),
+            (int) $request->get('semester', now()->month <= 6 ? 1 : 2),
+        ];
     }
 
     // Kriteria yang berlaku buat satu karyawan: 20 poin baku (employee_id kosong) + poin
@@ -150,9 +148,7 @@ class EmployeeKpiController extends Controller
     public function index(Request $request)
     {
         [$employees, $isSelfOnly] = $this->employeesPayload();
-        [$defYear, $defSemester] = $this->currentPeriod();
-        $tahun    = (int) $request->get('tahun', $defYear);
-        $semester = (int) $request->get('semester', $defSemester);
+        [$tahun, $semester] = $this->periode($request);
 
         $appraisals = KpiAppraisal::with('reviewer')
             ->whereIn('employee_id', $employees->pluck('id'))
@@ -190,9 +186,7 @@ class EmployeeKpiController extends Controller
     // Buka (atau buatkan kalau belum ada) form penilaian satu karyawan untuk satu periode.
     public function openAppraisal(Request $request, Employee $employee)
     {
-        [$defYear, $defSemester] = $this->currentPeriod();
-        $tahun    = (int) $request->get('tahun', $defYear);
-        $semester = (int) $request->get('semester', $defSemester);
+        [$tahun, $semester] = $this->periode($request);
 
         $appraisal = KpiAppraisal::where('employee_id', $employee->id)
             ->where('tahun', $tahun)->where('semester', $semester)->first();
@@ -486,9 +480,7 @@ class EmployeeKpiController extends Controller
     public function export(Request $request)
     {
         [$employees] = $this->employeesPayload();
-        [$defYear, $defSemester] = $this->currentPeriod();
-        $tahun    = (int) $request->get('tahun', $defYear);
-        $semester = (int) $request->get('semester', $defSemester);
+        [$tahun, $semester] = $this->periode($request);
         ActivityLog::record('export', 'Penilaian KPI', null, "Export Excel penilaian KPI semester {$semester}/{$tahun}");
 
         $employeesModel = Employee::aktif()->whereIn('id', $employees->pluck('id'))
@@ -505,18 +497,18 @@ class EmployeeKpiController extends Controller
 
         // ── SHEET 1: RINGKASAN ──
         $sheet1 = $wb->getActiveSheet()->setTitle('Ringkasan');
-        $this->kpiExportTitle($sheet1, "RINGKASAN PENILAIAN KPI SEMESTER {$semester} {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'H', $employeesModel->count());
+        $this->reportTitle($sheet1, "RINGKASAN PENILAIAN KPI SEMESTER {$semester} {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'H');
         $headers1 = [
             'A' => ['No.', 4], 'B' => ['Nama Karyawan', 26], 'C' => ['Jabatan', 24],
             'D' => ['Nilai A (40%)', 13], 'E' => ['Nilai B (60%)', 13], 'F' => ['Total Nilai', 12],
             'G' => ['Predikat', 16], 'H' => ['Status', 13],
         ];
-        $this->kpiExportHeaderRow($sheet1, $headers1, 4);
+        $this->reportHeaderRow($sheet1, $headers1, 4, 28);
         foreach ($employeesModel as $idx => $e) {
             $row = 5 + $idx;
             $a = $appraisals->get($e->id);
             $predikatLabel = $a ? (KpiAppraisal::predikatLabel($a->predikat) . " ({$a->predikat})") : '—';
-            $this->kpiExportRow($sheet1, $row, $idx, [
+            $this->reportRow($sheet1, $row, $idx, [
                 'A' => $idx + 1,
                 'B' => strtoupper($e->nama_lengkap),
                 'C' => $e->position?->nama_jabatan ?? '—',
@@ -595,17 +587,17 @@ class EmployeeKpiController extends Controller
                 ]);
             }
         }
-        $this->kpiExportTitle($sheet2, "DETAIL PENILAIAN KPI SEMESTER {$semester} {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'F', $detailRows->count());
+        $this->reportTitle($sheet2, "DETAIL PENILAIAN KPI SEMESTER {$semester} {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'F');
         $headers2 = [
             'A' => ['No.', 4], 'B' => ['Nama Karyawan', 26], 'C' => ['Jabatan', 22],
             'D' => ['Section', 10], 'E' => ['Kriteria', 55], 'F' => ['Nilai (1-5)', 11],
         ];
         $hRow2 = 4;
-        $this->kpiExportHeaderRow($sheet2, $headers2, $hRow2);
+        $this->reportHeaderRow($sheet2, $headers2, $hRow2, 28);
         foreach ($detailRows as $idx => $r) {
             $row = 5 + $idx;
             $label = $r['section'] === 'A' ? 'A. Keselamatan' : ('B. ' . ($r['sub'] ?? 'Produktivitas'));
-            $this->kpiExportRow($sheet2, $row, $idx, [
+            $this->reportRow($sheet2, $row, $idx, [
                 'A' => $idx + 1, 'B' => strtoupper($r['nama']), 'C' => $r['jabatan'],
                 'D' => $label, 'E' => $r['deskripsi'], 'F' => $r['nilai'] ?? '—',
             ], ['A', 'D', 'F']);
@@ -618,22 +610,12 @@ class EmployeeKpiController extends Controller
         $sheet2->freezePane('B5');
         $sheet2->setAutoFilter("A{$hRow2}:F{$hRow2}");
         $sheet2->setShowGridlines(false);
-        $sheet2->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
+        $sheet2->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE);
         $sheet2->getPageSetup()->setFitToPage(true)->setFitToWidth(1)->setFitToHeight(0);
 
         $wb->setActiveSheetIndex(0);
 
-        $namaFile = 'KPI_' . now()->format('Ymd_His') . '.xlsx';
-
-        $writer = new Xlsx($wb);
-        $writer->setIncludeCharts(true);
-        return response()->stream(function () use ($writer) {
-            $writer->save('php://output');
-        }, 200, [
-            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . $namaFile . '"',
-            'Cache-Control'       => 'max-age=0',
-        ]);
+        return $this->streamXlsx($wb, 'KPI_' . now()->format('Ymd_His') . '.xlsx', true);
     }
 
     // Bikin chart donut native Excel dari satu range kategori + satu range nilai di sheet
@@ -655,50 +637,6 @@ class EmployeeKpiController extends Controller
         return $chart;
     }
 
-    private function kpiExportTitle($sheet, string $title, string $lastCol, int $count): void
-    {
-        $sheet->mergeCells("A1:{$lastCol}1");
-        $sheet->setCellValue('A1', $title);
-        $sheet->getStyle('A1')->applyFromArray([
-            'font'      => ['name' => 'Arial', 'size' => 12, 'bold' => true, 'color' => ['rgb' => 'E8A020']],
-            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1A1A2E']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-        ]);
-        $sheet->getRowDimension(1)->setRowHeight(28);
-        $sheet->getRowDimension(2)->setRowHeight(6);
-        $sheet->getRowDimension(3)->setRowHeight(6);
-    }
-
-    private function kpiExportHeaderRow($sheet, array $headers, int $hRow): void
-    {
-        foreach ($headers as $col => [$label, $width]) {
-            $sheet->setCellValue($col . $hRow, $label);
-            $sheet->getStyle($col . $hRow)->applyFromArray([
-                'font'      => ['name' => 'Arial', 'size' => 9, 'bold' => true],
-                'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9D9D9']],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-                'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'AAAAAA']]],
-            ]);
-            $sheet->getColumnDimension($col)->setWidth($width);
-        }
-        $sheet->getRowDimension($hRow)->setRowHeight(28);
-    }
-
-    private function kpiExportRow($sheet, int $row, int $idx, array $values, array $centerCols = []): void
-    {
-        $rowBg = $idx % 2 === 0 ? 'FFFFFF' : 'F0F2F5';
-        foreach ($values as $col => $val) {
-            $sheet->setCellValue($col . $row, $val);
-            $sheet->getStyle($col . $row)->applyFromArray([
-                'font'      => ['name' => 'Arial', 'size' => 9],
-                'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $rowBg]],
-                'alignment' => ['horizontal' => in_array($col, $centerCols) ? Alignment::HORIZONTAL_CENTER : Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
-                'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'D0D3DC']]],
-            ]);
-        }
-        $sheet->getRowDimension($row)->setRowHeight(15);
-    }
-
     // ── STRUKTUR ORGANISASI (atasan-bawahan) ─────────────────────
     // Sebelumnya atasan_id cuma bisa diisi lewat seeder/DB langsung (hardcoded) — sekarang
     // bisa diatur bebas dari sini oleh HR, tanpa perlu sentuh kode. Dipakai buat hierarki
@@ -709,21 +647,10 @@ class EmployeeKpiController extends Controller
             abort(403, 'Kamu tidak memiliki akses ke halaman ini.');
         }
 
-        $hoProjectId = Project::where('kode', 'ho')->value('id');
-        $employees = Employee::aktif()->where('project_id', $hoProjectId)
-            ->with('position')->orderBy('nama_lengkap')
-            ->get(['id', 'nama_lengkap', 'position_id', 'atasan_id'])
-            ->map(fn ($e) => [
-                'id'           => $e->id,
-                'nama_lengkap' => $e->nama_lengkap,
-                'jabatan'      => $e->position?->nama_jabatan ?? '-',
-                'atasan_id'    => $e->atasan_id,
-            ]);
-
-        $doc = \App\Models\OrgStructureDocument::with('uploader')->latest()->first();
+        $doc = OrgStructureDocument::with('uploader')->latest()->first();
 
         return Inertia::render('Kpi/OrgStructure', [
-            'employees' => $employees,
+            'employees' => $this->allEmployeesPayload(),
             'document'  => $doc ? [
                 'id'           => $doc->id,
                 'nama_file'    => $doc->nama_file,
@@ -748,17 +675,17 @@ class EmployeeKpiController extends Controller
             'file' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ]);
 
-        $old = \App\Models\OrgStructureDocument::latest()->first();
+        $old = OrgStructureDocument::latest()->first();
         if ($old) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($old->path);
+            Storage::disk('public')->delete($old->path);
             $old->delete();
         }
 
         $file = $request->file('file');
-        $name = time() . '_' . \Illuminate\Support\Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
+        $name = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
         $path = $file->storeAs('org_structure', $name, 'public');
 
-        \App\Models\OrgStructureDocument::create([
+        OrgStructureDocument::create([
             'nama_file'   => $file->getClientOriginalName(),
             'path'        => $path,
             'mime_type'   => $file->getMimeType(),
@@ -773,12 +700,12 @@ class EmployeeKpiController extends Controller
 
     public function previewOrgDocument()
     {
-        $doc = \App\Models\OrgStructureDocument::latest()->first();
-        if (!$doc || !\Illuminate\Support\Facades\Storage::disk('public')->exists($doc->path)) {
+        $doc = OrgStructureDocument::latest()->first();
+        if (!$doc || !Storage::disk('public')->exists($doc->path)) {
             abort(404, 'Dokumen tidak ditemukan.');
         }
 
-        $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($doc->path);
+        $fullPath = Storage::disk('public')->path($doc->path);
         return response()->file($fullPath, [
             'Content-Type'        => $doc->mime_type,
             'Content-Disposition' => 'inline; filename="' . $doc->nama_file . '"',
@@ -791,9 +718,9 @@ class EmployeeKpiController extends Controller
             abort(403, 'Kamu tidak memiliki akses untuk menghapus dokumen ini.');
         }
 
-        $doc = \App\Models\OrgStructureDocument::latest()->first();
+        $doc = OrgStructureDocument::latest()->first();
         if ($doc) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($doc->path);
+            Storage::disk('public')->delete($doc->path);
             $nama = $doc->nama_file;
             $doc->delete();
             ActivityLog::record('delete', 'Struktur Organisasi', null, "Hapus dokumen struktur organisasi: {$nama}");

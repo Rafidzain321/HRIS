@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ExcelReport;
 use App\Models\ActivityLog;
 use App\Models\CcpmManpower;
 use App\Models\ClientProject;
@@ -21,7 +22,6 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Conditional;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 // Export Excel modul compliance & operasional. Tiap tabel didefinisikan sebagai daftar kolom:
 //   'B' => [label, lebar, fn($item) => nilai, tipe]
@@ -30,6 +30,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 // Kolom A (No.) selalu otomatis.
 class ExportController extends Controller
 {
+    use ExcelReport;
+
     const HDR_BG   = 'D9D9D9';
     const HDR_TXT  = '000000';
     const ROW_ODD  = 'FFFFFF';
@@ -166,7 +168,7 @@ class ExportController extends Controller
         }
 
         $this->finishTableSheet($sheet, $columns, $row - 1, 'E5');
-        return $this->streamExcel($wb, 'DataKaryawanHO_' . now()->format('Ymd_His') . '.xlsx');
+        return $this->streamXlsx($wb, 'DataKaryawanHO_' . now()->format('Ymd_His') . '.xlsx');
     }
 
     // ═══════════════════════════════════════════════════
@@ -460,7 +462,7 @@ class ExportController extends Controller
         }
 
         $this->printSettings($sheet, 'B11', 'A10:P10');
-        return $this->streamExcel($wb, 'PPE_' . now()->format('Ymd_His') . '.xlsx');
+        return $this->streamXlsx($wb, 'PPE_' . now()->format('Ymd_His') . '.xlsx');
     }
 
     // ═══════════════════════════════════════════════════
@@ -485,7 +487,7 @@ class ExportController extends Controller
             $this->writeRow($sheet, self::START_ROW + $idx, $idx + 1, $item, $columns, $this->rowBg($idx));
         }
         $this->finishTableSheet($sheet, $columns, self::START_ROW + $items->count() - 1, $freeze);
-        return $this->streamExcel($wb, $filePrefix . '_' . now()->format('Ymd_His') . '.xlsx');
+        return $this->streamXlsx($wb, $filePrefix . '_' . now()->format('Ymd_His') . '.xlsx');
     }
 
     private function newTableSheet(string $sheetTitle, string $title, array $columns, int $count): array
@@ -647,16 +649,6 @@ class ExportController extends Controller
             ->setFitToHeight(0);
         $sheet->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.4)->setRight(0.4);
         $sheet->getHeaderFooter()->setOddHeader('')->setOddFooter('');
-    }
-
-    private function streamExcel(Spreadsheet $wb, string $filename)
-    {
-        $writer = new Xlsx($wb);
-        return response()->stream(fn() => $writer->save('php://output'), 200, [
-            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            'Cache-Control'       => 'max-age=0',
-        ]);
     }
 
     private function applyPpeHdrStyle($sheet, string $cell, string $bg): void

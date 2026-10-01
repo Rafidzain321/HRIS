@@ -5,7 +5,6 @@ use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeLeave;
-use App\Models\Project;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,11 +18,7 @@ class EmployeeAttendanceController extends Controller
     {
         $tahun = (int) $request->get('tahun', now()->year);
         $bulan = (int) $request->get('bulan', now()->month);
-        $hoProjectId = Project::where('kode', 'ho')->value('id');
-
-        $employees = Employee::aktif()->where('project_id', $hoProjectId)
-            ->with('position')->orderBy('nama_lengkap')
-            ->get(['id', 'nama_lengkap', 'position_id']);
+        $employees = $this->karyawanAktifHo();
 
         $rows = EmployeeAttendance::where('tahun', $tahun)->where('bulan', $bulan)
             ->whereIn('employee_id', $employees->pluck('id'))
@@ -102,9 +97,7 @@ class EmployeeAttendanceController extends Controller
         $bulanAwal = $semester === 1 ? 1 : 7;
         $bulanAkhir = $semester === 1 ? 6 : 12;
 
-        $hoProjectId = Project::where('kode', 'ho')->value('id');
-        $employees = Employee::aktif()->where('project_id', $hoProjectId)
-            ->with('position')->orderBy('nama_lengkap')->get(['id', 'nama_lengkap', 'position_id']);
+        $employees = $this->karyawanAktifHo();
 
         $rows = EmployeeAttendance::where('tahun', $tahun)
             ->whereBetween('bulan', [$bulanAwal, $bulanAkhir])

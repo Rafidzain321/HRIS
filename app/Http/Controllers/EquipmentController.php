@@ -10,9 +10,62 @@ use Inertia\Inertia;
 
 class EquipmentController extends Controller
 {
+    const OPERATOR_RULES = [
+        'operator_name'        => 'required|string|max:200',
+        'badge'                => 'nullable|string|max:30',
+        'employee_id'          => 'nullable|exists:employees,id',
+        'license_no'           => 'nullable|string|max:50',
+        'license_expired_date' => 'nullable|date',
+        'rfid'                 => 'nullable|string|max:20',
+        'kp_no'                => 'nullable|string|max:100',
+        'kp_expired_date'      => 'nullable|date',
+        'cdrive_expired_date'  => 'nullable|date',
+        'postest_expired_date' => 'nullable|date',
+        'permit_no'            => 'nullable|string|max:100',
+        'permit_expired_date'  => 'nullable|date',
+        'sio_migas_no'         => 'nullable|string|max:100',
+        'sio_migas_expired'    => 'nullable|date',
+        'sio_disnaker_expired' => 'nullable|date',
+        'k3_p3a2_no'           => 'nullable|string|max:150',
+        'k3_p3a2_expired'      => 'nullable|date',
+    ];
+
+    private function unitRules(string $noUnitRule): array
+    {
+        return [
+            'no_unit'                  => $noUnitRule,
+            'plat_nomor'               => 'nullable|string|max:20',
+            'type_unit'                => 'nullable|string|max:100',
+            'model'                    => 'nullable|string|max:100',
+            'manufacture'              => 'nullable|string|max:50',
+            'serial_no'                => 'nullable|string|max:50',
+            'tahun'                    => 'nullable|integer|min:1990|max:' . (date('Y') + 5),
+            'gps_unit_id'              => 'nullable|string|max:50',
+            'kategori'                 => 'nullable|string|max:50',
+            'kapasitas'                => 'nullable|string|max:30',
+            'stnk_expired'             => 'nullable|date',
+            'tax_expired'              => 'nullable|date',
+            'kir_expired'              => 'nullable|date',
+            'izin_non_bm_expired'      => 'nullable|date',
+            'vehicle_pass_expired'     => 'nullable|date',
+            'inspection_date'          => 'nullable|date',
+            'smbr_pass_expired'        => 'nullable|date',
+            'green_stiker_expired'     => 'nullable|date',
+            'sio_migas_no'             => 'nullable|string|max:100',
+            'sio_migas_expired'        => 'nullable|date',
+            'sio_disnaker_expired'     => 'nullable|date',
+            'k3_p3a2_no'               => 'nullable|string|max:150',
+            'k3_p3a2_expired'          => 'nullable|date',
+            'tpe_cem_inspector'        => 'nullable|string|max:100',
+            'contractor_cem_inspector' => 'nullable|string|max:100',
+            'location_of_inspection'   => 'nullable|string|max:100',
+            'status'                   => 'nullable|string|max:30',
+            'keterangan'               => 'nullable|string',
+        ];
+    }
+
     public function index(Request $request)
     {
-        // ── PROJECT FILTER ──
         $pid       = $this->activeProjectId();
         $highlight = $request->get('highlight');
         $query     = Equipment::with('activeOperator.employee')
@@ -33,20 +86,13 @@ class EquipmentController extends Controller
         if ($status = $request->get('status')) $query->where('status', $status);
 
         $query->orderBy('no_unit');
-
-        $page = $request->get('page', 1);
-        if ($highlight) {
-            $allIds = (clone $query)->pluck('id')->toArray();
-            $pos    = array_search((int) $highlight, $allIds);
-            if ($pos !== false) $page = (int) floor($pos / 50) + 1;
-        }
+        $page = $this->highlightPage($query, $highlight, $request);
 
         $paginated = $query->paginate(50, ['*'], 'page', $page)->appends($request->except('highlight'));
         $paginated->getCollection()->transform(fn($e) => $this->formatEquipment($e));
 
         $data = $paginated->toArray();
 
-        // ── STATS juga difilter per project ──
         $base = Equipment::when($pid, fn($q) => $q->where('project_id', $pid));
         $data['stats'] = [
             'total'                => (clone $base)->count(),
@@ -75,38 +121,7 @@ class EquipmentController extends Controller
     {
         if ($this->isViewer()) return back()->with('error', 'Viewer tidak memiliki akses.');
 
-        $data = $request->validate([
-            'no_unit'                  => 'required|string|max:30|unique:equipments',
-            'plat_nomor'               => 'nullable|string|max:20',
-            'type_unit'                => 'nullable|string|max:100',
-            'model'                    => 'nullable|string|max:100',
-            'manufacture'              => 'nullable|string|max:50',
-            'serial_no'                => 'nullable|string|max:50',
-            'tahun'                    => 'nullable|integer|min:1990|max:' . (date('Y') + 5),
-            'gps_unit_id'              => 'nullable|string|max:50',
-            'kategori'                 => 'nullable|string|max:50',
-            'kapasitas'                => 'nullable|string|max:30',
-            'stnk_expired'             => 'nullable|date',
-            'tax_expired'              => 'nullable|date',
-            'kir_expired'              => 'nullable|date',
-            'izin_non_bm_expired'      => 'nullable|date',
-            'vehicle_pass_expired'     => 'nullable|date',
-            'inspection_date'          => 'nullable|date',
-            'smbr_pass_expired'        => 'nullable|date',
-            'green_stiker_expired'     => 'nullable|date',
-            'sio_migas_no'             => 'nullable|string|max:100',
-            'sio_migas_expired'        => 'nullable|date',
-            'sio_disnaker_expired'     => 'nullable|date',
-            'k3_p3a2_no'               => 'nullable|string|max:150',
-            'k3_p3a2_expired'          => 'nullable|date',
-            'tpe_cem_inspector'        => 'nullable|string|max:100',
-            'contractor_cem_inspector' => 'nullable|string|max:100',
-            'location_of_inspection'   => 'nullable|string|max:100',
-            'status'                   => 'nullable|string|max:30',
-            'keterangan'               => 'nullable|string',
-        ]);
-
-        // Set project_id otomatis
+        $data = $request->validate($this->unitRules('required|string|max:30|unique:equipments'));
         $data['project_id'] = $this->activeProjectId() ?? auth()->user()->project_id;
 
         Equipment::create($data);
@@ -118,38 +133,7 @@ class EquipmentController extends Controller
     {
         if ($this->isViewer()) return back()->with('error', 'Viewer tidak memiliki akses.');
 
-        $data = $request->validate([
-            'no_unit'                  => "required|string|max:30|unique:equipments,no_unit,{$equipment->id}",
-            'plat_nomor'               => 'nullable|string|max:20',
-            'type_unit'                => 'nullable|string|max:100',
-            'model'                    => 'nullable|string|max:100',
-            'manufacture'              => 'nullable|string|max:50',
-            'serial_no'                => 'nullable|string|max:50',
-            'tahun'                    => 'nullable|integer|min:1990|max:' . (date('Y') + 5),
-            'gps_unit_id'              => 'nullable|string|max:50',
-            'kategori'                 => 'nullable|string|max:50',
-            'kapasitas'                => 'nullable|string|max:30',
-            'stnk_expired'             => 'nullable|date',
-            'tax_expired'              => 'nullable|date',
-            'kir_expired'              => 'nullable|date',
-            'izin_non_bm_expired'      => 'nullable|date',
-            'vehicle_pass_expired'     => 'nullable|date',
-            'inspection_date'          => 'nullable|date',
-            'smbr_pass_expired'        => 'nullable|date',
-            'green_stiker_expired'     => 'nullable|date',
-            'sio_migas_no'             => 'nullable|string|max:100',
-            'sio_migas_expired'        => 'nullable|date',
-            'sio_disnaker_expired'     => 'nullable|date',
-            'k3_p3a2_no'               => 'nullable|string|max:150',
-            'k3_p3a2_expired'          => 'nullable|date',
-            'tpe_cem_inspector'        => 'nullable|string|max:100',
-            'contractor_cem_inspector' => 'nullable|string|max:100',
-            'location_of_inspection'   => 'nullable|string|max:100',
-            'status'                   => 'nullable|string|max:30',
-            'keterangan'               => 'nullable|string',
-        ]);
-
-        $equipment->update($data);
+        $equipment->update($request->validate($this->unitRules("required|string|max:30|unique:equipments,no_unit,{$equipment->id}")));
         ActivityLog::record('update', 'Equipment', $equipment->no_unit, "Update unit equipment: {$equipment->no_unit}");
         return redirect()->route('equipment')->with('success', "Unit {$equipment->no_unit} berhasil diperbarui.");
     }
@@ -160,48 +144,21 @@ class EquipmentController extends Controller
 
         $no = $equipment->no_unit;
 
-        // Hapus semua operator unit ini sekalian
+        // Operator unit ini ikut terhapus.
         $equipment->operators()->delete();
         $equipment->delete();
 
-        ActivityLog::create([
-            'user_id'     => auth()->id(),
-            'action'      => 'delete',
-            'module'      => 'Equipment',
-            'target_name' => $no,
-            'description' => "Hapus unit equipment {$no} beserta semua data operator",
-            'ip_address'  => request()->ip(),
-        ]);
+        ActivityLog::record('delete', 'Equipment', $no, "Hapus unit equipment {$no} beserta semua data operator");
 
         return redirect()->route('equipment')->with('success', "Unit {$no} beserta data operator berhasil dihapus.");
     }
 
-    // ── Operator CRUD ────────────────────────────────────────
+    // Operator baru jadi operator aktif unit ini; operator aktif sebelumnya dinonaktifkan (riwayat tetap ada).
     public function storeOperator(Request $request, Equipment $equipment)
     {
         if ($this->isViewer()) return back()->with('error', 'Viewer tidak memiliki akses.');
 
-        $data = $request->validate([
-            'operator_name'        => 'required|string|max:200',
-            'badge'                => 'nullable|string|max:30',
-            'employee_id'          => 'nullable|exists:employees,id',
-            'license_no'           => 'nullable|string|max:50',
-            'license_expired_date' => 'nullable|date',
-            'rfid'                 => 'nullable|string|max:20',
-            'kp_no'                => 'nullable|string|max:100',
-            'kp_expired_date'      => 'nullable|date',
-            'cdrive_expired_date'  => 'nullable|date',
-            'postest_expired_date' => 'nullable|date',
-            'permit_no'            => 'nullable|string|max:100',
-            'permit_expired_date'  => 'nullable|date',
-            'sio_migas_no'         => 'nullable|string|max:100',
-            'sio_migas_expired'    => 'nullable|date',
-            'sio_disnaker_expired' => 'nullable|date',
-            'k3_p3a2_no'           => 'nullable|string|max:150',
-            'k3_p3a2_expired'      => 'nullable|date',
-        ]);
-
-        // Set project_id dari equipment induknya
+        $data = $request->validate(self::OPERATOR_RULES);
         $data['project_id'] = $equipment->project_id;
 
         $equipment->operators()->where('is_active', true)->update(['is_active' => false]);
@@ -222,16 +179,14 @@ class EquipmentController extends Controller
 
         $employee = Employee::findOrFail($request->employee_id);
 
-        // Nonaktifkan operator lama di unit ini
+        // Satu karyawan cuma boleh jadi operator aktif di satu unit: nonaktifkan operator lama unit ini
+        // dan penugasan karyawan ini di unit lain.
         $equipment->operators()->where('is_active', true)->update(['is_active' => false]);
-
-        // Cek kalau employee ini aktif di unit lain, nonaktifkan juga
         EquipmentOperator::where('employee_id', $employee->id)
             ->where('is_active', true)
             ->where('equipment_id', '!=', $equipment->id)
             ->update(['is_active' => false]);
 
-        // Buat operator baru
         $equipment->operators()->create([
             'employee_id'   => $employee->id,
             'operator_name' => $employee->nama_lengkap,
@@ -247,31 +202,12 @@ class EquipmentController extends Controller
             "Operator unit {$equipment->no_unit} berhasil diganti ke {$employee->nama_lengkap}."
         );
     }
+
     public function updateOperator(Request $request, Equipment $equipment, EquipmentOperator $operator)
     {
         if ($this->isViewer()) return back()->with('error', 'Viewer tidak memiliki akses.');
 
-        $data = $request->validate([
-            'operator_name'        => 'required|string|max:200',
-            'badge'                => 'nullable|string|max:30',
-            'employee_id'          => 'nullable|exists:employees,id',
-            'license_no'           => 'nullable|string|max:50',
-            'license_expired_date' => 'nullable|date',
-            'rfid'                 => 'nullable|string|max:20',
-            'kp_no'                => 'nullable|string|max:100',
-            'kp_expired_date'      => 'nullable|date',
-            'cdrive_expired_date'  => 'nullable|date',
-            'postest_expired_date' => 'nullable|date',
-            'permit_no'            => 'nullable|string|max:100',
-            'permit_expired_date'  => 'nullable|date',
-            'sio_migas_no'         => 'nullable|string|max:100',
-            'sio_migas_expired'    => 'nullable|date',
-            'sio_disnaker_expired' => 'nullable|date',
-            'k3_p3a2_no'           => 'nullable|string|max:150',
-            'k3_p3a2_expired'      => 'nullable|date',
-        ]);
-
-        $operator->update($data);
+        $operator->update($request->validate(self::OPERATOR_RULES));
         ActivityLog::record('update', 'Equipment', $operator->operator_name, "Update data operator: {$operator->operator_name}");
         return redirect()->route('equipment')->with('success', "Data operator {$operator->operator_name} berhasil diperbarui.");
     }
@@ -280,20 +216,11 @@ class EquipmentController extends Controller
     {
         if ($this->isViewer()) return back()->with('error', 'Viewer tidak memiliki akses.');
 
-        $nama = $operator->operator_name;
+        $nama   = $operator->operator_name;
         $noUnit = $equipment->no_unit;
-
-        // Hapus operator, unit tetap ada
         $operator->delete();
 
-        ActivityLog::create([
-            'user_id'     => auth()->id(),
-            'action'      => 'delete',
-            'module'      => 'Equipment',
-            'target_name' => $nama,
-            'description' => "Hapus operator {$nama} dari unit {$noUnit}",
-            'ip_address'  => request()->ip(),
-        ]);
+        ActivityLog::record('delete', 'Equipment', $nama, "Hapus operator {$nama} dari unit {$noUnit}");
 
         return redirect()->route('equipment')->with('success', "Operator {$nama} berhasil dihapus dari unit {$noUnit}.");
     }

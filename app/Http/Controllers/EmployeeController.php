@@ -1,26 +1,69 @@
 <?php
-// app>Http>Controllers>EmployeeController.php
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\ClientProject;
+use App\Models\Department;
 use App\Models\Employee;
+use App\Models\EmployeeHoDetail;
+use App\Models\EmployeePayroll;
+use App\Models\EmployeeSalaryHistory;
+use App\Models\EmployeeTerminationLog;
 use App\Models\Position;
 use App\Models\Project;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Models\Timesheet;
+use App\Models\TimesheetMember;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class EmployeeController extends Controller
 {
+    const PTKP_RULE = 'nullable|in:TK/0,TK/1,TK/2,TK/3,K/0,K/1,K/2,K/3';
+
+    const HO_DETAIL_RULES = [
+        'ho_detail'                 => 'nullable|array',
+        'ho_detail.unit'            => 'nullable|in:HO-1,HO-2',
+        'ho_detail.nik_ho'          => 'nullable|string|max:40',
+        'ho_detail.lokasi_kerja'    => 'nullable|string|max:255',
+        'ho_detail.status_karyawan' => 'nullable|string|max:40',
+        'ho_detail.nama_ktp'        => 'nullable|string|max:255',
+        'ho_detail.no_kk'           => 'nullable|string|max:40',
+        'ho_detail.rt_rw'           => 'nullable|string|max:20',
+        'ho_detail.kelurahan'       => 'nullable|string|max:255',
+        'ho_detail.kecamatan'       => 'nullable|string|max:255',
+        'ho_detail.propinsi'        => 'nullable|string|max:255',
+        'ho_detail.npwp'            => 'nullable|string|max:40',
+        'ho_detail.email'           => 'nullable|string|max:255',
+    ];
+
+    const CLIENT_PROJECT_RULES = [
+        'client_project_ids'   => 'nullable|array',
+        'client_project_ids.*' => 'exists:client_projects,id',
+    ];
+
+    // Kartu statistik jabatan lapangan di Data Karyawan (kantor non-HO).
+    const STAT_JABATAN = [
+        'dump_truck' => 'Driver Dump Truck',
+        'spotter'    => 'Spotter',
+        'pmcow'      => 'PMCOW',
+        'hes'        => 'HES Man',
+    ];
+
+    const TANGGAL_EDIT = [
+        'tanggal_lahir', 'tanggal_masuk', 'tanggal_akhir_probation', 'tanggal_hi', 'expire_badge',
+        'exp_kp', 'expired_sim', 'expire_sio', 'exp_mcu', 'start_pkwt', 'end_pkwt',
+    ];
+
     public function index(Request $request)
     {
-        $today   = Carbon::today();
         $pid     = $this->activeProjectId();
         $search  = $request->get('search', '');
         $jabatan = $request->get('jabatan', '');
         $clientProjectId = $request->get('client_project', '');
 
-        // Fungsi apply filter — dipakai di $query dan $freshQuery supaya konsisten
+        // Dipakai untuk query tabel & pencarian halaman "highlight" supaya hasilnya konsisten.
         $applyFilters = function ($q) use ($pid, $search, $jabatan, $clientProjectId) {
             $q->when($pid, fn($q) => $q->where('project_id', $pid));
             if ($search) {
@@ -42,53 +85,46 @@ class EmployeeController extends Controller
 
         $projectInfo = $pid ? Project::find($pid, ['id', 'kode', 'nama', 'tipe_gaji']) : null;
 
-        // Query utama untuk paginate
         $query = $applyFilters(Employee::aktif()->with(['position', 'documents', 'project', 'hoDetail', 'clientProjects']))
             ->orderBy('nama_lengkap');
 
-        // Highlight: cari halaman yang mengandung employee id
+        // ?highlight=id (mis. dari notifikasi): lompat ke halaman yang memuat karyawan tsb.
         $highlight = $request->get('highlight');
         if ($highlight && !$request->get('page')) {
-            $allIds = $applyFilters(Employee::aktif())
-                ->orderBy('nama_lengkap')
-                ->pluck('id')
-                ->toArray();
-
+            $allIds = $applyFilters(Employee::aktif())->orderBy('nama_lengkap')->pluck('id')->toArray();
             $pos = array_search((int) $highlight, $allIds);
-
             if ($pos !== false) {
-                $targetPage = (int) floor($pos / 50) + 1;
-                $request->merge(['page' => $targetPage]);
+                $request->merge(['page' => (int) floor($pos / 50) + 1]);
             }
         }
 
         $employees = $query->paginate(50)->appends($request->except('highlight'))->through(fn($e) => [
-            'id' => $e->id,
-            'no_ktp' => $e->no_ktp,
-            'id_badge' => $e->id_badge,
-            'nama_lengkap' => $e->nama_lengkap,
-            'jabatan' => $e->position?->nama_jabatan ?? '-',
-            'alamat' => $e->alamat,
-            'agama' => $e->agama,
-            'type_sim' => $e->type_sim,
-            'sim_status' => $e->sim_status,
-            'sio_k3' => $e->sio_k3,
-            'mcu_status' => $e->mcu_status,
-            'status_mcu' => $e->status_mcu,
-            'status_kp' => $e->status_kp,
-            'badge_status' => $e->badge_status,
-            'badge_days' => $e->expire_badge ? (int) now()->diffInDays($e->expire_badge, false) : null,
-            'expired_sim' => $e->expired_sim?->format('d M Y'),
-            'exp_mcu' => $e->exp_mcu?->format('d M Y'),
-            'expire_badge' => $e->expire_badge?->format('d M Y'),
-            'tanggal_masuk' => $e->tanggal_masuk?->format('d M Y'),
-            'docs' => $e->documents->pluck('tipe')->unique()->values(),
-            'umur' => $e->tanggal_lahir ? (int) $e->tanggal_lahir->age : null,
-            'masa_kerja' => $e->tanggal_masuk ? $this->formatMasaKerja($e->tanggal_masuk) : null,
-            'project_id'   => $e->project_id,
-            'project_nama' => $e->project?->nama ?? '-',
-            'client_projects' => $e->clientProjects->pluck('kode')->values(),
-            'ho_unit'      => $e->hoDetail?->unit,
+            'id'                 => $e->id,
+            'no_ktp'             => $e->no_ktp,
+            'id_badge'           => $e->id_badge,
+            'nama_lengkap'       => $e->nama_lengkap,
+            'jabatan'            => $e->position?->nama_jabatan ?? '-',
+            'alamat'             => $e->alamat,
+            'agama'              => $e->agama,
+            'type_sim'           => $e->type_sim,
+            'sim_status'         => $e->sim_status,
+            'sio_k3'             => $e->sio_k3,
+            'mcu_status'         => $e->mcu_status,
+            'status_mcu'         => $e->status_mcu,
+            'status_kp'          => $e->status_kp,
+            'badge_status'       => $e->badge_status,
+            'badge_days'         => $e->expire_badge ? (int) now()->diffInDays($e->expire_badge, false) : null,
+            'expired_sim'        => $e->expired_sim?->format('d M Y'),
+            'exp_mcu'            => $e->exp_mcu?->format('d M Y'),
+            'expire_badge'       => $e->expire_badge?->format('d M Y'),
+            'tanggal_masuk'      => $e->tanggal_masuk?->format('d M Y'),
+            'docs'               => $e->documents->pluck('tipe')->unique()->values(),
+            'umur'               => $e->tanggal_lahir ? (int) $e->tanggal_lahir->age : null,
+            'masa_kerja'         => $e->tanggal_masuk ? $this->formatMasaKerja($e->tanggal_masuk) : null,
+            'project_id'         => $e->project_id,
+            'project_nama'       => $e->project?->nama ?? '-',
+            'client_projects'    => $e->clientProjects->pluck('kode')->values(),
+            'ho_unit'            => $e->hoDetail?->unit,
             'ho_nik'             => $e->hoDetail?->nik_ho,
             'ho_lokasi_kerja'    => $e->hoDetail?->lokasi_kerja,
             'ho_status_karyawan' => $e->hoDetail?->status_karyawan,
@@ -108,39 +144,36 @@ class EmployeeController extends Controller
             ->orderByDesc('tanggal_keluar')
             ->get()
             ->map(fn($e) => [
-                'id' => $e->id,
-                'id_badge' => $e->id_badge,
-                'no_ktp' => $e->no_ktp, 
-                'nama_lengkap' => $e->nama_lengkap,
-                'jabatan' => $e->position?->nama_jabatan ?? '-',
+                'id'             => $e->id,
+                'id_badge'       => $e->id_badge,
+                'no_ktp'         => $e->no_ktp,
+                'nama_lengkap'   => $e->nama_lengkap,
+                'jabatan'        => $e->position?->nama_jabatan ?? '-',
                 'tanggal_keluar' => $e->tanggal_keluar?->format('Y-m-d'),
-                'alasan_keluar' => $e->alasan_keluar,
+                'alasan_keluar'  => $e->alasan_keluar,
                 'catatan_keluar' => $e->catatan_keluar,
             ]);
 
-        $base = Employee::aktif()->when($pid, fn($q) => $q->where('project_id', $pid));
-        $stats = [
-            'total' => (clone $base)->count(),
-            'dump_truck' => (clone $base)->whereHas('position', fn($q) => $q->where('nama_jabatan', 'Driver Dump Truck'))->count(),
-            'spotter' => (clone $base)->whereHas('position', fn($q) => $q->where('nama_jabatan', 'Spotter'))->count(),
-            'pmcow' => (clone $base)->whereHas('position', fn($q) => $q->where('nama_jabatan', 'PMCOW'))->count(),
-            'hes' => (clone $base)->whereHas('position', fn($q) => $q->where('nama_jabatan', 'HES Man'))->count(),
-        ];
+        $base  = Employee::aktif()->when($pid, fn($q) => $q->where('project_id', $pid));
+        $stats = ['total' => (clone $base)->count()];
+        foreach (self::STAT_JABATAN as $key => $namaJabatan) {
+            $stats[$key] = (clone $base)->whereHas('position', fn($q) => $q->where('nama_jabatan', $namaJabatan))->count();
+        }
 
         // HO tidak punya jabatan lapangan (dump truck/spotter/dll) — hitung total & jabatan
         // terbanyak per unit (Semua/HO-1/HO-2) dari data aslinya, bukan hardcode.
         if ($projectInfo && $projectInfo->tipe_gaji === 'ho') {
             $hoEmployees = (clone $base)->with(['position', 'hoDetail'])->get();
-            $buildUnitStats = function ($collection) {
-                $topJabatan = $collection
+            $buildUnitStats = fn($collection) => [
+                'total'       => $collection->count(),
+                'top_jabatan' => $collection
                     ->filter(fn($e) => $e->position?->nama_jabatan)
                     ->groupBy(fn($e) => $e->position->nama_jabatan)
                     ->map(fn($g, $label) => ['label' => $label, 'val' => $g->count()])
                     ->sortByDesc('val')
                     ->take(4)
-                    ->values();
-                return ['total' => $collection->count(), 'top_jabatan' => $topJabatan];
-            };
+                    ->values(),
+            ];
             $stats['ho'] = [
                 'all'  => $buildUnitStats($hoEmployees),
                 'HO-1' => $buildUnitStats($hoEmployees->filter(fn($e) => $e->hoDetail?->unit === 'HO-1')),
@@ -148,32 +181,40 @@ class EmployeeController extends Controller
             ];
         }
 
-        $jabatan_list = Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']);
         // Dropdown filter: project milik kantor yang sedang dibuka (diatur di Pengaturan > Data Project),
         // plus project lain yang kebetulan dipegang karyawan kantor ini.
-        $client_project_list = \App\Models\ClientProject::orderBy('kode')
+        $clientProjectList = ClientProject::orderBy('kode')
             ->withCount(['employees' => fn($q) => $q->where('status', 'AKTIF')->when($pid, fn($q2) => $q2->where('project_id', $pid))])
             ->get(['id', 'kode', 'project_id', 'is_active'])
             ->filter(fn($cp) => !$pid || $cp->project_id == $pid || $cp->employees_count > 0 || (string) $cp->id === (string) $clientProjectId)
             ->map(fn($cp) => ['id' => $cp->id, 'kode' => $cp->kode, 'jumlah' => $cp->employees_count, 'is_active' => $cp->is_active])
             ->values();
+
         return Inertia::render('Employee/Index', [
-            'employees'    => $employees,
-            'terminated'   => $terminated,
-            'jabatan_list' => $jabatan_list,
-            'client_project_list' => $client_project_list,
-            'stats'        => $stats,
-            'project_info' => $projectInfo,
+            'employees'           => $employees,
+            'terminated'          => $terminated,
+            'jabatan_list'        => Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']),
+            'client_project_list' => $clientProjectList,
+            'stats'               => $stats,
+            'project_info'        => $projectInfo,
         ]);
     }
 
     private function formatMasaKerja($tanggalMasuk): string
     {
         $diff = $tanggalMasuk->diff(now());
-        $parts = [];
-        if ($diff->y > 0) $parts[] = "{$diff->y} thn";
-        $parts[] = "{$diff->m} bln";
-        return implode(' ', $parts);
+        return ($diff->y > 0 ? "{$diff->y} thn " : '') . "{$diff->m} bln";
+    }
+
+    // HO tidak pakai id_badge sama sekali — tidak wajib & tidak unik. Kantor lapangan: wajib & unik
+    // di antara karyawan AKTIF kantor yang sama.
+    private function idBadgeRules(bool $isHo, $projectId, ?int $ignoreId = null): array
+    {
+        if ($isHo) return ['nullable', 'string', 'max:30'];
+        return [
+            'required', 'string', 'max:30',
+            Rule::unique('employees', 'id_badge')->ignore($ignoreId)->where('project_id', $projectId)->where('status', 'AKTIF'),
+        ];
     }
 
     public function store(Request $request)
@@ -186,54 +227,27 @@ class EmployeeController extends Controller
         $targetProjectId = $user->hasRole('super-admin') ? $request->input('project_id') : $user->project_id;
         $isHoProject = $targetProjectId && Project::find($targetProjectId)?->tipe_gaji === 'ho';
 
-        // HO tidak pakai id_badge sama sekali — jangan wajibkan / unique-kan (sama seperti update()).
-        $idBadgeRules = $isHoProject
-            ? ['nullable', 'string', 'max:30']
-            : [
-                'required', 'string', 'max:30',
-                \Illuminate\Validation\Rule::unique('employees', 'id_badge')
-                    ->where('project_id', $targetProjectId)
-                    ->where('status', 'AKTIF'),
-            ];
-
         $data = $request->validate([
-            'nama_lengkap' => 'required|string|max:200',
-            'nama_ibu' => 'nullable|string|max:200',
-            'id_badge' => $idBadgeRules,
-            'no_ktp' => [
-                'nullable', 'string', 'max:20',
-                \Illuminate\Validation\Rule::unique('employees', 'no_ktp')
-                    ->where('project_id', $targetProjectId),
-            ],
-            'no_telepon' => 'nullable|string|max:25',
-            'tempat_lahir' => 'nullable|string|max:100',
-            'tanggal_lahir' => 'nullable|date',
-            'tanggal_masuk' => 'nullable|date',
+            'nama_lengkap'            => 'required|string|max:200',
+            'nama_ibu'                => 'nullable|string|max:200',
+            'id_badge'                => $this->idBadgeRules($isHoProject, $targetProjectId),
+            'no_ktp'                  => ['nullable', 'string', 'max:20', Rule::unique('employees', 'no_ktp')->where('project_id', $targetProjectId)],
+            'no_telepon'              => 'nullable|string|max:25',
+            'tempat_lahir'            => 'nullable|string|max:100',
+            'tanggal_lahir'           => 'nullable|date',
+            'tanggal_masuk'           => 'nullable|date',
             'tanggal_akhir_probation' => 'nullable|date',
-            'alamat' => 'nullable|string',
-            'agama' => 'nullable|string|max:50',
-            'position_id' => 'nullable|exists:positions,id',
-            'department_id' => 'nullable|exists:departments,id',
-            'ptkp' => 'nullable|in:TK/0,TK/1,TK/2,TK/3,K/0,K/1,K/2,K/3',
-            'status' => 'required|in:AKTIF,NONAKTIF',
-            'status_mcu' => 'nullable|string|max:20',
-            'lokasi_mcu' => 'nullable|string|max:100',
-            'exp_mcu' => 'nullable|date',
-            'client_project_ids' => 'nullable|array',
-            'client_project_ids.*' => 'exists:client_projects,id',
-            'ho_detail' => 'nullable|array',
-            'ho_detail.unit' => 'nullable|in:HO-1,HO-2',
-            'ho_detail.nik_ho' => 'nullable|string|max:40',
-            'ho_detail.lokasi_kerja' => 'nullable|string|max:255',
-            'ho_detail.status_karyawan' => 'nullable|string|max:40',
-            'ho_detail.nama_ktp' => 'nullable|string|max:255',
-            'ho_detail.no_kk' => 'nullable|string|max:40',
-            'ho_detail.rt_rw' => 'nullable|string|max:20',
-            'ho_detail.kelurahan' => 'nullable|string|max:255',
-            'ho_detail.kecamatan' => 'nullable|string|max:255',
-            'ho_detail.propinsi' => 'nullable|string|max:255',
-            'ho_detail.npwp' => 'nullable|string|max:40',
-            'ho_detail.email' => 'nullable|string|max:255',
+            'alamat'                  => 'nullable|string',
+            'agama'                   => 'nullable|string|max:50',
+            'position_id'             => 'nullable|exists:positions,id',
+            'department_id'           => 'nullable|exists:departments,id',
+            'ptkp'                    => self::PTKP_RULE,
+            'status'                  => 'required|in:AKTIF,NONAKTIF',
+            'status_mcu'              => 'nullable|string|max:20',
+            'lokasi_mcu'              => 'nullable|string|max:100',
+            'exp_mcu'                 => 'nullable|date',
+            ...self::CLIENT_PROJECT_RULES,
+            ...self::HO_DETAIL_RULES,
         ], [
             'nama_lengkap.required' => 'Nama lengkap wajib diisi.',
             'id_badge.required'     => 'ID Badge wajib diisi.',
@@ -242,22 +256,16 @@ class EmployeeController extends Controller
             'status.required'       => 'Status wajib dipilih.',
         ]);
 
-        $hoDetailData = $data['ho_detail'] ?? null;
-        unset($data['ho_detail']);
+        $hoDetailData     = $data['ho_detail'] ?? null;
         $clientProjectIds = $data['client_project_ids'] ?? [];
-        unset($data['client_project_ids']);
-
-        if (!$user->hasRole('super-admin')) {
-            $data['project_id'] = $user->project_id;
-        } else {
-            $data['project_id'] = $request->input('project_id');
-        }
+        unset($data['ho_detail'], $data['client_project_ids']);
+        $data['project_id'] = $targetProjectId;
 
         $employee = Employee::create($data);
         $employee->clientProjects()->sync($clientProjectIds);
 
-        if ($isHoProject && $hoDetailData && array_filter($hoDetailData, fn ($v) => $v !== null)) {
-            \App\Models\EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], $hoDetailData);
+        if ($isHoProject && $hoDetailData && array_filter($hoDetailData, fn($v) => $v !== null)) {
+            EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], $hoDetailData);
         }
 
         ActivityLog::record('create', 'Karyawan', $data['nama_lengkap'],
@@ -275,48 +283,38 @@ class EmployeeController extends Controller
                 ->with('error', 'Viewer tidak memiliki akses halaman edit.');
         }
 
-        $umur = $employee->tanggal_lahir
-            ? Carbon::parse($employee->tanggal_lahir)->age
-            : null;
-
         $employee->loadMissing('hoDetail', 'project', 'clientProjects');
         $projectInfo = $employee->project
             ? Project::find($employee->project_id, ['id', 'kode', 'nama', 'tipe_gaji'])
             : null;
 
+        $tanggal = [];
+        foreach (self::TANGGAL_EDIT as $field) {
+            $tanggal[$field] = $employee->$field?->format('Y-m-d');
+        }
+
         return Inertia::render('Employee/Edit', [
-            'employee' => array_merge($employee->toArray(), [
-                'tanggal_lahir' => $employee->tanggal_lahir?->format('Y-m-d'),
-                'tanggal_masuk' => $employee->tanggal_masuk?->format('Y-m-d'),
-                'tanggal_akhir_probation' => $employee->tanggal_akhir_probation?->format('Y-m-d'),
-                'tanggal_hi' => $employee->tanggal_hi?->format('Y-m-d'),
-                'expire_badge' => $employee->expire_badge?->format('Y-m-d'),
-                'exp_kp' => $employee->exp_kp?->format('Y-m-d'),
-                'expired_sim' => $employee->expired_sim?->format('Y-m-d'),
-                'expire_sio' => $employee->expire_sio?->format('Y-m-d'),
-                'exp_mcu' => $employee->exp_mcu?->format('Y-m-d'),
-                'start_pkwt' => $employee->start_pkwt?->format('Y-m-d'),
-                'end_pkwt' => $employee->end_pkwt?->format('Y-m-d'),
-                'umur' => $umur,
-                'ho_detail' => $employee->hoDetail,
+            'employee' => array_merge($employee->toArray(), $tanggal, [
+                'umur'               => $employee->tanggal_lahir?->age,
+                'ho_detail'          => $employee->hoDetail,
                 'client_project_ids' => $employee->clientProjects->pluck('id')->values(),
             ]),
-            'positions' => \App\Models\Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']),
-            'departments' => \App\Models\Department::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
+            'positions'   => Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']),
+            'departments' => Department::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
             // Pilihan = project AKTIF milik kantor karyawan ini, plus project yang sudah terpasang
             // (walau sudah nonaktif/pindah kantor) supaya tidak hilang diam-diam saat disimpan.
-            'client_project_list' => \App\Models\ClientProject::orderBy('kode')
+            'client_project_list' => ClientProject::orderBy('kode')
                 ->where(fn($q) => $q
                     ->where(fn($q2) => $q2->where('project_id', $employee->project_id)->where('is_active', true))
                     ->orWhereIn('id', $employee->clientProjects->pluck('id')))
                 ->get(['id', 'kode', 'is_active']),
             'can_manage_client_project' => $this->isAdminSettings(),
-            'project_info' => $projectInfo,
+            'project_info'              => $projectInfo,
             // Riwayat gaji mentah hasil import HO — arsip referensi, cuma relevan untuk karyawan HO.
             // Data gaji sensitif, jadi cuma dikirim ke frontend kalau yang buka super-admin —
             // akun lain (termasuk atasan/manager) tidak boleh lihat sama sekali.
             'salary_history' => auth()->user()?->hasRole('super-admin')
-                ? \App\Models\EmployeeSalaryHistory::where('employee_id', $employee->id)
+                ? EmployeeSalaryHistory::where('employee_id', $employee->id)
                     ->orderByRaw('tahun IS NULL, tahun, bulan IS NULL, bulan, urutan')
                     ->get(['label', 'nominal', 'tahun', 'bulan'])
                 : [],
@@ -336,111 +334,83 @@ class EmployeeController extends Controller
 
         $isHoProject = $employee->project?->tipe_gaji === 'ho';
 
-        // HO tidak pakai id_badge sama sekali — jangan wajibkan / unique-kan.
-        $idBadgeRules = $isHoProject
-            ? ['nullable', 'string', 'max:30']
-            : [
-                'required', 'string', 'max:30',
-                \Illuminate\Validation\Rule::unique('employees', 'id_badge')
-                    ->ignore($employee->id)
-                    ->where('project_id', $employee->project_id)
-                    ->where('status', 'AKTIF'),
-            ];
-
         $data = $request->validate([
-            'nama_lengkap' => 'required|string|max:200',
-            'nama_ibu' => 'nullable|string|max:200',
-            'id_badge' => $idBadgeRules,
-            'ho_detail' => 'nullable|array',
-            'ho_detail.unit' => 'nullable|in:HO-1,HO-2',
-            'ho_detail.nik_ho' => 'nullable|string|max:40',
-            'ho_detail.lokasi_kerja' => 'nullable|string|max:255',
-            'ho_detail.status_karyawan' => 'nullable|string|max:40',
-            'ho_detail.nama_ktp' => 'nullable|string|max:255',
-            'ho_detail.no_kk' => 'nullable|string|max:40',
-            'ho_detail.rt_rw' => 'nullable|string|max:20',
-            'ho_detail.kelurahan' => 'nullable|string|max:255',
-            'ho_detail.kecamatan' => 'nullable|string|max:255',
-            'ho_detail.propinsi' => 'nullable|string|max:255',
-            'ho_detail.npwp' => 'nullable|string|max:40',
-            'ho_detail.email' => 'nullable|string|max:255',
-            'no_ktp' => [
+            'nama_lengkap'            => 'required|string|max:200',
+            'nama_ibu'                => 'nullable|string|max:200',
+            'id_badge'                => $this->idBadgeRules($isHoProject, $employee->project_id, $employee->id),
+            ...self::HO_DETAIL_RULES,
+            'no_ktp'                  => [
                 'nullable', 'string', 'max:20',
-                \Illuminate\Validation\Rule::unique('employees', 'no_ktp')
-                    ->ignore($employee->id)->whereNotNull('no_ktp')->where('project_id', $employee->project_id),
+                Rule::unique('employees', 'no_ktp')->ignore($employee->id)->whereNotNull('no_ktp')->where('project_id', $employee->project_id),
             ],
-            'no_telepon' => 'nullable|string|max:25',
-            'tempat_lahir' => 'nullable|string|max:100',
-            'tanggal_lahir' => 'nullable|date',
-            'alamat' => 'nullable|string',
-            'kota_asal' => 'nullable|string|max:100',
-            'tamatan' => 'nullable|string|max:20',
-            'ptkp' => 'nullable|in:TK/0,TK/1,TK/2,TK/3,K/0,K/1,K/2,K/3',
-            'ccpm' => 'nullable|string|max:30',
-            'expire_badge' => 'nullable|date',
-            'status_kp' => 'nullable|string|max:100',
-            'kp_ready' => 'nullable|string|max:100',
-            'exp_kp' => 'nullable|date',
-            'type_sim' => 'nullable|string|max:10',
-            'no_sim' => 'nullable|string|max:30',
-            'expired_sim' => 'nullable|date',
-            'sio_k3' => 'nullable|in:YES,NO',
-            'no_sio' => 'nullable|string|max:50',
-            'rfid' => 'nullable|string|max:50',
-            'expire_sio' => 'nullable|date',
-            'nama_perusahaan_sio' => 'nullable|string|max:200',
-            'tipe_sio' => 'nullable|string|max:100',
-            'exp_mcu' => 'nullable|date',
-            'status_mcu' => 'nullable|string|max:20',
-            'lokasi_mcu' => 'nullable|string|max:100',
-            'ukuran_baju' => 'nullable|string|max:10',
-            'ukuran_sepatu' => 'nullable|string|max:10',
-            'start_pkwt' => 'nullable|date',
-            'end_pkwt' => 'nullable|date',
-            'position_id' => 'nullable|exists:positions,id',
-            'department_id' => 'nullable|exists:departments,id',
-            'tanggal_masuk' => 'nullable|date',
-            'status_kerja' => 'nullable|in:PKWT,PKWTT,PROBATION',
+            'no_telepon'              => 'nullable|string|max:25',
+            'tempat_lahir'            => 'nullable|string|max:100',
+            'tanggal_lahir'           => 'nullable|date',
+            'alamat'                  => 'nullable|string',
+            'kota_asal'               => 'nullable|string|max:100',
+            'tamatan'                 => 'nullable|string|max:20',
+            'ptkp'                    => self::PTKP_RULE,
+            'ccpm'                    => 'nullable|string|max:30',
+            'expire_badge'            => 'nullable|date',
+            'status_kp'               => 'nullable|string|max:100',
+            'kp_ready'                => 'nullable|string|max:100',
+            'exp_kp'                  => 'nullable|date',
+            'type_sim'                => 'nullable|string|max:10',
+            'no_sim'                  => 'nullable|string|max:30',
+            'expired_sim'             => 'nullable|date',
+            'sio_k3'                  => 'nullable|in:YES,NO',
+            'no_sio'                  => 'nullable|string|max:50',
+            'rfid'                    => 'nullable|string|max:50',
+            'expire_sio'              => 'nullable|date',
+            'nama_perusahaan_sio'     => 'nullable|string|max:200',
+            'tipe_sio'                => 'nullable|string|max:100',
+            'exp_mcu'                 => 'nullable|date',
+            'status_mcu'              => 'nullable|string|max:20',
+            'lokasi_mcu'              => 'nullable|string|max:100',
+            'ukuran_baju'             => 'nullable|string|max:10',
+            'ukuran_sepatu'           => 'nullable|string|max:10',
+            'start_pkwt'              => 'nullable|date',
+            'end_pkwt'                => 'nullable|date',
+            'position_id'             => 'nullable|exists:positions,id',
+            'department_id'           => 'nullable|exists:departments,id',
+            'tanggal_masuk'           => 'nullable|date',
+            'status_kerja'            => 'nullable|in:PKWT,PKWTT,PROBATION',
             'tanggal_akhir_probation' => 'nullable|date',
-            'agama' => 'nullable|string|max:50',
-            'tgl_mcu' => 'nullable|date',
-            'derajat_kesehatan' => 'nullable|string|max:20',
-            'sim_kota_keluar' => 'nullable|string|max:100',
-            'no_bpjs' => 'nullable|string|max:50',
-            'no_contract' => 'nullable|string|max:100',
-            'no_rekening'   => 'nullable|string|max:50',
-            'no_bpjs_tk'    => 'nullable|string|max:20',
-            'no_bpjs_kes'   => 'nullable|string|max:20',
-            'nama_bank'     => 'nullable|string|max:50',
-            'client_project_ids' => 'nullable|array',
-            'client_project_ids.*' => 'exists:client_projects,id',
+            'agama'                   => 'nullable|string|max:50',
+            'tgl_mcu'                 => 'nullable|date',
+            'derajat_kesehatan'       => 'nullable|string|max:20',
+            'sim_kota_keluar'         => 'nullable|string|max:100',
+            'no_bpjs'                 => 'nullable|string|max:50',
+            'no_contract'             => 'nullable|string|max:100',
+            'no_rekening'             => 'nullable|string|max:50',
+            'no_bpjs_tk'              => 'nullable|string|max:20',
+            'no_bpjs_kes'             => 'nullable|string|max:20',
+            'nama_bank'               => 'nullable|string|max:50',
+            ...self::CLIENT_PROJECT_RULES,
         ]);
 
-        // Deteksi field yang berubah untuk log
-        $changed = [];
+        // Field penting yang perubahannya dicatat detail di log aktivitas.
         $watchFields = [
-            'no_rekening' => 'No. Rekening',
-            'expired_sim' => 'Expired SIM',
-            'exp_mcu'     => 'Expired MCU',
-            'expire_badge'=> 'Expired Badge',
-            'position_id' => 'Jabatan',
-            'ptkp'        => 'PTKP',
-            'status_mcu'  => 'Status MCU',
+            'no_rekening'  => 'No. Rekening',
+            'expired_sim'  => 'Expired SIM',
+            'exp_mcu'      => 'Expired MCU',
+            'expire_badge' => 'Expired Badge',
+            'position_id'  => 'Jabatan',
+            'ptkp'         => 'PTKP',
+            'status_mcu'   => 'Status MCU',
         ];
+        $changed = [];
         foreach ($watchFields as $field => $label) {
-            $old = $employee->$field instanceof \Carbon\Carbon
-                ? $employee->$field->format('Y-m-d')
-                : $employee->$field;
+            $old = $employee->$field instanceof Carbon ? $employee->$field->format('Y-m-d') : $employee->$field;
             $new = $data[$field] ?? null;
-            if ((string)$old !== (string)$new) {
+            if ((string) $old !== (string) $new) {
                 $changed[] = "{$label}: {$old} -> {$new}";
             }
         }
 
-        $hoDetailData = $data['ho_detail'] ?? null;
-        unset($data['ho_detail']);
+        $hoDetailData     = $data['ho_detail'] ?? null;
         $clientProjectIds = $data['client_project_ids'] ?? null;
-        unset($data['client_project_ids']);
+        unset($data['ho_detail'], $data['client_project_ids']);
 
         if ($isHoProject) {
             $data['id_badge'] = $data['id_badge'] ?: null;
@@ -454,19 +424,17 @@ class EmployeeController extends Controller
 
         $employee->update($data);
 
+        // null = field tidak dikirim -> project tidak diubah; [] = dikosongkan.
         if ($clientProjectIds !== null) {
             $employee->clientProjects()->sync($clientProjectIds);
         }
 
         if ($isHoProject && $hoDetailData) {
-            \App\Models\EmployeeHoDetail::updateOrCreate(
-                ['employee_id' => $employee->id],
-                $hoDetailData
-            );
+            EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], $hoDetailData);
         }
 
         $desc = "Update data karyawan: {$employee->nama_lengkap} ({$employee->id_badge})";
-        if (!empty($changed)) {
+        if ($changed) {
             $desc .= ' | ' . implode(', ', $changed);
         }
         ActivityLog::record('update', 'Karyawan', $employee->nama_lengkap, $desc);
@@ -497,10 +465,7 @@ class EmployeeController extends Controller
             ], 422);
         }
 
-        \App\Models\EmployeeHoDetail::updateOrCreate(
-            ['employee_id' => $employee->id],
-            ['unit' => $data['unit']]
-        );
+        EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], ['unit' => $data['unit']]);
 
         $desc = "Pindah unit: {$employee->nama_lengkap} ke {$data['unit']}";
         if (!empty($data['catatan'])) {
@@ -523,22 +488,19 @@ class EmployeeController extends Controller
 
         $data = $request->validate([
             'tanggal_keluar' => 'required|date',
-            'alasan_keluar' => 'required|in:RESIGN,PHK,KONTRAK HABIS,MENINGGAL DUNIA,MUTASI,LAINNYA',
+            'alasan_keluar'  => 'required|in:RESIGN,PHK,KONTRAK HABIS,MENINGGAL DUNIA,MUTASI,LAINNYA',
             'catatan_keluar' => 'nullable|string|max:500',
         ]);
-
-        $employee->update([
-            'status' => 'NONAKTIF',
+        $keluar = [
             'tanggal_keluar' => $data['tanggal_keluar'],
-            'alasan_keluar' => $data['alasan_keluar'],
+            'alasan_keluar'  => $data['alasan_keluar'],
             'catatan_keluar' => $data['catatan_keluar'] ?? null,
-        ]);
+        ];
 
-        \App\Models\EmployeeTerminationLog::create([
-            'employee_id' => $employee->id,
-            'tanggal_keluar' => $data['tanggal_keluar'],
-            'alasan_keluar' => $data['alasan_keluar'],
-            'catatan_keluar' => $data['catatan_keluar'] ?? null,
+        $employee->update(['status' => 'NONAKTIF', ...$keluar]);
+        EmployeeTerminationLog::create([
+            'employee_id'  => $employee->id,
+            ...$keluar,
             'dicatat_oleh' => auth()->user()->name ?? 'System',
         ]);
 
@@ -546,13 +508,10 @@ class EmployeeController extends Controller
             "Terminate {$employee->nama_lengkap} ({$employee->id_badge}): {$data['alasan_keluar']} tgl {$data['tanggal_keluar']}"
         );
 
-        $tglKeluar = Carbon::parse($data['tanggal_keluar']);
-        $bulanSekarang = Carbon::today()->format('Y-m');
-        $bulanKeluar = $tglKeluar->format('Y-m');
-
-        if ($bulanKeluar < $bulanSekarang) {
-            \App\Models\TimesheetMember::where('id_badge', $employee->id_badge)
-                ->update(['aktif' => false]);
+        // Keluar di bulan sebelumnya -> langsung hilang dari timesheet. Kalau keluar bulan ini,
+        // tetap tampil supaya hari kerjanya bulan ini masih bisa diinput.
+        if (Carbon::parse($data['tanggal_keluar'])->format('Y-m') < Carbon::today()->format('Y-m')) {
+            TimesheetMember::where('id_badge', $employee->id_badge)->update(['aktif' => false]);
         }
 
         return redirect()->route('employees.index')
@@ -561,18 +520,17 @@ class EmployeeController extends Controller
 
     public function checkBadge(Request $request)
     {
-        $badge = $request->get('badge');
         $exclude = $request->get('exclude');
-        $pid = $this->activeProjectId();
+        $pid     = $this->activeProjectId();
 
-        $exists = Employee::where('id_badge', $badge)
+        $exists = Employee::where('id_badge', $request->get('badge'))
             ->when($exclude, fn($q) => $q->where('id', '!=', $exclude))
             ->when($pid, fn($q) => $q->where('project_id', $pid))
             ->first();
 
         return response()->json([
             'exists' => (bool) $exists,
-            'nama' => $exists?->nama_lengkap,
+            'nama'   => $exists?->nama_lengkap,
         ]);
     }
 
@@ -583,9 +541,9 @@ class EmployeeController extends Controller
         }
 
         $employee->update([
-            'status' => 'AKTIF',
+            'status'         => 'AKTIF',
             'tanggal_keluar' => null,
-            'alasan_keluar' => null,
+            'alasan_keluar'  => null,
             'catatan_keluar' => null,
         ]);
 
@@ -603,10 +561,8 @@ class EmployeeController extends Controller
             return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
         }
 
-        $hasTimesheet = \App\Models\Timesheet::where('employee_id', $employee->id)->exists();
-        $hasPayroll = \App\Models\EmployeePayroll::where('employee_id', $employee->id)->exists();
-
-        if ($hasTimesheet || $hasPayroll) {
+        // Karyawan yang sudah punya riwayat timesheet/payroll tidak boleh dihapus permanen (pakai terminate).
+        if (Timesheet::where('employee_id', $employee->id)->exists() || EmployeePayroll::where('employee_id', $employee->id)->exists()) {
             return redirect()->route('employees.index')
                 ->with('error', "Data {$employee->nama_lengkap} tidak bisa dihapus permanen karena masih memiliki history timesheet/payroll.");
         }

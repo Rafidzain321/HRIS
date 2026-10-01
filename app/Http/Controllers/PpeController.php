@@ -75,7 +75,7 @@ class PpeController extends Controller
             'tgl_sepatu'      => 'nullable|date',
             'tgl_sepatu_2'    => 'nullable|date',
             'tgl_sepatu_3'    => 'nullable|date',
-            'tgl_helm'      => 'nullable|date',
+            'tgl_helm'        => 'nullable|date',
             'tgl_helm_orange' => 'nullable|date',
             'tgl_glass'       => 'nullable|date',
             'tgl_glass_2'     => 'nullable|date',
@@ -89,55 +89,36 @@ class PpeController extends Controller
         return back()->with('success', "PPE {$employee->nama_lengkap} berhasil diperbarui.");
     }
 
-    /**
-     * Bentuk 1 baris data PPE karyawan untuk response index().
-     */
+    const TANGGAL = [
+        'tgl_frc', 'tgl_frc_2', 'tgl_frc_3', 'tgl_frc_4', 'tgl_sepatu', 'tgl_sepatu_2', 'tgl_sepatu_3',
+        'tgl_helm', 'tgl_helm_orange', 'tgl_glass', 'tgl_glass_2', 'tgl_vest', 'tgl_ear_plug', 'tgl_ear_plug_2',
+    ];
+
     private function mapPpeRow(Employee $e): array
     {
-        return [
-            'id'              => $e->id,
-            'id_badge'        => $e->id_badge,
-            'no_ktp'          => $e->no_ktp,
-            'nama_lengkap'    => $e->nama_lengkap,
-            'jabatan'         => $e->position?->nama_jabatan ?? '-',
-            'status'          => $e->status,
-            'ppe_id'          => $e->ppe?->id,
-            'frc'             => $e->ppe?->frc,
-            'safety_shoes'    => $e->ppe?->safety_shoes,
-            'safety_glass'    => $e->ppe?->safety_glass ?? false,
-            'safety_vest'     => $e->ppe?->safety_vest  ?? false,
-            'ear_plug'        => $e->ppe?->ear_plug      ?? false,
-            'catatan'         => $e->ppe?->catatan,
-            'tgl_frc'         => $e->ppe?->tgl_frc?->format('Y-m-d'),
-            'tgl_frc_fmt'     => $e->ppe?->tgl_frc?->format('d M Y'),
-            'tgl_frc_2'       => $e->ppe?->tgl_frc_2?->format('Y-m-d'),
-            'tgl_frc_2_fmt'   => $e->ppe?->tgl_frc_2?->format('d M Y'),
-            'tgl_frc_3'       => $e->ppe?->tgl_frc_3?->format('Y-m-d'),
-            'tgl_frc_3_fmt'   => $e->ppe?->tgl_frc_3?->format('d M Y'),
-            'tgl_frc_4'       => $e->ppe?->tgl_frc_4?->format('Y-m-d'),
-            'tgl_frc_4_fmt'   => $e->ppe?->tgl_frc_4?->format('d M Y'),
-            'tgl_sepatu'      => $e->ppe?->tgl_sepatu?->format('Y-m-d'),
-            'tgl_sepatu_fmt'  => $e->ppe?->tgl_sepatu?->format('d M Y'),
-            'tgl_sepatu_2'    => $e->ppe?->tgl_sepatu_2?->format('Y-m-d'),
-            'tgl_sepatu_2_fmt'=> $e->ppe?->tgl_sepatu_2?->format('d M Y'),
-            'tgl_sepatu_3'    => $e->ppe?->tgl_sepatu_3?->format('Y-m-d'),
-            'tgl_sepatu_3_fmt'=> $e->ppe?->tgl_sepatu_3?->format('d M Y'),
-            'tgl_helm'          => $e->ppe?->tgl_helm?->format('Y-m-d'),
-            'tgl_helm_fmt'      => $e->ppe?->tgl_helm?->format('d M Y'),
-            'white_helmet'        => (bool)($e->ppe?->white_helmet ?? false),
-            'helmet'              => (bool)($e->ppe?->helmet       ?? false),
-            'tgl_helm_orange'     => $e->ppe?->tgl_helm_orange?->format('Y-m-d'),
-            'tgl_helm_orange_fmt' => $e->ppe?->tgl_helm_orange?->format('d M Y'),
-            'tgl_glass'       => $e->ppe?->tgl_glass?->format('Y-m-d'),
-            'tgl_glass_fmt'   => $e->ppe?->tgl_glass?->format('d M Y'),
-            'tgl_glass_2'     => $e->ppe?->tgl_glass_2?->format('Y-m-d'),
-            'tgl_glass_2_fmt' => $e->ppe?->tgl_glass_2?->format('d M Y'),
-            'tgl_vest'        => $e->ppe?->tgl_vest?->format('Y-m-d'),
-            'tgl_vest_fmt'    => $e->ppe?->tgl_vest?->format('d M Y'),
-            'tgl_ear_plug'      => $e->ppe?->tgl_ear_plug?->format('Y-m-d'),
-            'tgl_ear_plug_fmt'  => $e->ppe?->tgl_ear_plug?->format('d M Y'),
-            'tgl_ear_plug_2'    => $e->ppe?->tgl_ear_plug_2?->format('Y-m-d'),
-            'tgl_ear_plug_2_fmt'=> $e->ppe?->tgl_ear_plug_2?->format('d M Y'),
+        $p = $e->ppe;
+        $row = [
+            'id'           => $e->id,
+            'id_badge'     => $e->id_badge,
+            'no_ktp'       => $e->no_ktp,
+            'nama_lengkap' => $e->nama_lengkap,
+            'jabatan'      => $e->position?->nama_jabatan ?? '-',
+            'status'       => $e->status,
+            'ppe_id'       => $p?->id,
+            'frc'          => $p?->frc,
+            'safety_shoes' => $p?->safety_shoes,
+            'safety_glass' => $p?->safety_glass ?? false,
+            'safety_vest'  => $p?->safety_vest ?? false,
+            'ear_plug'     => $p?->ear_plug ?? false,
+            'catatan'      => $p?->catatan,
+            'white_helmet' => (bool) ($p?->white_helmet ?? false),
+            'helmet'       => (bool) ($p?->helmet ?? false),
         ];
+        // Tiap tanggal dikirim 2 versi: untuk input (Y-m-d) & untuk ditampilkan (d M Y).
+        foreach (self::TANGGAL as $field) {
+            $row[$field]          = $p?->$field?->format('Y-m-d');
+            $row["{$field}_fmt"] = $p?->$field?->format('d M Y');
+        }
+        return $row;
     }
 }

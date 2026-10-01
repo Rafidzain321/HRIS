@@ -11,14 +11,10 @@ class SimController extends Controller
 {
     public function index(Request $request)
     {
-        $today = Carbon::today();
-        $in30  = $today->copy()->addDays(30);
-
-        $filter    = $request->get('filter', 'all');
+        $today     = Carbon::today();
         $search    = $request->get('search', '');
         $highlight = $request->get('highlight');
-
-        if ($highlight) $filter = 'all';
+        $filter    = $highlight ? 'all' : $request->get('filter', 'all');
 
         $query = Employee::aktif()->with('position')->whereNotNull('type_sim');
         $this->applyProjectFilter($query);
@@ -31,20 +27,9 @@ class SimController extends Controller
             );
         }
 
-        match ($filter) {
-            'expired' => $query->where('expired_sim', '<', $today),
-            'warning' => $query->whereBetween('expired_sim', [$today, $in30]),
-            'ok'      => $query->where('expired_sim', '>=', $in30),
-            default   => null,
-        };
+        $this->filterExpiry($query, 'expired_sim', $filter);
         $query->orderBy('expired_sim');
-
-        $page = $request->get('page', 1);
-        if ($highlight) {
-            $allIds = (clone $query)->pluck('id')->toArray();
-            $pos    = array_search((int) $highlight, $allIds);
-            if ($pos !== false) $page = (int) floor($pos / 50) + 1;
-        }
+        $page = $this->highlightPage($query, $highlight, $request);
 
         $employees = $query->paginate(50, ['*'], 'page', $page)->appends($request->except('highlight'))
             ->through(fn($e) => [
@@ -64,15 +49,8 @@ class SimController extends Controller
             ]);
 
         $pid = $this->activeProjectId();
-        $all = Employee::aktif()->whereNotNull('type_sim')
-                   ->when($pid, fn($q) => $q->where('project_id', $pid));
-        $stats = [
-            'total'   => (clone $all)->count(),
-            'expired' => (clone $all)->where('expired_sim', '<', $today)->count(),
-            'warning' => (clone $all)->whereBetween('expired_sim', [$today, $in30])->count(),
-            'ok'      => (clone $all)->where('expired_sim', '>=', $in30)->count(),
-            'no_data' => (clone $all)->whereNull('expired_sim')->count(),
-        ];
+        $all   = Employee::aktif()->whereNotNull('type_sim')->when($pid, fn($q) => $q->where('project_id', $pid));
+        $stats = ['total' => (clone $all)->count(), ...$this->expiryCounts($all, 'expired_sim')];
 
         return Inertia::render('Compliance/Sim', compact('employees', 'stats', 'filter', 'search', 'highlight'));
     }

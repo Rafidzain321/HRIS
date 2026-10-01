@@ -8,6 +8,23 @@ use Inertia\Inertia;
 
 class DriverController extends Controller
 {
+    const RULES = [
+        'name'                     => 'required|string|max:200',
+        'id_card'                  => 'nullable|string|max:25',
+        'badge'                    => 'nullable|string|max:30',
+        'license_type'             => 'nullable|string|max:10',
+        'license_no'               => 'nullable|string|max:30',
+        'rfid'                     => 'nullable|string|max:20',
+        'posttest_schedule'        => 'nullable|date',
+        'driver_status'            => 'nullable|string|max:100',
+        'permit_expired_date'      => 'nullable|date',
+        'posttest_schedule_status' => 'nullable|string|max:50',
+        'posttest_status'          => 'nullable|string|max:20',
+        'date_approve_posttest'    => 'nullable|date',
+        'dvp_status'               => 'nullable|string|max:150',
+    ];
+
+    // Nomor panjang (NIK, SIM, RFID, badge) disimpan sebagai teks supaya tidak berubah jadi angka/notasi ilmiah.
     private function castStringFields(array $data): array
     {
         foreach (['license_no', 'id_card', 'rfid', 'badge'] as $field) {
@@ -20,7 +37,6 @@ class DriverController extends Controller
 
     public function index(Request $request)
     {
-        // ── PROJECT FILTER ──
         $pid   = $this->activeProjectId();
         $query = DriverDetail::query()
             ->when($pid, fn($q) => $q->where('project_id', $pid));
@@ -70,7 +86,6 @@ class DriverController extends Controller
 
         $data = $paginated->toArray();
 
-        // ── STATS juga difilter per project ──
         $base = DriverDetail::when($pid, fn($q) => $q->where('project_id', $pid));
         $data['stats'] = [
             'total'          => (clone $base)->count(),
@@ -95,25 +110,7 @@ class DriverController extends Controller
             return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
         }
 
-        $data = $request->validate([
-            'name'                     => 'required|string|max:200',
-            'id_card'                  => 'nullable|string|max:25',
-            'badge'                    => 'nullable|string|max:30',
-            'license_type'             => 'nullable|string|max:10',
-            'license_no'               => 'nullable|string|max:30',
-            'rfid'                     => 'nullable|string|max:20',
-            'posttest_schedule'        => 'nullable|date',
-            'driver_status'            => 'nullable|string|max:100',
-            'permit_expired_date'      => 'nullable|date',
-            'posttest_schedule_status' => 'nullable|string|max:50',
-            'posttest_status'          => 'nullable|string|max:20',
-            'date_approve_posttest'    => 'nullable|date',
-            'dvp_status'               => 'nullable|string|max:150',
-        ]);
-
-        $data = $this->castStringFields($data);
-
-        // ── Set project_id otomatis ──
+        $data = $this->castStringFields($request->validate(self::RULES));
         $data['project_id'] = $this->activeProjectId() ?? auth()->user()->project_id;
 
         $driver = DriverDetail::create($data);
@@ -127,24 +124,7 @@ class DriverController extends Controller
             return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
         }
 
-        $data = $request->validate([
-            'name'                     => 'required|string|max:200',
-            'id_card'                  => 'nullable|string|max:25',
-            'badge'                    => 'nullable|string|max:30',
-            'license_type'             => 'nullable|string|max:10',
-            'license_no'               => 'nullable|string|max:30',
-            'rfid'                     => 'nullable|string|max:20',
-            'posttest_schedule'        => 'nullable|date',
-            'driver_status'            => 'nullable|string|max:100',
-            'permit_expired_date'      => 'nullable|date',
-            'posttest_schedule_status' => 'nullable|string|max:50',
-            'posttest_status'          => 'nullable|string|max:20',
-            'date_approve_posttest'    => 'nullable|date',
-            'dvp_status'               => 'nullable|string|max:150',
-        ]);
-
-        $data = $this->castStringFields($data);
-        $driver->update($data);
+        $driver->update($this->castStringFields($request->validate(self::RULES)));
         ActivityLog::record('update', 'Driver', $driver->name, "Update data driver: {$driver->name}");
         return redirect()->route('driver')->with('success', "Data {$driver->name} diperbarui.");
     }

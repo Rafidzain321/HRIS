@@ -11,14 +11,10 @@ class McuController extends Controller
 {
     public function index(Request $request)
     {
-        $today = Carbon::today();
-        $in30  = $today->copy()->addDays(30);
-
-        $filter    = $request->get('filter', 'all');
+        $today     = Carbon::today();
         $search    = $request->get('search', '');
         $highlight = $request->get('highlight');
-
-        if ($highlight) $filter = 'all';
+        $filter    = $highlight ? 'all' : $request->get('filter', 'all');
 
         $query = Employee::aktif()->with(['position' => fn($q) => $q->select('id', 'nama_jabatan')]);
         $this->applyProjectFilter($query);
@@ -30,21 +26,9 @@ class McuController extends Controller
             );
         }
 
-        match ($filter) {
-            'expired' => $query->where('exp_mcu', '<', $today),
-            'warning' => $query->whereBetween('exp_mcu', [$today, $in30]),
-            'ok'      => $query->where('exp_mcu', '>=', $in30),
-            'no_data' => $query->whereNull('exp_mcu'),
-            default   => null,
-        };
+        $this->filterExpiry($query, 'exp_mcu', $filter, true);
         $query->orderBy('exp_mcu');
-
-        $page = $request->get('page', 1);
-        if ($highlight) {
-            $allIds = (clone $query)->pluck('id')->toArray();
-            $pos    = array_search((int) $highlight, $allIds);
-            if ($pos !== false) $page = (int) floor($pos / 50) + 1;
-        }
+        $page = $this->highlightPage($query, $highlight, $request);
 
         $employees = $query->paginate(50, ['*'], 'page', $page)->appends($request->except('highlight'))
             ->through(fn($e) => [
@@ -66,13 +50,7 @@ class McuController extends Controller
 
         $pid  = $this->activeProjectId();
         $base = Employee::aktif()->when($pid, fn($q) => $q->where('project_id', $pid));
-        $stats = [
-            'total'   => (clone $base)->count(),
-            'expired' => (clone $base)->whereNotNull('exp_mcu')->where('exp_mcu', '<', $today)->count(),
-            'warning' => (clone $base)->whereNotNull('exp_mcu')->whereBetween('exp_mcu', [$today, $in30])->count(),
-            'ok'      => (clone $base)->whereNotNull('exp_mcu')->where('exp_mcu', '>=', $in30)->count(),
-            'no_data' => (clone $base)->whereNull('exp_mcu')->count(),
-        ];
+        $stats = ['total' => (clone $base)->count(), ...$this->expiryCounts($base, 'exp_mcu')];
 
         return Inertia::render('Compliance/Mcu', compact('employees', 'stats', 'filter', 'search', 'highlight'));
     }
