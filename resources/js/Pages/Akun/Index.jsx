@@ -63,15 +63,22 @@ export default function AkunIndex({ akun }) {
   }
 
   // ── Data akun ──
-  const [form, setForm] = useState({ name: akun.name || '', no_wa: akun.no_wa || '' });
+  const [form, setForm] = useState({ name: akun.name || '', email: akun.email || '', no_wa: akun.no_wa || '' });
   const [errors, setErrors]   = useState({});
   const [loading, setLoading] = useState(false);
-  const berubah = form.name !== (akun.name || '') || form.no_wa !== (akun.no_wa || '');
+  const [confirmEmail, setConfirmEmail] = useState(false);
+  const emailBaru = form.email.trim().toLowerCase();
+  const emailBerubah = emailBaru !== (akun.email || '');
+  const berubah = form.name !== (akun.name || '') || emailBerubah || form.no_wa !== (akun.no_wa || '');
   function simpanAkun(e) {
-    e.preventDefault();
+    e?.preventDefault();
     if (!form.name.trim()) { setErrors({ name: 'Nama wajib diisi.' }); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailBaru)) { setErrors({ email: 'Format email tidak valid.' }); return; }
+    // Email dipakai untuk login — minta konfirmasi dulu supaya salah ketik tidak bikin terkunci.
+    if (emailBerubah && !confirmEmail) { setConfirmEmail(true); return; }
+    setConfirmEmail(false);
     setLoading(true); setErrors({});
-    router.put('/akun', form, {
+    router.put('/akun', { ...form, email: emailBaru }, {
       preserveScroll: true,
       onError: err => setErrors(err),
       onFinish: () => setLoading(false),
@@ -113,6 +120,10 @@ export default function AkunIndex({ akun }) {
       <ConfirmModal open={confirmHapus} onCancel={()=>setConfirmHapus(false)} onConfirm={hapusFoto}
         title="Hapus Foto Profil" message="Foto profil akan dihapus dan diganti inisial nama. Lanjutkan?"
         confirmLabel="Ya, Hapus" icon={<Trash2 size={28} color="#E04545"/>} />
+      <ConfirmModal open={confirmEmail} onCancel={()=>setConfirmEmail(false)} onConfirm={()=>simpanAkun()} type="warning"
+        title="Ganti Email Login"
+        message={<>Email login akan diganti dari <b>{akun.email}</b> menjadi <b>{emailBaru}</b>. Pastikan sudah benar — login berikutnya wajib pakai email baru ini.</>}
+        confirmLabel="Ya, Ganti Email" icon={<Mail size={28} color="#E8A020"/>} />
 
       {/* ── Kartu profil ── */}
       <div className="panel" style={{maxWidth:980,marginBottom:16}}>
@@ -167,8 +178,12 @@ export default function AkunIndex({ akun }) {
             </div>
             <div>
               <label style={LBL}><Mail size={10} style={{verticalAlign:'-1px'}}/> Email Login</label>
-              <input style={{...INP,opacity:.7}} value={akun.email} readOnly />
-              <div style={{fontSize:10,color:'var(--muted)',marginTop:4}}>Email dipakai untuk login — hanya bisa diubah oleh admin.</div>
+              <input type="email" style={{...INP,borderColor:errors.email?'#E04545':'var(--border)'}} value={form.email} maxLength={255} autoComplete="email"
+                onChange={e=>{setForm(f=>({...f,email:e.target.value})); setErrors(er=>({...er,email:null}));}} />
+              <ErrorText>{errors.email}</ErrorText>
+              <div style={{fontSize:10,color:emailBerubah?'var(--accent)':'var(--muted)',marginTop:4}}>
+                {emailBerubah ? 'Setelah disimpan, login berikutnya pakai email baru ini.' : 'Email ini dipakai untuk login.'}
+              </div>
             </div>
             <div>
               <label style={LBL}><Phone size={10} style={{verticalAlign:'-1px'}}/> Nomor WhatsApp</label>

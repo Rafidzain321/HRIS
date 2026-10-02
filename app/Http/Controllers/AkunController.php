@@ -7,8 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
-// "Akun Saya" — semua role mengelola akunnya sendiri: foto profil, nama tampilan, nomor WhatsApp.
-// Ganti password tetap lewat UserManagementController::changePassword. Email & role cuma bisa diubah super-admin.
+// "Akun Saya" — semua role mengelola akunnya sendiri: foto profil, nama tampilan, email login, nomor WhatsApp.
+// Ganti password tetap lewat UserManagementController::changePassword. Role & akses kantor cuma bisa diubah admin.
 class AkunController extends Controller
 {
     public function index()
@@ -32,21 +32,34 @@ class AkunController extends Controller
         ]);
     }
 
+    const LABEL_FIELD = ['name' => 'nama', 'email' => 'email login', 'no_wa' => 'nomor WhatsApp'];
+
     public function update(Request $request)
     {
+        $user = auth()->user();
+        $request->merge(['email' => strtolower(trim((string) $request->input('email')))]);
         $data = $request->validate([
             'name'  => 'required|string|max:100',
+            'email' => "required|email|max:255|unique:users,email,{$user->id}",
             'no_wa' => ['nullable', 'string', 'max:20', 'regex:/^(\+?62|0)8[0-9]{7,13}$/'],
-        ], ['no_wa.regex' => 'Format nomor WhatsApp tidak valid (cth: 081234567890 atau +6281234567890).']);
+        ], [
+            'email.unique' => 'Email ini sudah dipakai akun lain.',
+            'email.email'  => 'Format email tidak valid.',
+            'no_wa.regex'  => 'Format nomor WhatsApp tidak valid (cth: 081234567890 atau +6281234567890).',
+        ]);
         $data['no_wa'] = $data['no_wa'] ? preg_replace('/^(\+?62)/', '0', $data['no_wa']) : null;
 
-        $user    = auth()->user();
-        $berubah = array_keys(array_diff_assoc($data, $user->only(['name', 'no_wa'])));
+        $lama    = $user->only(['name', 'email', 'no_wa']);
+        $berubah = array_keys(array_diff_assoc($data, $lama));
         if (!$berubah) return back();
 
         $user->update($data);
-        ActivityLog::record('update', 'Akun', $user->name, 'Ubah ' . implode(' & ', array_map(fn($f) => $f === 'name' ? 'nama' : 'nomor WhatsApp', $berubah)));
-        return back()->with('success', 'Akun berhasil diperbarui.');
+        $ket = 'Ubah ' . implode(' & ', array_map(fn($f) => self::LABEL_FIELD[$f], $berubah));
+        if (in_array('email', $berubah)) $ket .= " (email: {$lama['email']} -> {$data['email']})";
+        ActivityLog::record('update', 'Akun', $user->name, $ket);
+        return back()->with('success', in_array('email', $berubah)
+            ? "Akun berhasil diperbarui. Login berikutnya pakai email {$data['email']}."
+            : 'Akun berhasil diperbarui.');
     }
 
     public function uploadFoto(Request $request)
