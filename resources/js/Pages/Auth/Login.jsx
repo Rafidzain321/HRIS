@@ -189,7 +189,7 @@ export default function Login() {
           {/* Sesi biasa habis 12 jam; centang supaya tetap login di perangkat ini. */}
           <label style={{display:'flex', alignItems:'center', gap:8, marginBottom:18, fontSize:12.5, color:'rgba(255,255,255,0.6)', cursor:'pointer', userSelect:'none'}}>
             <input type="checkbox" checked={data.remember} onChange={e => setData('remember', e.target.checked)} style={{accentColor:'#E8A020', width:14, height:14, cursor:'pointer'}} />
-            Ingat saya
+            Ingatkan saya
           </label>
 
           <button type="submit" className="login-btn" disabled={processing} style={{marginTop:4}}>
