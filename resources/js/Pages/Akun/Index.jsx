@@ -155,7 +155,7 @@ export default function AkunIndex({ akun }) {
           </div>
         </div>
         <div style={{padding:'0 24px 14px',fontSize:10.5,color:'var(--muted)'}}>
-          Foto JPG, PNG, atau WEBP, maksimal {MAKS_FOTO_MB} MB. Tampil di sidebar.
+          Foto JPG, PNG, atau WEBP, maksimal {MAKS_FOTO_MB} MB.
           <ErrorText>{fotoError}</ErrorText>
         </div>
       </div>
