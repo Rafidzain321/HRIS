@@ -13,7 +13,6 @@ const BTN = {
   padding:'8px 18px', borderRadius:8, border:'none', fontSize:12.5, fontWeight:700, cursor:'pointer',
   fontFamily:"'Outfit',sans-serif", display:'inline-flex', alignItems:'center', gap:6,
 };
-const ROLE_LABEL = { 'super-admin':'Super Admin', 'hr-staff':'HR Staff', manager:'Manager', 'project-user':'Project User', viewer:'Viewer' };
 const MAKS_FOTO_MB = 2;
 
 function ErrorText({ children }) {
@@ -103,11 +102,8 @@ export default function AkunIndex({ akun }) {
   }
 
   const info = [
-    ['Role', ROLE_LABEL[akun.role] || akun.role || '—'],
     ['Kantor Utama', akun.kantor_utama || '—'],
     ['Akses Kantor', akun.akses_kantor === null ? 'Semua kantor' : (akun.akses_kantor.join(', ') || '—')],
-    ['Akun Dibuat', akun.dibuat || '—'],
-    ['Login Sebelumnya', akun.login_terakhir || '—'],
   ];
 
   return (
@@ -142,7 +138,6 @@ export default function AkunIndex({ akun }) {
             <div style={{fontFamily:'Syne,sans-serif',fontSize:18,fontWeight:700}}>{akun.name}</div>
             <div style={{fontSize:12.5,color:'var(--muted2)',marginTop:2}}>{akun.email}</div>
             <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
-              <span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:99,background:'rgba(232,160,32,.12)',color:'var(--accent)'}}>{ROLE_LABEL[akun.role] || akun.role}</span>
               {akun.kantor_utama && <span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:99,background:'var(--bg3)',color:'var(--muted2)'}}>{akun.kantor_utama}</span>}
             </div>
           </div>
@@ -160,7 +155,7 @@ export default function AkunIndex({ akun }) {
           </div>
         </div>
         <div style={{padding:'0 24px 14px',fontSize:10.5,color:'var(--muted)'}}>
-          Foto JPG, PNG, atau WEBP, maksimal {MAKS_FOTO_MB} MB. Tampil di pojok kanan atas & sidebar.
+          Foto JPG, PNG, atau WEBP, maksimal {MAKS_FOTO_MB} MB. Tampil di sidebar.
           <ErrorText>{fotoError}</ErrorText>
         </div>
       </div>
@@ -235,7 +230,7 @@ export default function AkunIndex({ akun }) {
                   <div style={{fontWeight:500,minWidth:0,wordBreak:'break-word'}}>{v}</div>
                 </div>
               ))}
-              <div style={{fontSize:10,color:'var(--muted)',marginTop:8}}>Role & akses kantor diatur oleh admin.</div>
+              <div style={{fontSize:10,color:'var(--muted)',marginTop:8}}>Akses kantor diatur oleh admin.</div>
             </div>
           </div>
         </div>

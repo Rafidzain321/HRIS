@@ -241,7 +241,7 @@ function Avatar({ authUser, size, radius }) {
 function ProfileMenu({ authUser, onLogout }) {
   return (
     <div style={{ padding:'10px 8px', borderTop:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:6 }}>
-      <Link href="/akun" title="Akun Saya" style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'var(--bg3)', border:'1px solid var(--border)', textDecoration:'none', cursor:'pointer' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'var(--bg3)', border:'1px solid var(--border)' }}>
         <Avatar authUser={authUser} size={28} radius={7} />
         <div style={{ minWidth:0, flex:1 }}>
           <div style={{ fontSize:11, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{authUser?.name || 'Admin HR'}</div>
@@ -251,7 +251,7 @@ function ProfileMenu({ authUser, onLogout }) {
             authUser?.project?.nama || 'Project User'}
           </div>
         </div>
-      </Link>
+      </div>
       <div onClick={onLogout} style={{
         display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 10px', borderRadius:8,
         fontSize:12, fontWeight:600, color:'#E04545', cursor:'pointer',
@@ -661,9 +661,6 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
                 <div style={{ position:'absolute', top:6, right:6, width:7, height:7, borderRadius:'50%', background:'var(--red)', animation:'blink 1.5s infinite' }}/>
               ) : null}
             </div>
-            <Link href="/akun" className="icon-btn" title="Akun Saya" style={{ padding:0, overflow:'hidden' }}>
-              <Avatar authUser={authUser} size={34} radius={7} />
-            </Link>
             <div className="icon-btn icon-btn-logout" title="Keluar" onClick={()=>setConfirmLogout(true)}>
               <LogOut size={17}/>
             </div>

@@ -22,12 +22,8 @@ class AkunController extends Controller
                 'name'         => $user->name,
                 'email'        => $user->email,
                 'no_wa'        => $user->no_wa,
-                'role'         => $user->roles->first()?->name,
                 'kantor_utama' => $user->project?->nama,
                 'akses_kantor' => $kantor, // null = semua kantor
-                'dibuat'       => $user->created_at?->locale('id')->translatedFormat('d F Y'),
-                'login_terakhir' => ActivityLog::where('user_id', $user->id)->where('action', 'login')
-                    ->latest('id')->skip(1)->first()?->created_at?->locale('id')->translatedFormat('d F Y, H:i'), // skip sesi sekarang
             ],
         ]);
     }
