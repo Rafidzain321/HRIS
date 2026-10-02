@@ -168,7 +168,7 @@ export default function AkunIndex({ akun }) {
             <div>
               <label style={LBL}><Mail size={10} style={{verticalAlign:'-1px'}}/> Email Login</label>
               <input style={{...INP,opacity:.7}} value={akun.email} readOnly />
-              <div style={{fontSize:10,color:'var(--muted)',marginTop:4}}>Email dipakai untuk login — hanya bisa diubah oleh super admin.</div>
+              <div style={{fontSize:10,color:'var(--muted)',marginTop:4}}>Email dipakai untuk login — hanya bisa diubah oleh admin.</div>
             </div>
             <div>
               <label style={LBL}><Phone size={10} style={{verticalAlign:'-1px'}}/> Nomor WhatsApp</label>
@@ -220,7 +220,7 @@ export default function AkunIndex({ akun }) {
                   <div style={{fontWeight:500,minWidth:0,wordBreak:'break-word'}}>{v}</div>
                 </div>
               ))}
-              <div style={{fontSize:10,color:'var(--muted)',marginTop:8}}>Role & akses kantor diatur oleh super admin.</div>
+              <div style={{fontSize:10,color:'var(--muted)',marginTop:8}}>Role & akses kantor diatur oleh admin.</div>
             </div>
           </div>
         </div>

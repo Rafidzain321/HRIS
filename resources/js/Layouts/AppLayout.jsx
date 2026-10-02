@@ -6,7 +6,7 @@ import {
   LayoutDashboard, User, Shield, Stethoscope, CreditCard, HardHat,
   ClipboardList, Car, Truck, Calendar, Receipt, Wallet, BookOpen, Bell,
   Settings, X, Loader2, CheckCircle2, XCircle, TriangleAlert,
-  Trash2, LogOut, Menu, Eye, Building2, Check, Target, CalendarDays, HeartHandshake,
+  Trash2, LogOut, Menu, Eye, Building2, Check, Target, CalendarDays, HeartHandshake, CircleUser,
 } from 'lucide-react';
 
 const NAV = [
@@ -31,6 +31,7 @@ const NAV = [
   { key: 'konseling',  icon: HeartHandshake, label: 'Konseling', href: '/konseling' },
   { section: 'Sistem' },
   { key: 'notifications', icon: Bell, label: 'Notifikasi', href: '/notifications' },
+  { key: 'akun',       icon: CircleUser, label: 'Akun',       href: '/akun' },
   { key: 'pengaturan', icon: Settings, label: 'Pengaturan',   href: '/pengaturan' },
 ];
 
@@ -699,11 +700,11 @@ function SidebarContent({ url, authUser, onLogout }) {
   const NON_HO_HIDDEN_KEYS = ['kpi', 'cuti'];
   const restrictPayroll = authUser?.can?.restrict_payroll;
   const PAYROLL_KEYS = ['slip-gaji', 'data-gaji'];
-  // Menu 'pengaturan' sengaja tidak dicek lewat permission matriks (tetap kelihatan untuk semua,
+  // Menu 'akun' (akun sendiri) & 'pengaturan' sengaja tidak dicek lewat permission matriks (tetap kelihatan untuk semua,
   // aksesnya sendiri sudah digerbang lewat hasRole('super-admin') di controller-nya).
   // 'cuti' sekarang menu gabungan Cuti Tahunan + Kehadiran (dua tab di satu halaman) — tampilkan
   // kalau user punya izin salah satunya, biar yang cuma dikasih akses Kehadiran saja tetap kelihatan menunya.
-  const canViewMenu = (key) => key === 'pengaturan' || (key === 'cuti' ? (permissions.includes('view-cuti') || permissions.includes('view-kehadiran')) : permissions.includes(`view-${key}`));
+  const canViewMenu = (key) => key === 'akun' || key === 'pengaturan' || (key === 'cuti' ? (permissions.includes('view-cuti') || permissions.includes('view-kehadiran')) : permissions.includes(`view-${key}`));
   const filteredNav = (isHoProject
       ? NAV.filter(item => !item.key || !HO_HIDDEN_KEYS.includes(item.key))
       : NAV.filter(item => !item.key || !NON_HO_HIDDEN_KEYS.includes(item.key)))
