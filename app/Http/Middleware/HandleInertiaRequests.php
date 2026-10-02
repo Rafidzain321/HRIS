@@ -92,6 +92,8 @@ class HandleInertiaRequests extends Middleware
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    // ?v= berubah tiap ganti foto supaya cache browser ikut diperbarui.
+                    'foto_url' => $user->foto_path ? '/akun/foto?v=' . substr(md5($user->foto_path), 0, 8) : null,
                     'role' => $user->roles->first()?->name,
                     'project_id' => $user->project_id,
                     'project_ids' => $user->project_ids ? json_decode($user->project_ids, true) : null,

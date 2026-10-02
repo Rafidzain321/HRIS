@@ -160,6 +160,13 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pengaturan/holidays', [HolidayController::class, 'store'])->name('holidays.store');
     Route::delete('/pengaturan/holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
 
+    // Akun Saya — semua user yang login, data akunnya sendiri.
+    Route::get('/akun', [\App\Http\Controllers\AkunController::class, 'index'])->name('akun');
+    Route::put('/akun', [\App\Http\Controllers\AkunController::class, 'update']);
+    Route::get('/akun/foto', [\App\Http\Controllers\AkunController::class, 'foto'])->name('akun.foto');
+    Route::post('/akun/foto', [\App\Http\Controllers\AkunController::class, 'uploadFoto']);
+    Route::delete('/akun/foto', [\App\Http\Controllers\AkunController::class, 'hapusFoto']);
+
     Route::get('/notifications', [NotificationController::class, 'page'])->middleware('menu:notifications,view')->name('notifications.page');
     Route::get('/pengaturan', [UserManagementController::class, 'index'])->name('pengaturan');
     Route::post('/pengaturan/users', [UserManagementController::class, 'store']);

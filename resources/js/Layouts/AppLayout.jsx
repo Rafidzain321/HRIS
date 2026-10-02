@@ -224,14 +224,24 @@ export function ConfirmModal({ open, onConfirm, onCancel, title, message, confir
   );
 }
 
+// ── Foto profil (atau inisial kalau belum upload) ───────────
+function Avatar({ authUser, size, radius }) {
+  if (authUser?.foto_url) {
+    return <img src={authUser.foto_url} alt="" style={{ width:size, height:size, borderRadius:radius, objectFit:'cover', flexShrink:0 }} />;
+  }
+  return (
+    <div style={{ width:size, height:size, borderRadius:radius, background:'linear-gradient(135deg,#3A8FE0,#22C97A)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:size*0.36, fontWeight:700, color:'#fff', flexShrink:0 }}>
+      {(authUser?.name || 'HR').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase()}
+    </div>
+  );
+}
+
 // ── Profile + Logout ────────────────────────────────────────
 function ProfileMenu({ authUser, onLogout }) {
   return (
     <div style={{ padding:'10px 8px', borderTop:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:6 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'var(--bg3)', border:'1px solid var(--border)' }}>
-        <div style={{ width:28, height:28, borderRadius:7, background:'linear-gradient(135deg,#3A8FE0,#22C97A)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
-          {(authUser?.name || 'HR').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase()}
-        </div>
+      <Link href="/akun" title="Akun Saya" style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:8, background:'var(--bg3)', border:'1px solid var(--border)', textDecoration:'none', cursor:'pointer' }}>
+        <Avatar authUser={authUser} size={28} radius={7} />
         <div style={{ minWidth:0, flex:1 }}>
           <div style={{ fontSize:11, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{authUser?.name || 'Admin HR'}</div>
           <div style={{ fontSize:9.5, color:'var(--muted)' }}>
@@ -240,7 +250,7 @@ function ProfileMenu({ authUser, onLogout }) {
             authUser?.project?.nama || 'Project User'}
           </div>
         </div>
-      </div>
+      </Link>
       <div onClick={onLogout} style={{
         display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 10px', borderRadius:8,
         fontSize:12, fontWeight:600, color:'#E04545', cursor:'pointer',
@@ -650,6 +660,9 @@ export default function AppLayout({ children, title='Dashboard', subtitle='HRIS'
                 <div style={{ position:'absolute', top:6, right:6, width:7, height:7, borderRadius:'50%', background:'var(--red)', animation:'blink 1.5s infinite' }}/>
               ) : null}
             </div>
+            <Link href="/akun" className="icon-btn" title="Akun Saya" style={{ padding:0, overflow:'hidden' }}>
+              <Avatar authUser={authUser} size={34} radius={7} />
+            </Link>
             <div className="icon-btn icon-btn-logout" title="Keluar" onClick={()=>setConfirmLogout(true)}>
               <LogOut size={17}/>
             </div>

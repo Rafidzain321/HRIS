@@ -1,0 +1,84 @@
+<?php
+namespace App\Http\Controllers;
+
+use App\Models\ActivityLog;
+use App\Models\Project;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
+
+// "Akun Saya" — semua role mengelola akunnya sendiri: foto profil, nama tampilan, nomor WhatsApp.
+// Ganti password tetap lewat UserManagementController::changePassword. Email & role cuma bisa diubah super-admin.
+class AkunController extends Controller
+{
+    public function index()
+    {
+        $user   = auth()->user();
+        $akses  = $user->aksesKantor();
+        $kantor = $akses === null ? null : Project::whereIn('id', $akses)->orderBy('nama')->pluck('nama');
+
+        return Inertia::render('Akun/Index', [
+            'akun' => [
+                'name'         => $user->name,
+                'email'        => $user->email,
+                'no_wa'        => $user->no_wa,
+                'role'         => $user->roles->first()?->name,
+                'kantor_utama' => $user->project?->nama,
+                'akses_kantor' => $kantor, // null = semua kantor
+                'dibuat'       => $user->created_at?->locale('id')->translatedFormat('d F Y'),
+                'login_terakhir' => ActivityLog::where('user_id', $user->id)->where('action', 'login')
+                    ->latest('id')->skip(1)->first()?->created_at?->locale('id')->translatedFormat('d F Y, H:i'), // skip sesi sekarang
+            ],
+        ]);
+    }
+
+    public function update(Request $request)
+    {
+        $data = $request->validate([
+            'name'  => 'required|string|max:100',
+            'no_wa' => ['nullable', 'string', 'max:20', 'regex:/^(\+?62|0)8[0-9]{7,13}$/'],
+        ], ['no_wa.regex' => 'Format nomor WhatsApp tidak valid (cth: 081234567890 atau +6281234567890).']);
+        $data['no_wa'] = $data['no_wa'] ? preg_replace('/^(\+?62)/', '0', $data['no_wa']) : null;
+
+        $user    = auth()->user();
+        $berubah = array_keys(array_diff_assoc($data, $user->only(['name', 'no_wa'])));
+        if (!$berubah) return back();
+
+        $user->update($data);
+        ActivityLog::record('update', 'Akun', $user->name, 'Ubah ' . implode(' & ', array_map(fn($f) => $f === 'name' ? 'nama' : 'nomor WhatsApp', $berubah)));
+        return back()->with('success', 'Akun berhasil diperbarui.');
+    }
+
+    public function uploadFoto(Request $request)
+    {
+        $request->validate(['foto' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048'],
+            ['foto.max' => 'Ukuran foto maksimal 2 MB.', 'foto.image' => 'File harus berupa gambar.', 'foto.mimes' => 'Foto harus JPG, PNG, atau WEBP.']);
+
+        $user = auth()->user();
+        if ($user->foto_path) Storage::disk('local')->delete($user->foto_path);
+        $path = $request->file('foto')->storeAs('avatars', $user->id . '_' . time() . '.' . strtolower($request->file('foto')->extension()), 'local');
+        $user->update(['foto_path' => $path]);
+
+        ActivityLog::record('update', 'Akun', $user->name, 'Ganti foto profil');
+        return back()->with('success', 'Foto profil berhasil diperbarui.');
+    }
+
+    public function hapusFoto()
+    {
+        $user = auth()->user();
+        if ($user->foto_path) {
+            Storage::disk('local')->delete($user->foto_path);
+            $user->update(['foto_path' => null]);
+            ActivityLog::record('update', 'Akun', $user->name, 'Hapus foto profil');
+        }
+        return back()->with('success', 'Foto profil dihapus.');
+    }
+
+    // Foto profil disimpan di disk private, disajikan lewat route ini (wajib login).
+    public function foto()
+    {
+        $path = auth()->user()->foto_path;
+        if (!$path || !Storage::disk('local')->exists($path)) abort(404);
+        return response()->file(Storage::disk('local')->path($path), ['Cache-Control' => 'private, max-age=86400']);
+    }
+}
