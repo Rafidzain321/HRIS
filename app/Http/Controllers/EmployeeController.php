@@ -185,8 +185,9 @@ class EmployeeController extends Controller
         // plus project lain yang kebetulan dipegang karyawan kantor ini.
         $clientProjectList = ClientProject::orderBy('kode')
             ->withCount(['employees' => fn($q) => $q->where('status', 'AKTIF')->when($pid, fn($q2) => $q2->where('project_id', $pid))])
-            ->get(['id', 'kode', 'project_id', 'is_active'])
-            ->filter(fn($cp) => !$pid || $cp->project_id == $pid || $cp->employees_count > 0 || (string) $cp->id === (string) $clientProjectId)
+            ->when($pid, fn($q) => $q->withExists(['kantors as milik_kantor' => fn($q2) => $q2->where('projects.id', $pid)]))
+            ->get(['id', 'kode', 'is_active'])
+            ->filter(fn($cp) => !$pid || $cp->milik_kantor || $cp->employees_count > 0 || (string) $cp->id === (string) $clientProjectId)
             ->map(fn($cp) => ['id' => $cp->id, 'kode' => $cp->kode, 'jumlah' => $cp->employees_count, 'is_active' => $cp->is_active])
             ->values();
 
@@ -305,7 +306,7 @@ class EmployeeController extends Controller
             // (walau sudah nonaktif/pindah kantor) supaya tidak hilang diam-diam saat disimpan.
             'client_project_list' => ClientProject::orderBy('kode')
                 ->where(fn($q) => $q
-                    ->where(fn($q2) => $q2->where('project_id', $employee->project_id)->where('is_active', true))
+                    ->where(fn($q2) => $q2->whereHas('kantors', fn($q3) => $q3->where('projects.id', $employee->project_id))->where('is_active', true))
                     ->orWhereIn('id', $employee->clientProjects->pluck('id')))
                 ->get(['id', 'kode', 'is_active']),
             'can_manage_client_project' => $this->isAdminSettings(),

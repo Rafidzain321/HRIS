@@ -3,23 +3,28 @@ namespace App\Http\Controllers;
 
 use App\Models\ClientProject;
 use App\Models\ActivityLog;
+use App\Models\Project;
 use Illuminate\Http\Request;
 
 // "Data Project" — project riil (kode kontrak/pekerjaan, mis. "AKM-PP"), beda dari Project
-// (kantor/entitas payroll). Tiap project dihubungkan ke satu kantor, bisa diaktif/nonaktifkan.
+// (kantor/entitas payroll). Tiap project dihubungkan ke satu atau beberapa kantor, bisa diaktif/nonaktifkan.
 // Dipakai buat penanda karyawan mana pegang project mana (many-to-many, lihat Employee::clientProjects()).
 class ClientProjectController extends Controller
 {
+    const KANTOR_RULES = [
+        'project_ids'   => 'required|array|min:1',
+        'project_ids.*' => 'exists:projects,id',
+    ];
+    const KANTOR_MESSAGES = ['project_ids.required' => 'Kantor wajib dipilih.', 'project_ids.min' => 'Kantor wajib dipilih.'];
+
     public function store(Request $request)
     {
         if (!$this->isAdminSettings()) abort(403);
 
-        $data = $request->validate([
-            'kode'       => 'required|string|max:50|unique:client_projects,kode',
-            'project_id' => 'required|exists:projects,id',
-        ], ['project_id.required' => 'Kantor wajib dipilih.']);
-        $cp = ClientProject::create($data);
-        ActivityLog::record('create', 'Data Project', $cp->kode, "Kantor: {$cp->kantor?->nama}");
+        $data = $request->validate(['kode' => 'required|string|max:50|unique:client_projects,kode'] + self::KANTOR_RULES, self::KANTOR_MESSAGES);
+        $cp = ClientProject::create(['kode' => $data['kode']]);
+        $cp->kantors()->sync($data['project_ids']);
+        ActivityLog::record('create', 'Data Project', $cp->kode, 'Kantor: ' . $this->namaKantor($cp));
         return back()->with('success', "Project \"{$cp->kode}\" berhasil ditambahkan.");
     }
 
@@ -27,21 +32,19 @@ class ClientProjectController extends Controller
     {
         if (!$this->isAdminSettings()) abort(403);
 
-        $data = $request->validate([
-            'kode'       => "required|string|max:50|unique:client_projects,kode,{$clientProject->id}",
-            'project_id' => 'required|exists:projects,id',
-        ], ['project_id.required' => 'Kantor wajib dipilih.']);
+        $data = $request->validate(['kode' => "required|string|max:50|unique:client_projects,kode,{$clientProject->id}"] + self::KANTOR_RULES, self::KANTOR_MESSAGES);
         $old       = $clientProject->kode;
-        $oldKantor = $clientProject->kantor?->nama ?? '-';
-        $clientProject->update($data);
-        $newKantor = $clientProject->fresh('kantor')->kantor?->nama ?? '-';
+        $oldKantor = $this->namaKantor($clientProject);
+        $clientProject->update(['kode' => $data['kode']]);
+        $clientProject->kantors()->sync($data['project_ids']);
+        $newKantor = $this->namaKantor($clientProject->load('kantors'));
         ActivityLog::record('update', 'Data Project', $data['kode'], "Kode: \"{$old}\" -> \"{$data['kode']}\", Kantor: {$oldKantor} -> {$newKantor}");
         return back()->with('success', 'Project berhasil diperbarui.');
     }
 
-    // "Edit Kantor → Pilih Project": set sekaligus project apa saja milik satu kantor.
-    // Project yang dicentang pindah ke kantor ini; yang tadinya milik kantor ini tapi tidak dicentang dilepas.
-    public function syncKantor(Request $request, \App\Models\Project $project)
+    // "Edit Kantor → Pilih Project": set sekaligus project apa saja yang terhubung ke satu kantor.
+    // Yang dicentang ditambahkan ke kantor ini (hubungan ke kantor lain tetap); yang tidak dicentang dilepas dari kantor ini saja.
+    public function syncKantor(Request $request, Project $project)
     {
         if (!$this->isAdminSettings()) abort(403);
 
@@ -51,9 +54,7 @@ class ClientProjectController extends Controller
         ]);
         $ids = array_map('intval', $data['client_project_ids'] ?? []);
 
-        $lepas = ClientProject::where('project_id', $project->id)->whereNotIn('id', $ids)->pluck('kode');
-        ClientProject::where('project_id', $project->id)->whereNotIn('id', $ids)->update(['project_id' => null]);
-        ClientProject::whereIn('id', $ids)->update(['project_id' => $project->id]);
+        $lepas = ClientProject::whereIn('id', $project->clientProjects()->sync($ids)['detached'])->pluck('kode');
 
         $kodes = ClientProject::whereIn('id', $ids)->orderBy('kode')->pluck('kode')->implode(', ');
         ActivityLog::record('update', 'Data Project', $project->nama,
@@ -83,5 +84,10 @@ class ClientProjectController extends Controller
         $clientProject->delete();
         ActivityLog::record('delete', 'Data Project', $kode);
         return back()->with('success', "Project \"{$kode}\" berhasil dihapus.");
+    }
+
+    private function namaKantor(ClientProject $cp): string
+    {
+        return $cp->kantors->pluck('nama')->sort()->implode(', ') ?: '-';
     }
 }

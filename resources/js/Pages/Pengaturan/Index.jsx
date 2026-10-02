@@ -443,13 +443,13 @@ function JabatanModal({ mode, position, onClose }) {
 
 // ── MODAL DATA PROJECT (project riil, mis. "AKM-PP" — beda dari kantor) ──
 // "Edit Kantor → Pilih Project": pilih banyak project sekaligus untuk satu kantor.
+// Satu project boleh di beberapa kantor — mencentang di sini tidak melepas project dari kantor lain.
 function KantorProjectModal({ kantor, clientProjects=[], onClose }) {
-  const [selected, setSelected] = useState(clientProjects.filter(p=>p.project_id===kantor.id).map(p=>p.id));
+  const [selected, setSelected] = useState(clientProjects.filter(p=>p.project_ids.includes(kantor.id)).map(p=>p.id));
   const [search,   setSearch]   = useState('');
   const [loading,  setLoading]  = useState(false);
   const toggle = id => setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
   const list = clientProjects.filter(p => !search || p.kode.toLowerCase().includes(search.toLowerCase()));
-  const pindahan = clientProjects.filter(p => selected.includes(p.id) && p.project_id && p.project_id!==kantor.id);
   function save() {
     setLoading(true);
     router.put(`/pengaturan/kantor/${kantor.id}/client-projects`, {client_project_ids:selected}, {
@@ -486,7 +486,7 @@ function KantorProjectModal({ kantor, clientProjects=[], onClose }) {
             <div style={{maxHeight:260,overflowY:'auto',marginTop:6}}>
               {list.map(p=>{
                 const on = selected.includes(p.id);
-                const milikLain = p.project_id && p.project_id!==kantor.id;
+                const kantorLain = (p.kantor_nama||'').split(', ').filter(n=>n && n!==kantor.nama);
                 return (
                   <div key={p.id} onClick={()=>toggle(p.id)}
                     style={{display:'flex',alignItems:'center',gap:8,padding:'7px 8px',borderRadius:6,cursor:'pointer',fontSize:12.5,
@@ -496,19 +496,13 @@ function KantorProjectModal({ kantor, clientProjects=[], onClose }) {
                     </span>
                     <span style={{fontWeight:on?600:400,opacity:p.is_active?1:.55}}>{p.kode}</span>
                     {!p.is_active && <span style={{fontSize:10,color:'var(--muted)'}}>(nonaktif)</span>}
-                    {milikLain && <span style={{marginLeft:'auto',fontSize:10.5,color:'var(--muted)'}}>saat ini: {p.kantor_nama}</span>}
+                    {kantorLain.length>0 && <span style={{marginLeft:'auto',fontSize:10.5,color:'var(--muted)'}}>juga di: {kantorLain.join(', ')}</span>}
                   </div>
                 );
               })}
               {list.length===0 && <div style={{padding:12,textAlign:'center',fontSize:12,color:'var(--muted)'}}>Tidak ada project yang cocok. Tambah project baru lewat tombol "Tambah Project".</div>}
             </div>
           </div>
-          {pindahan.length>0 && (
-            <div style={{display:'flex',gap:6,alignItems:'flex-start',fontSize:11,color:'var(--accent)',marginTop:10}}>
-              <TriangleAlert size={13} style={{flexShrink:0,marginTop:1}}/>
-              <span>{pindahan.map(p=>`${p.kode} (dari ${p.kantor_nama})`).join(', ')} akan dipindah ke kantor {kantor.nama}.</span>
-            </div>
-          )}
         </div>
         <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
           <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
@@ -523,19 +517,20 @@ function KantorProjectModal({ kantor, clientProjects=[], onClose }) {
 
 function ClientProjectModal({ mode, clientProject, kantorList=[], defaultKantor='', onClose }) {
   const [kode,    setKode]    = useState(clientProject?.kode||'');
-  const [kantor,  setKantor]  = useState(String(clientProject?.project_id || defaultKantor || ''));
+  const [kantor,  setKantor]  = useState(clientProject?.project_ids || (defaultKantor ? [Number(defaultKantor)] : []));
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
+  const toggleKantor = id => setKantor(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
   function submit(e) {
     e.preventDefault();
     if (!kode.trim()) { setError('Kode project wajib diisi.'); return; }
-    if (!kantor) { setError('Kantor wajib dipilih.'); return; }
+    if (!kantor.length) { setError('Kantor wajib dipilih.'); return; }
     setLoading(true); setError('');
     const url    = mode==='add'?'/pengaturan/client-projects':`/pengaturan/client-projects/${clientProject.id}`;
     const method = mode==='add'?'post':'put';
-    router[method](url, {kode, project_id:kantor}, {
+    router[method](url, {kode, project_ids:kantor}, {
       onSuccess:()=>{ setLoading(false); onClose(); },
-      onError:(err)=>{ setLoading(false); setError(err.kode||err.project_id||'Gagal menyimpan.'); },
+      onError:(err)=>{ setLoading(false); setError(err.kode||err.project_ids||'Gagal menyimpan.'); },
     });
   }
   return (
@@ -553,11 +548,19 @@ function ClientProjectModal({ mode, clientProject, kantorList=[], defaultKantor=
             <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Kode Project *</label>
             <input type="text" style={{...INP,borderColor:error?'#E04545':'var(--border)'}}
               value={kode} onChange={e=>setKode(e.target.value)} placeholder="cth: AKM-PP" autoFocus />
-            <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,marginTop:12,display:'block'}}>Kantor *</label>
-            <select style={INP} value={kantor} onChange={e=>setKantor(e.target.value)}>
-              <option value="">— Pilih Kantor —</option>
-              {kantorList.map(k=><option key={k.id} value={k.id}>{k.nama}</option>)}
-            </select>
+            <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,marginTop:12,display:'block'}}>Kantor * <span style={{opacity:.8}}>(bisa lebih dari satu)</span></label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {kantorList.map(k=>{
+                const on = kantor.includes(k.id);
+                return (
+                  <span key={k.id} onClick={()=>toggleKantor(k.id)}
+                    style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:on?600:500,padding:'5px 10px',borderRadius:99,cursor:'pointer',userSelect:'none',
+                      border:`1px solid ${on?'rgba(232,160,32,.45)':'var(--border)'}`,background:on?'rgba(232,160,32,.12)':'var(--bg3)',color:on?'var(--accent)':'var(--muted2)'}}>
+                    {on && <Check size={12}/>}{k.nama}
+                  </span>
+                );
+              })}
+            </div>
             {error&&<div style={{display:'flex',alignItems:'center',gap:4,fontSize:10.5,color:'#E04545',marginTop:4}}><TriangleAlert size={12}/>{error}</div>}
           </div>
           <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
@@ -825,7 +828,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
 
   const filteredClientProjects = client_projects.filter(p =>
     (!clientProjectSearch || p.kode.toLowerCase().includes(clientProjectSearch.toLowerCase())) &&
-    (!clientProjectKantor || (clientProjectKantor==='none' ? !p.project_id : String(p.project_id)===clientProjectKantor))
+    (!clientProjectKantor || (clientProjectKantor==='none' ? !p.project_ids.length : p.project_ids.includes(Number(clientProjectKantor))))
   );
 
   const filteredUsers = users.filter(u => {
@@ -1188,13 +1191,13 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
             </div>
             <div style={{padding:'14px 16px'}}>
               <div style={{fontSize:11,color:'var(--muted)',marginBottom:12,padding:'8px 12px',background:'var(--bg3)',borderRadius:8,lineHeight:1.5}}>
-                <b>Kantor</b> (Giam, Khawista, Purnama, MD, dst) bisa punya banyak <b>project</b> (AKM-BKP, AKM-WUR EW, dst). Hubungkan tiap project ke kantornya di sini — nanti di Edit Karyawan cuma muncul project <b>aktif</b> milik kantor karyawan tersebut. Project yang sudah selesai cukup dinonaktifkan (data karyawan yang pernah memegangnya tetap tersimpan).
+                <b>Kantor</b> (Giam, Khawista, Purnama, MD, dst) bisa punya banyak <b>project</b> (AKM-BKP, AKM-WUR EW, dst). Hubungkan tiap project ke satu atau beberapa kantor di sini — nanti di Edit Karyawan cuma muncul project <b>aktif</b> milik kantor karyawan tersebut. Project yang sudah selesai cukup dinonaktifkan (data karyawan yang pernah memegangnya tetap tersimpan).
               </div>
               {kantorProjectModal && <KantorProjectModal kantor={kantorProjectModal} clientProjects={client_projects} onClose={()=>setKantorProjectModal(null)}/>}
               <div style={{fontSize:11,fontWeight:700,color:'var(--accent)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8,display:'flex',alignItems:'center',gap:6}}><Building2 size={12}/> Project per Kantor</div>
               <div style={{border:'1px solid var(--border)',borderRadius:10,overflow:'hidden',marginBottom:20}}>
                 {projects.map((k,i)=>{
-                  const list = client_projects.filter(p=>p.project_id===k.id);
+                  const list = client_projects.filter(p=>p.project_ids.includes(k.id));
                   return (
                     <div key={k.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderTop:i?'1px solid var(--border)':'none',flexWrap:'wrap'}}>
                       <div style={{width:180,flexShrink:0}}>

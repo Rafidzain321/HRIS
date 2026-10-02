@@ -6,6 +6,7 @@ export default function Login() {
   const { data, setData, post, processing, errors } = useForm({
     email: '',
     password: '',
+    remember: false,
   });
   const [showPass, setShowPass] = useState(false);
 
@@ -184,6 +185,12 @@ export default function Login() {
               <div style={{fontSize:11.5, color:'#E88080', marginTop:5}}>{errors.password}</div>
             )}
           </div>
+
+          {/* Sesi biasa habis 12 jam; centang supaya tetap login di perangkat ini. */}
+          <label style={{display:'flex', alignItems:'center', gap:8, marginBottom:18, fontSize:12.5, color:'rgba(255,255,255,0.6)', cursor:'pointer', userSelect:'none'}}>
+            <input type="checkbox" checked={data.remember} onChange={e => setData('remember', e.target.checked)} style={{accentColor:'#E8A020', width:14, height:14, cursor:'pointer'}} />
+            Ingat saya
+          </label>
 
           <button type="submit" className="login-btn" disabled={processing} style={{marginTop:4}}>
             {processing ? 'Loading...' : 'Login'}

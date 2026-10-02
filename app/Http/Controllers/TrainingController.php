@@ -176,8 +176,8 @@ class TrainingController extends Controller
 
         $oldMasaBerlaku = $trainingType->masa_berlaku_tahun;
         $newMasaBerlaku = $data['masa_berlaku_tahun'] ?? null;
-        // Catatan: perbandingan ketat (nilai DB int vs input form string) sehingga hampir selalu dianggap berubah.
-        $berubah = $oldMasaBerlaku !== $newMasaBerlaku;
+        // Dibandingkan sebagai string: nilai DB int (2) vs input form string ("2"), null/"" = seumur hidup.
+        $berubah = (string) $oldMasaBerlaku !== (string) $newMasaBerlaku;
 
         $trainingType->update([...$data, 'has_expired' => isset($data['masa_berlaku_tahun'])]);
 

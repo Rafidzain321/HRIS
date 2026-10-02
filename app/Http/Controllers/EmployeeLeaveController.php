@@ -86,8 +86,7 @@ class EmployeeLeaveController extends Controller
     }
 
     // Export Excel gabungan Cuti Tahunan + Kehadiran — 3 sheet: rekap cuti, detail cuti, ringkasan kehadiran semester.
-    // Catatan: % kehadiran di sheet 3 = Hadir / (Hadir+Izin+Sakit+Alpha), TANPA Dinas Luar — beda dengan
-    // EmployeeAttendanceController::semester() yang menghitung Dinas Luar sebagai masuk.
+    // % kehadiran di sheet 3 sama dengan EmployeeAttendanceController::semester(): Dinas Luar dihitung masuk.
     public function export(Request $request)
     {
         $tahun     = (int) $request->get('tahun', now()->year);
@@ -163,25 +162,26 @@ class EmployeeLeaveController extends Controller
         // ── SHEET 3: RINGKASAN KEHADIRAN ──
         $sheet3 = $wb->createSheet()->setTitle('Kehadiran');
         $periodeLabel = $semester === 1 ? 'Jan–Jun' : 'Jul–Des';
-        $this->reportTitle($sheet3, "RINGKASAN KEHADIRAN SEMESTER {$semester} ({$periodeLabel}) {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'H', $employees->count());
+        $this->reportTitle($sheet3, "RINGKASAN KEHADIRAN SEMESTER {$semester} ({$periodeLabel}) {$tahun} — PT. ANDALAS KARYA MULIA (HEAD OFFICE)", 'I', $employees->count());
         $headers3 = [
             'A' => ['No.', 4], 'B' => ['Nama Karyawan', 28], 'C' => ['Jabatan', 24],
-            'D' => ['Hadir', 10], 'E' => ['Izin', 10], 'F' => ['Sakit', 10], 'G' => ['Alpha', 10],
-            'H' => ['% Kehadiran', 14],
+            'D' => ['Hadir', 10], 'E' => ['Dinas Luar', 11], 'F' => ['Izin', 10], 'G' => ['Sakit', 10], 'H' => ['Alpha', 10],
+            'I' => ['% Kehadiran', 14],
         ];
         $this->reportHeaderRow($sheet3, $headers3, 4, 26);
         foreach ($employees as $idx => $e) {
             $row = 5 + $idx;
             $recs  = $attendanceRows->get($e->id, collect());
-            $hadir = $recs->sum('hadir'); $izin = $recs->sum('izin'); $sakit = $recs->sum('sakit'); $alpha = $recs->sum('alpha');
-            $dasar = $hadir + $izin + $sakit + $alpha;
-            $pct   = $dasar > 0 ? round($hadir / $dasar * 100, 1) . '%' : '—';
+            $hadir = $recs->sum('hadir'); $dinasLuar = $recs->sum('dinas_luar'); $izin = $recs->sum('izin'); $sakit = $recs->sum('sakit'); $alpha = $recs->sum('alpha');
+            $masuk = $hadir + $dinasLuar;
+            $dasar = $masuk + $izin + $sakit + $alpha;
+            $pct   = $dasar > 0 ? round($masuk / $dasar * 100, 1) . '%' : '—';
             $this->reportRow($sheet3, $row, $idx, [
                 'A' => $idx + 1, 'B' => strtoupper($e->nama_lengkap), 'C' => $e->position?->nama_jabatan ?? '—',
-                'D' => $hadir, 'E' => $izin, 'F' => $sakit, 'G' => $alpha, 'H' => $pct,
-            ], ['A', 'D', 'E', 'F', 'G', 'H']);
+                'D' => $hadir, 'E' => $dinasLuar, 'F' => $izin, 'G' => $sakit, 'H' => $alpha, 'I' => $pct,
+            ], ['A', 'D', 'E', 'F', 'G', 'H', 'I']);
         }
-        $sheet3->setAutoFilter('A4:H4');
+        $sheet3->setAutoFilter('A4:I4');
         $sheet3->freezePane('B5');
         $sheet3->setShowGridlines(false);
 

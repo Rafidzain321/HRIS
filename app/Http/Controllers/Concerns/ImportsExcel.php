@@ -18,15 +18,13 @@ trait ImportsExcel
         return $sheet->toArray(null, true, true, true);
     }
 
-    // Baris data (mulai baris 5) beserta nomor baris yang ditampilkan di pesan error.
-    // Catatan: nomor yang ditampilkan = nomor baris Excel + 4 (perilaku lama, dipertahankan).
+    // Baris data (mulai baris 5) beserta nomor baris Excel-nya (key dari toArray = nomor baris asli),
+    // dipakai di pesan error supaya sama dengan nomor baris yang dilihat user di Excel.
     private function dataRows(array $rows): \Generator
     {
-        $rowNum = 4;
         foreach ($rows as $rowIndex => $row) {
-            $rowNum++;
             if ($rowIndex < 5) continue;
-            yield $rowNum => $row;
+            yield $rowIndex => $row;
         }
     }
 

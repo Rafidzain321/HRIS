@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            \App\Http\Middleware\EnsureUserIsActive::class,
+            // Ganti/reset password → sesi & cookie "Ingat saya" di perangkat lain otomatis terputus.
+            \Illuminate\Session\Middleware\AuthenticateSession::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Http\Middleware\ProjectAccessMiddleware::class,
         ]);

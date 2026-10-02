@@ -14,7 +14,7 @@ class PpeController extends Controller
         $search = $request->get('search', '');
         $filter = $request->get('filter', 'all');
 
-        $query = Employee::with(['position', 'ppe']);
+        $query = Employee::aktif()->with(['position', 'ppe']);
         $this->applyProjectFilter($query);
 
         if ($search) {

@@ -250,6 +250,7 @@ class BulkImportController extends Controller
             $data = ['project_id' => $pid, 'no_unit' => $noUnit] + $this->rowData($row, $colMapUnit, $dateColsUnit, ['no_unit']);
             $tahun = self::cleanStr($row[$colMapUnit['tahun']] ?? null);
             $data['tahun'] = $tahun && is_numeric($tahun) ? (int) $tahun : null;
+            $data['status'] ??= 'AKTIF'; // kolom status NOT NULL — sel kosong = AKTIF (sama dengan default form)
 
             $this->simpan($results['unit'], $rowNum, $noUnit, fn() => Equipment::create($data));
         }
