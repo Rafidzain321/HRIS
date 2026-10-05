@@ -489,7 +489,7 @@ function RiwayatGajiSection({ items = [] }) {
 }
 
 // ── MAIN COMPONENT ──
-export default function EmployeeEdit({ employee, positions = [], departments = [], client_project_list = [], can_manage_client_project = false, project_info = null, salary_history = [] }) {
+export default function EmployeeEdit({ employee, positions = [], departments = [], ho_divisions = [], client_project_list = [], can_manage_client_project = false, project_info = null, salary_history = [] }) {
   const isHo = project_info?.tipe_gaji === 'ho';
   const { data, setData, put, processing, isDirty } = useForm({
     id_badge:             employee.id_badge             || '',
@@ -548,6 +548,7 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
     // Detail HO (kantor pusat)
     ho_detail: {
       unit:            employee.ho_detail?.unit            || '',
+      ho_division_id:  employee.ho_detail?.ho_division_id  || '',
       nik_ho:          employee.ho_detail?.nik_ho          || '',
       lokasi_kerja:    employee.ho_detail?.lokasi_kerja    || '',
       status_karyawan: employee.ho_detail?.status_karyawan || '',
@@ -865,6 +866,12 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                     <option value="">— Pilih —</option>
                     <option value="HO-1">HO-1</option>
                     <option value="HO-2">HO-2</option>
+                  </select>
+                </Field>
+                <Field label="Divisi">
+                  <select style={selectStyle} value={data.ho_detail.ho_division_id} onChange={e=>setHo('ho_division_id',e.target.value)}>
+                    <option value="">— Pilih —</option>
+                    {ho_divisions.map(d=><option key={d.id} value={d.id}>{d.nama}</option>)}
                   </select>
                 </Field>
                 <Field label="NIK HO">

@@ -5,7 +5,7 @@ import { router, usePage } from '@inertiajs/react';
 import {
   Pencil, X, TriangleAlert, Plus, Check, CheckCircle2, ClipboardList, Trash2,
   Save, Loader2, Briefcase, Search, Settings, User, Ban, Key, Lock, LogOut,
-  Eye, EyeOff, Building2, CircleSlash, FolderKanban,
+  Eye, EyeOff, Building2, CircleSlash, FolderKanban, Network,
 } from 'lucide-react';
 
 // ── CONFIRM MODAL (ganti window.confirm) ────────────────────
@@ -441,6 +441,52 @@ function JabatanModal({ mode, position, onClose }) {
   );
 }
 
+// ── MODAL DIVISI HO (dipakai Edit Karyawan HO & Pengajuan Training) ──
+function DivisiModal({ mode, divisi, onClose }) {
+  const [nama,    setNama]    = useState(divisi?.nama||'');
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+  function submit(e) {
+    e.preventDefault();
+    if (!nama.trim()) { setError('Nama divisi wajib diisi.'); return; }
+    setLoading(true); setError('');
+    const url    = mode==='add'?'/pengaturan/ho-divisions':`/pengaturan/ho-divisions/${divisi.id}`;
+    const method = mode==='add'?'post':'put';
+    router[method](url, {nama}, {
+      onSuccess:()=>{ setLoading(false); onClose(); },
+      onError:(err)=>{ setLoading(false); setError(err.nama||'Gagal menyimpan.'); },
+    });
+  }
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
+      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(380px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}>
+            {mode==='add'?<><Plus size={15}/> Tambah Divisi</>:<><Pencil size={15}/> Edit Divisi</>}
+          </div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
+        </div>
+        <form onSubmit={submit}>
+          <div style={{padding:'18px 20px'}}>
+            <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Nama Divisi *</label>
+            <input type="text" style={{...INP,borderColor:error?'#E04545':'var(--border)'}}
+              value={nama} onChange={e=>setNama(e.target.value)} placeholder="cth: Finance Department" autoFocus />
+            {error&&<div style={{display:'flex',alignItems:'center',gap:4,fontSize:10.5,color:'#E04545',marginTop:4}}><TriangleAlert size={12}/>{error}</div>}
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
+            <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
+            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1,display:'flex',alignItems:'center',gap:6,justifyContent:'center'}}>
+              {loading?<Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>:mode==='add'?<Plus size={14}/>:<Save size={14}/>}
+              {loading?'...':mode==='add'?'Tambah':'Simpan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── MODAL DATA PROJECT (project riil, mis. "AKM-PP" — beda dari kantor) ──
 // "Edit Kantor → Pilih Project": pilih banyak project sekaligus untuk satu kantor.
 // Satu project boleh di beberapa kantor — mencentang di sini tidak melepas project dari kantor lain.
@@ -677,7 +723,7 @@ function ProjectModal({ mode, project, onClose }) {
 // ═══════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════
-export default function PengaturanIndex({ users=[], roles=[], projects=[], positions=[], client_projects=[], logs=[], menus=[], is_admin_settings=true, profile=null }) {
+export default function PengaturanIndex({ users=[], roles=[], projects=[], positions=[], ho_divisions=[], client_projects=[], logs=[], menus=[], is_admin_settings=true, profile=null }) {
   const { auth }     = usePage().props;
   const isSuperAdmin = auth?.user?.can?.is_super_admin;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
@@ -686,6 +732,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
   const [resetPwModal,   setResetPwModal]   = useState(null);
   const [changePwModal,  setChangePwModal]  = useState(false);
   const [jabatanModal,   setJabatanModal]   = useState(null);
+  const [divisiModal,    setDivisiModal]    = useState(null);
   const [jabatanSearch,  setJabatanSearch]  = useState('');
   const [clientProjectModal,  setClientProjectModal]  = useState(null);
   const [clientProjectSearch, setClientProjectSearch] = useState('');
@@ -864,6 +911,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     ...(isSuperAdmin ? [{key:'users', label:<><User size={14}/> Manajemen User</>, count:users.length}] : []),
     ...(isSuperAdmin ? [{key:'project', label:<><Building2 size={14}/> Project</>, count:projects.length}] : []),
     {key:'jabatan',        label:<><Briefcase size={14}/> Jabatan</>,        count:positions.length},
+    {key:'divisi',         label:<><Network size={14}/> Divisi HO</>,         count:ho_divisions.length},
     {key:'client-project', label:<><FolderKanban size={14}/> Data Project</>, count:client_projects.length},
     // Log Aktivitas cuma buat super-admin — standarnya user lain tidak perlu (dan tidak boleh)
     // memantau aktivitas user lain, jadi bukan lagi soal restrict_activity_log per-akun.
@@ -1172,6 +1220,71 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                     <tr><td colSpan={3} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>
                       {positions.length===0?'Belum ada jabatan':'Tidak ada jabatan yang cocok dengan pencarian'}
                     </td></tr>
+                  )}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab==='divisi'&&(
+        <>
+          {divisiModal&&<DivisiModal mode={divisiModal.mode} divisi={divisiModal.divisi} onClose={()=>setDivisiModal(null)}/>}
+          <div className="panel">
+            <div className="panel-head">
+              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><Network size={14}/> Divisi Head Office</div>
+              {!isViewer && <button onClick={()=>setDivisiModal({mode:'add'})} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah Divisi</button>}
+            </div>
+            <div style={{padding:'14px 16px'}}>
+              <div style={{fontSize:11,color:'var(--muted)',marginBottom:12,padding:'8px 12px',background:'var(--bg3)',borderRadius:8,lineHeight:1.5}}>
+                Divisi karyawan <b>Head Office</b> — diisi di Edit Karyawan (Detail HO) dan dipakai menu <b>Pengajuan Training</b> (kuota pengajuan per divisi per tahun). Divisi yang sudah tidak dipakai cukup dinonaktifkan.
+              </div>
+              <div style={{overflowX:'auto'}}>
+              <table className="kar-table">
+                <thead><tr><th>Nama Divisi</th><th style={{textAlign:'center'}}>Jumlah Karyawan</th><th style={{textAlign:'center'}}>Pengajuan Training</th><th style={{textAlign:'center'}}>Status</th><th style={{textAlign:'center'}}>Aksi</th></tr></thead>
+                <tbody>
+                  {ho_divisions.map(d=>(
+                    <tr key={d.id}
+                      onMouseEnter={ev=>Array.from(ev.currentTarget.cells).forEach(c=>c.style.background='rgba(232,160,32,.04)')}
+                      onMouseLeave={ev=>Array.from(ev.currentTarget.cells).forEach(c=>c.style.background='')}>
+                      <td style={{fontWeight:500,opacity:d.is_active?1:.55}}>{d.nama}</td>
+                      <td style={{textAlign:'center'}}>
+                        <span style={{background:d.employees_count>0?'rgba(58,143,224,.1)':'var(--bg3)',color:d.employees_count>0?'var(--blue)':'var(--muted)',padding:'2px 10px',borderRadius:99,fontSize:11,fontWeight:600}}>{d.employees_count} karyawan</span>
+                      </td>
+                      <td style={{textAlign:'center',fontSize:12,color:'var(--muted2)'}}>{d.requests_count}</td>
+                      <td style={{textAlign:'center'}}>
+                        <button disabled={isViewer} title={isViewer?'':d.is_active?'Klik untuk nonaktifkan':'Klik untuk aktifkan'}
+                          onClick={()=>router.put(`/pengaturan/ho-divisions/${d.id}/toggle`,{},{preserveScroll:true})}
+                          style={{padding:'2px 10px',borderRadius:99,fontSize:11,fontWeight:700,cursor:isViewer?'default':'pointer',fontFamily:"'Outfit',sans-serif",
+                            border:`1px solid ${d.is_active?'rgba(34,201,122,.35)':'var(--border)'}`,
+                            background:d.is_active?'rgba(34,201,122,.1)':'var(--bg3)',
+                            color:d.is_active?'#22C97A':'var(--muted)'}}>
+                          {d.is_active?'● Aktif':'○ Nonaktif'}
+                        </button>
+                      </td>
+                      <td>
+                        <div style={{display:'flex',gap:5,justifyContent:'center'}}>
+                          {!isViewer && <button onClick={()=>setDivisiModal({mode:'edit',divisi:d})} style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><Pencil size={12}/></button>}
+                          {!isViewer && d.employees_count===0 && d.requests_count===0 && (
+                            <button onClick={()=>setConfirmModal({
+                              title: 'Hapus Divisi',
+                              icon: <Trash2 size={24} color="#E04545"/>,
+                              message: `Divisi "${d.nama}" akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`,
+                              confirmLabel: <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Trash2 size={14}/>Hapus Permanen</span>,
+                              confirmColor: '#E04545',
+                              confirmBg: 'rgba(224,69,69,.12)',
+                              onConfirm: () => router.delete(`/pengaturan/ho-divisions/${d.id}`,{preserveScroll:true}),
+                            })}
+                              style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><Trash2 size={12}/></button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {ho_divisions.length===0&&(
+                    <tr><td colSpan={5} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Belum ada divisi</td></tr>
                   )}
                 </tbody>
               </table>

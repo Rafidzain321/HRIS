@@ -25,6 +25,7 @@ class EmployeeController extends Controller
     const HO_DETAIL_RULES = [
         'ho_detail'                 => 'nullable|array',
         'ho_detail.unit'            => 'nullable|in:HO-1,HO-2',
+        'ho_detail.ho_division_id'  => 'nullable|exists:ho_divisions,id',
         'ho_detail.nik_ho'          => 'nullable|string|max:40',
         'ho_detail.lokasi_kerja'    => 'nullable|string|max:255',
         'ho_detail.status_karyawan' => 'nullable|string|max:40',
@@ -302,6 +303,8 @@ class EmployeeController extends Controller
             ]),
             'positions'   => Position::orderBy('nama_jabatan')->get(['id', 'nama_jabatan']),
             'departments' => Department::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
+            // Divisi HO (Pengajuan Training): yang aktif + divisi karyawan ini walau sudah dinonaktifkan.
+            'ho_divisions' => \App\Models\HoDivision::where(fn($q) => $q->where('is_active', true)->orWhere('id', $employee->hoDetail?->ho_division_id))->orderBy('nama')->get(['id', 'nama']),
             // Pilihan = project AKTIF milik kantor karyawan ini, plus project yang sudah terpasang
             // (walau sudah nonaktif/pindah kantor) supaya tidak hilang diam-diam saat disimpan.
             'client_project_list' => ClientProject::orderBy('kode')

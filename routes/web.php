@@ -185,6 +185,11 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/pengaturan/positions/{position}', [PositionController::class, 'update'])->name('positions.update');
     Route::delete('/pengaturan/positions/{position}', [PositionController::class, 'destroy'])->name('positions.destroy');
 
+    Route::post('/pengaturan/ho-divisions', [\App\Http\Controllers\HoDivisionController::class, 'store']);
+    Route::put('/pengaturan/ho-divisions/{hoDivision}', [\App\Http\Controllers\HoDivisionController::class, 'update']);
+    Route::put('/pengaturan/ho-divisions/{hoDivision}/toggle', [\App\Http\Controllers\HoDivisionController::class, 'toggleActive']);
+    Route::delete('/pengaturan/ho-divisions/{hoDivision}', [\App\Http\Controllers\HoDivisionController::class, 'destroy']);
+
     Route::post('/pengaturan/client-projects', [ClientProjectController::class, 'store'])->name('client-projects.store');
     Route::put('/pengaturan/client-projects/{clientProject}', [ClientProjectController::class, 'update'])->name('client-projects.update');
     Route::put('/pengaturan/client-projects/{clientProject}/toggle', [ClientProjectController::class, 'toggleActive'])->name('client-projects.toggle');
@@ -236,6 +241,14 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/kehadiran/mesin/{machineUser}/jam-sabtu', [\App\Http\Controllers\AttendanceScanController::class, 'updateJamSabtu'])->middleware('menu:kehadiran,edit');
 
     // ── Konseling (pembinaan karyawan) — HR/super-admin atau atasan langsung saja ──
+    // Pengajuan Training (khusus HO) — persetujuan/selesai dicek HR di controller.
+    Route::get('/pengajuan-training', [\App\Http\Controllers\TrainingRequestController::class, 'index'])->middleware('menu:pengajuan-training,view')->name('pengajuan-training');
+    Route::post('/pengajuan-training', [\App\Http\Controllers\TrainingRequestController::class, 'store'])->middleware('menu:pengajuan-training,edit');
+    Route::put('/pengajuan-training/{trainingRequest}', [\App\Http\Controllers\TrainingRequestController::class, 'update'])->middleware('menu:pengajuan-training,edit');
+    Route::delete('/pengajuan-training/{trainingRequest}', [\App\Http\Controllers\TrainingRequestController::class, 'destroy'])->middleware('menu:pengajuan-training,edit');
+    Route::put('/pengajuan-training/{trainingRequest}/proses', [\App\Http\Controllers\TrainingRequestController::class, 'proses'])->middleware('menu:pengajuan-training,edit');
+    Route::put('/pengajuan-training/{trainingRequest}/selesai', [\App\Http\Controllers\TrainingRequestController::class, 'selesai'])->middleware('menu:pengajuan-training,edit');
+
     Route::get('/konseling', [EmployeeCounselingController::class, 'index'])->middleware('menu:konseling,view')->name('konseling');
     Route::post('/konseling', [EmployeeCounselingController::class, 'store'])->middleware('menu:konseling,edit')->name('konseling.store');
     Route::put('/konseling/{counseling}/selesai', [EmployeeCounselingController::class, 'markSelesai'])->middleware('menu:konseling,edit')->name('konseling.selesai');
@@ -330,7 +343,7 @@ Route::middleware(['auth'])->group(function () {
         }
 
         if ($proj && strtoupper($proj->kode) !== 'HO') {
-            $nonHoHiddenPrefixes = ['/kpi', '/cuti', '/kehadiran'];
+            $nonHoHiddenPrefixes = ['/kpi', '/cuti', '/kehadiran', '/pengajuan-training'];
             if (collect($nonHoHiddenPrefixes)->contains(fn ($p) => str_starts_with($refPath, $p))) {
                 return redirect('/');
             }

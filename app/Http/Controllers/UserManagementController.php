@@ -27,7 +27,7 @@ class UserManagementController extends Controller
                     'name'  => auth()->user()->name,
                     'email' => auth()->user()->email,
                 ],
-                'users' => [], 'roles' => [], 'projects' => [], 'positions' => [], 'client_projects' => [],
+                'users' => [], 'roles' => [], 'projects' => [], 'positions' => [], 'ho_divisions' => [], 'client_projects' => [],
                 'training_types' => [], 'logs' => [], 'menus' => [],
             ]);
         }
@@ -76,6 +76,12 @@ class UserManagementController extends Controller
                 'employees_count' => $p->employees_count,
             ]);
 
+        $ho_divisions = \App\Models\HoDivision::orderBy('nama')->withCount(['hoDetails', 'trainingRequests'])->get()
+            ->map(fn($d) => [
+                'id' => $d->id, 'nama' => $d->nama, 'is_active' => $d->is_active,
+                'employees_count' => $d->ho_details_count, 'requests_count' => $d->training_requests_count,
+            ]);
+
         $client_projects = \App\Models\ClientProject::with('kantors:id,nama')->orderBy('kode')
             ->withCount('employees')->get()
             ->map(fn($cp) => [
@@ -119,7 +125,7 @@ class UserManagementController extends Controller
 
         return Inertia::render('Pengaturan/Index', [
             'is_admin_settings' => true,
-            ...compact('users', 'roles', 'projects', 'positions', 'client_projects', 'training_types', 'logs', 'menus'),
+            ...compact('users', 'roles', 'projects', 'positions', 'ho_divisions', 'client_projects', 'training_types', 'logs', 'menus'),
         ]);
     }
 

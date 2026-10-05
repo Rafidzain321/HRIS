@@ -21,6 +21,7 @@ return [
     'kpi'           => ['label' => 'KPI',                    'edit' => true],
     'cuti'          => ['label' => 'Cuti Tahunan',           'edit' => true],
     'kehadiran'     => ['label' => 'Kehadiran',              'edit' => true],
+    'pengajuan-training' => ['label' => 'Pengajuan Training (HO)', 'edit' => true],
     'konseling'     => ['label' => 'Konseling',              'edit' => true],
     'notifications' => ['label' => 'Notifikasi',             'edit' => false],
 ];

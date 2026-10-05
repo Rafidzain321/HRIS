@@ -9,7 +9,7 @@ class EmployeeHoDetail extends Model
     protected $table = 'employee_ho_details';
 
     protected $fillable = [
-        'employee_id', 'unit', 'nik_ho', 'lokasi_kerja', 'status_karyawan',
+        'employee_id', 'unit', 'ho_division_id', 'nik_ho', 'lokasi_kerja', 'status_karyawan',
         'nama_ktp', 'no_kk', 'rt_rw', 'kelurahan', 'kecamatan', 'propinsi',
         'npwp', 'email',
     ];
