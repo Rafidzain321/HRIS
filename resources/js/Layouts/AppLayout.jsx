@@ -698,11 +698,11 @@ function SidebarContent({ url, authUser, onLogout }) {
   const NON_HO_HIDDEN_KEYS = ['kpi', 'cuti', 'pengajuan-training'];
   const restrictPayroll = authUser?.can?.restrict_payroll;
   const PAYROLL_KEYS = ['slip-gaji', 'data-gaji'];
-  // Menu 'akun' (akun sendiri) & 'pengaturan' sengaja tidak dicek lewat permission matriks (tetap kelihatan untuk semua,
-  // aksesnya sendiri sudah digerbang lewat hasRole('super-admin') di controller-nya).
+  // Menu 'akun' (akun sendiri) sengaja tidak dicek lewat permission matriks (kelihatan untuk semua).
+  // 'pengaturan' cuma untuk admin pengaturan (super-admin/hr-staff/edit-kpi) — user lain cukup lewat menu Akun.
   // 'cuti' sekarang menu gabungan Cuti Tahunan + Kehadiran (dua tab di satu halaman) — tampilkan
   // kalau user punya izin salah satunya, biar yang cuma dikasih akses Kehadiran saja tetap kelihatan menunya.
-  const canViewMenu = (key) => key === 'akun' || key === 'pengaturan' || (key === 'cuti' ? (permissions.includes('view-cuti') || permissions.includes('view-kehadiran')) : permissions.includes(`view-${key}`));
+  const canViewMenu = (key) => key === 'akun' || (key === 'pengaturan' ? !!authUser?.can?.is_admin_settings : key === 'cuti' ? (permissions.includes('view-cuti') || permissions.includes('view-kehadiran')) : permissions.includes(`view-${key}`));
   const filteredNav = (isHoProject
       ? NAV.filter(item => !item.key || !HO_HIDDEN_KEYS.includes(item.key))
       : NAV.filter(item => !item.key || !NON_HO_HIDDEN_KEYS.includes(item.key)))

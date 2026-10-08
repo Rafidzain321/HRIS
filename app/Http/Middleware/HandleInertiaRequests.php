@@ -110,6 +110,8 @@ class HandleInertiaRequests extends Middleware
                         'is_project_readonly' => $isProjectReadonly,
                         'restrict_payroll' => (bool) $user->restrict_payroll,
                         'restrict_activity_log' => (bool) $user->restrict_activity_log,
+                        // Sama dengan Controller::isAdminSettings() — penentu menu Pengaturan tampil.
+                        'is_admin_settings' => $user->hasRole('super-admin') || $user->hasRole('hr-staff') || $user->can('edit-kpi'),
                     ],
                     'permissions' => $permissions,
                 ] : null,

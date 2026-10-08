@@ -17,19 +17,10 @@ class UserManagementController extends Controller
         $isAdminSettings = $this->isAdminSettings();
         $pid             = $this->activeProjectId();
 
-        // ── Bukan HR/super-admin (manager, project-user, viewer) cuma dapat halaman Pengaturan
-        // versi sederhana: profil sendiri + ganti password. Tidak boleh lihat/kelola Jabatan
-        // maupun Log Aktivitas seluruh user HO.
+        // ── Bukan HR/super-admin (manager, project-user, viewer): profil & ganti password
+        // sendiri sudah ada di halaman Akun, jadi arahkan ke sana.
         if (!$isAdminSettings) {
-            return Inertia::render('Pengaturan/Index', [
-                'is_admin_settings' => false,
-                'profile' => [
-                    'name'  => auth()->user()->name,
-                    'email' => auth()->user()->email,
-                ],
-                'users' => [], 'roles' => [], 'projects' => [], 'positions' => [], 'ho_divisions' => [], 'client_projects' => [],
-                'training_types' => [], 'logs' => [], 'menus' => [],
-            ]);
+            return redirect()->route('akun');
         }
 
         // ── User list cuma untuk super-admin — user lain (project-user, viewer, dst) tidak boleh

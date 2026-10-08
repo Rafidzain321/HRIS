@@ -4,7 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import {
   Pencil, X, TriangleAlert, Plus, Check, CheckCircle2, ClipboardList, Trash2,
-  Save, Loader2, Briefcase, Search, Settings, User, Ban, Key, Lock, LogOut,
+  Save, Loader2, Briefcase, Search, Settings, User, Ban, Key,
   Eye, EyeOff, Building2, CircleSlash, FolderKanban, Network,
 } from 'lucide-react';
 
@@ -345,56 +345,6 @@ function ResetPasswordModal({ user, onClose }) {
   );
 }
 
-// ── MODAL GANTI PASSWORD SENDIRI ────────────────────────────
-function ChangePasswordModal({ onClose }) {
-  const [form, setForm] = useState({ password:'', password_confirmation:'' });
-  const [loading, setLoading] = useState(false);
-  const [errors,  setErrors]  = useState({});
-
-  function submit(e) {
-    e.preventDefault();
-    setLoading(true); setErrors({});
-    router.post('/pengaturan/change-password', form, {
-      onSuccess: ()=>{ setLoading(false); onClose(); },
-      onError:   (err)=>{ setLoading(false); setErrors(err); },
-    });
-  }
-
-  return (
-    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}}
-      onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
-      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(420px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Lock size={15}/> Ganti Password</div>
-          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
-        </div>
-        <form onSubmit={submit}>
-          <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:13}}>
-            {[
-              {label:'Password Baru *',         key:'password',              ph:'min. 6 karakter'},
-              {label:'Konfirmasi Password *',   key:'password_confirmation', ph:'ulangi password baru'},
-            ].map(f=>(
-              <div key={f.key}>
-                <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>{f.label}</label>
-                <PasswordInput value={form[f.key]} placeholder={f.ph} hasError={!!errors[f.key]}
-                  onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} />
-                {errors[f.key]&&<div style={{display:'flex',alignItems:'center',gap:4,fontSize:10.5,color:'#E04545',marginTop:3}}><TriangleAlert size={12}/>{errors[f.key]}</div>}
-              </div>
-            ))}
-          </div>
-          <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
-            <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
-            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1,display:'flex',alignItems:'center',gap:6,justifyContent:'center'}}>
-              {loading?<Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>:<Lock size={14}/>}
-              {loading?'...':'Simpan Password'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 // ── MODAL JABATAN ────────────────────────────────────────────
 function JabatanModal({ mode, position, onClose }) {
   const [nama,    setNama]    = useState(position?.nama_jabatan||'');
@@ -723,14 +673,13 @@ function ProjectModal({ mode, project, onClose }) {
 // ═══════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════
-export default function PengaturanIndex({ users=[], roles=[], projects=[], positions=[], ho_divisions=[], client_projects=[], logs=[], menus=[], is_admin_settings=true, profile=null }) {
+export default function PengaturanIndex({ users=[], roles=[], projects=[], positions=[], ho_divisions=[], client_projects=[], logs=[], menus=[] }) {
   const { auth }     = usePage().props;
   const isSuperAdmin = auth?.user?.can?.is_super_admin;
   const isViewer = auth?.user?.can?.is_viewer || auth?.user?.can?.is_project_readonly || false;
   const [activeTab,      setActiveTab]      = useState(isSuperAdmin ? 'users' : 'jabatan');
   const [modal,          setModal]          = useState(null);
   const [resetPwModal,   setResetPwModal]   = useState(null);
-  const [changePwModal,  setChangePwModal]  = useState(false);
   const [jabatanModal,   setJabatanModal]   = useState(null);
   const [divisiModal,    setDivisiModal]    = useState(null);
   const [jabatanSearch,  setJabatanSearch]  = useState('');
@@ -741,9 +690,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
   const [userSearch,     setUserSearch]     = useState('');
   const [projectModal,   setProjectModal]   = useState(null);
   const [confirmModal,   setConfirmModal]   = useState(null);
-  const [profilePw,        setProfilePw]        = useState('');
-  const [profilePwLoading, setProfilePwLoading] = useState(false);
-  const [profilePwError,   setProfilePwError]   = useState('');
   // confirmModal: { title, message, confirmLabel, confirmColor, confirmBg, onConfirm }
 
   // Log state
@@ -766,107 +712,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
       confirmBg: user.is_active ? 'rgba(224,69,69,.12)' : 'rgba(34,201,122,.12)',
       onConfirm: () => router.post(`/pengaturan/users/${user.id}/toggle`, {}, {preserveScroll:true}),
     });
-  }
-  function handleLogout() {
-    setConfirmModal({
-      title: 'Logout',
-      message: 'Kamu akan keluar dari sistem. Yakin mau logout?',
-      confirmLabel: 'Ya, Logout',
-      confirmColor: '#E04545',
-      confirmBg: 'rgba(224,69,69,.12)',
-      onConfirm: () => router.post('/logout'),
-    });
-  }
-
-  // ── Bukan HR/super-admin: halaman Pengaturan versi sederhana, cuma profil sendiri ──
-  if (!is_admin_settings) {
-    const initials = (profile?.name || '?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
-
-    function submitProfilePassword(e) {
-      e.preventDefault();
-      if (!profilePw) return; // dikosongkan = tidak diubah, tidak perlu kirim request
-      setProfilePwLoading(true); setProfilePwError('');
-      router.post('/pengaturan/change-password', { password: profilePw }, {
-        preserveScroll: true,
-        onSuccess: () => { setProfilePwLoading(false); setProfilePw(''); },
-        onError:   (err) => { setProfilePwLoading(false); setProfilePwError(err.password || 'Gagal menyimpan.'); },
-      });
-    }
-
-    return (
-      <AppLayout title="Akun" subtitle="Saya">
-        <style>{`
-          /* Sembunyikan icon mata bawaan browser (Edge) supaya tidak dobel sama toggle custom */
-          input[type="password"]::-ms-reveal { display: none !important; }
-          input[type="password"]::-ms-clear { display: none !important; }
-          input::-webkit-credentials-auto-fill-button { display: none !important; }
-          input[type="password"]::-webkit-textfield-decoration-container { display: none !important; }
-        `}</style>
-        {confirmModal && (
-          <ConfirmModal
-            title={confirmModal.title} message={confirmModal.message}
-            confirmLabel={confirmModal.confirmLabel} confirmColor={confirmModal.confirmColor}
-            confirmBg={confirmModal.confirmBg} icon={confirmModal.icon}
-            onConfirm={confirmModal.onConfirm} onClose={()=>setConfirmModal(null)}
-          />
-        )}
-        <div className="panel" style={{maxWidth:520}}>
-          <div className="panel-head">
-            <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><User size={14}/> Profil</div>
-          </div>
-          <div style={{padding:'20px 24px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-              <div style={{width:44,height:44,borderRadius:10,background:'linear-gradient(135deg,#E8A020,#A06010)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Syne,sans-serif',fontSize:16,fontWeight:700,color:'#0C0F14',flexShrink:0}}>
-                {initials}
-              </div>
-              <div style={{minWidth:0}}>
-                <div style={{fontSize:14.5,fontWeight:700}}>{profile?.name}</div>
-                <div style={{fontSize:12,color:'var(--muted2)'}}>{profile?.email}</div>
-              </div>
-              {auth?.user?.project?.nama && (
-                <span style={{marginLeft:'auto',fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:99,background:'var(--bg3)',color:'var(--muted2)'}}>{auth.user.project.nama}</span>
-              )}
-            </div>
-
-            <div style={{marginTop:20,paddingTop:18,borderTop:'1px solid var(--border)'}}>
-              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Password Baru</label>
-              <form onSubmit={submitProfilePassword} style={{display:'flex',gap:8}}>
-                <div style={{flex:1}}>
-                  <PasswordInput value={profilePw} placeholder="******"
-                    hasError={!!profilePwError} onChange={e=>{setProfilePw(e.target.value); setProfilePwError('');}} />
-                </div>
-                <button type="submit" disabled={profilePwLoading} style={{
-                  padding:'0 16px',borderRadius:8,border:'none',flexShrink:0,
-                  background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',
-                  fontSize:12.5,fontWeight:700,cursor:profilePwLoading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",
-                  opacity:profilePwLoading?.7:1,display:'flex',alignItems:'center',gap:6,
-                }}>
-                  {profilePwLoading?<Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>:<Save size={14}/>}
-                  Simpan
-                </button>
-              </form>
-              {profilePwError && (
-                <div style={{display:'flex',alignItems:'center',gap:4,fontSize:10.5,color:'#E04545',marginTop:5}}>
-                  <TriangleAlert size={12}/>{profilePwError}
-                </div>
-              )}
-              <div style={{fontSize:10,color:'var(--muted)',marginTop:6}}>Kosongkan kalau tidak ingin mengubah password.</div>
-            </div>
-
-            <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid var(--border)'}}>
-              <button onClick={handleLogout} style={{
-                width:'100%',padding:'10px 16px',borderRadius:10,border:'1px solid rgba(224,69,69,.3)',
-                background:'rgba(224,69,69,.08)',color:'#E04545',
-                fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
-                display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-              }}>
-                <LogOut size={15}/> Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </AppLayout>
-    );
   }
 
   const filteredPositions = positions.filter(p =>
@@ -938,7 +783,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
       `}</style>
       {modal        && <UserModal mode={modal.mode} user={modal.user} roles={roles} projects={projects} menus={menus} onClose={()=>setModal(null)}/>}
       {resetPwModal && <ResetPasswordModal user={resetPwModal} onClose={()=>setResetPwModal(null)}/>}
-      {changePwModal&& <ChangePasswordModal onClose={()=>setChangePwModal(false)}/>}
       {confirmModal && (
         <ConfirmModal
           title={confirmModal.title}
@@ -957,24 +801,6 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
         <div>
           <div style={{fontFamily:'Syne,sans-serif',fontSize:16,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><Settings size={16}/> Pengaturan Sistem</div>
           <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>Manajemen user, jabatan, dan log aktivitas</div>
-        </div>
-        <div style={{display:'flex',gap:8}}>
-          <button onClick={()=>setChangePwModal(true)} style={{
-            padding:'8px 16px',borderRadius:8,border:'1px solid var(--border)',
-            background:'var(--card)',color:'var(--text)',
-            fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
-            display:'flex',alignItems:'center',gap:6,
-          }}>
-            <Lock size={14}/> Ganti Password
-          </button>
-          <button onClick={handleLogout} style={{
-            padding:'8px 16px',borderRadius:8,border:'1px solid rgba(224,69,69,.3)',
-            background:'rgba(224,69,69,.08)',color:'#E04545',
-            fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",
-            display:'flex',alignItems:'center',gap:6,
-          }}>
-            <LogOut size={14}/> Logout
-          </button>
         </div>
       </div>
 
