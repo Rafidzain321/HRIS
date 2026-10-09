@@ -254,7 +254,7 @@ export default function AkunIndex({ akun, project_kantor = [] }) {
                 <Info size={13} style={{flexShrink:0,marginTop:1}}/>
                 {auth?.user?.can?.is_admin_settings
                   ? <span>Project bisa ditambah atau diubah di <b>Pengaturan → Data Project</b>.</span>
-                  : <span>Project yang Anda butuhkan belum ada? Hubungi <b>admin</b> untuk menambahkan project ke kantor Anda.</span>}
+                  : <span>Jika project yang Anda butuhkan belum ada, Hubungi <b>admin</b> untuk menambahkan project.</span>}
               </div>
             </div>
           </div>
