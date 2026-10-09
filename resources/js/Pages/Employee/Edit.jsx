@@ -611,6 +611,18 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
           )}
         </div>
 
+        {employee.status === 'NONAKTIF' && (
+          <div style={{ marginBottom:16, padding:'10px 14px', borderRadius:8, fontSize:12, background:'rgba(224,69,69,.08)', border:'1px solid rgba(224,69,69,.25)', color:'#E04545', display:'flex', alignItems:'center', gap:8 }}>
+            <TriangleAlert size={14}/>
+            <span>
+              Karyawan ini sudah <b>terminated</b>
+              {employee.tanggal_keluar && <> per {new Date(employee.tanggal_keluar + 'T00:00:00').toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })}</>}
+              {employee.alasan_keluar && <> — {employee.alasan_keluar}</>}
+              . Data tetap bisa dilihat dan diperbaiki; untuk mengaktifkan kembali gunakan tombol Aktifkan di arsip.
+            </span>
+          </div>
+        )}
+
         <form onSubmit={submit}>
           <div className="panel" style={{ padding:24 }}>
 

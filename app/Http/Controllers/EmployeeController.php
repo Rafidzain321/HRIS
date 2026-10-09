@@ -54,7 +54,7 @@ class EmployeeController extends Controller
 
     const TANGGAL_EDIT = [
         'tanggal_lahir', 'tanggal_masuk', 'tanggal_akhir_probation', 'tanggal_hi', 'expire_badge',
-        'exp_kp', 'expired_sim', 'expire_sio', 'tgl_mcu', 'exp_mcu', 'start_pkwt', 'end_pkwt',
+        'exp_kp', 'expired_sim', 'expire_sio', 'tgl_mcu', 'exp_mcu', 'start_pkwt', 'end_pkwt', 'tanggal_keluar',
     ];
 
     public function index(Request $request)
