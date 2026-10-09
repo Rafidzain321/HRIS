@@ -335,6 +335,10 @@ class EmployeeController extends Controller
         if ($this->isViewer()) {
             return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
         }
+        // Karyawan terminated hanya bisa dilihat — aktifkan kembali dulu lewat arsip kalau mau diubah.
+        if ($employee->status === 'NONAKTIF') {
+            return back()->with('error', 'Karyawan sudah terminated, data hanya bisa dilihat.');
+        }
 
         $isHoProject = $employee->project?->tipe_gaji === 'ho';
 

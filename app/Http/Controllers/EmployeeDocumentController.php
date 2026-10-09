@@ -32,6 +32,9 @@ class EmployeeDocumentController extends Controller
 
     public function upload(Request $request, Employee $employee)
     {
+        if ($employee->status === 'NONAKTIF') {
+            return response()->json(['message' => 'Karyawan sudah terminated, data hanya bisa dilihat.'], 403);
+        }
         $tipe = $request->input('tipe');
         // foto karyawan boleh jpg/png/pdf, lainnya PDF only
         $isFoto = $tipe === 'foto';
@@ -103,6 +106,9 @@ class EmployeeDocumentController extends Controller
 
     public function destroy(EmployeeDocument $document)
     {
+        if ($document->employee?->status === 'NONAKTIF') {
+            return response()->json(['message' => 'Karyawan sudah terminated, data hanya bisa dilihat.'], 403);
+        }
         $nama = $document->nama_file;
         $emp  = $document->employee?->nama_lengkap;
         Storage::disk('local')->delete($document->path);

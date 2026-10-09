@@ -19,7 +19,7 @@ const TIPE_CONFIG = {
   lainnya:        { label:'Dokumen Lainnya',      color:'#6B7494', icon:FileText },
 };
 
-export default function DocumentPanel({ employeeId, employeeName }) {
+export default function DocumentPanel({ employeeId, employeeName, readOnly = false }) {
   const [docs,      setDocs]      = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -117,7 +117,7 @@ export default function DocumentPanel({ employeeId, employeeName }) {
         </div>
 
         {/* Upload Area */}
-        <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:16,padding:'12px 14px',borderRadius:9,background:'var(--bg3)',border:'1px solid var(--border)'}}>
+        {!readOnly && <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:16,padding:'12px 14px',borderRadius:9,background:'var(--bg3)',border:'1px solid var(--border)'}}>
           <select style={{...inp,width:180}} value={tipe} onChange={e=>setTipe(e.target.value)}>
             <option value="foto">Foto Karyawan</option>
             <option value="ktp">KTP</option>
@@ -147,7 +147,7 @@ export default function DocumentPanel({ employeeId, employeeName }) {
           <span style={{fontSize:11,color:'var(--muted)'}}>
             {tipe==='foto' ? 'Maks. 5MB · PDF / JPG / PNG' : 'Maks. 5MB · PDF only'}
           </span>
-        </div>
+        </div>}
 
         {/* Docs List */}
         {loading ? (
@@ -192,11 +192,11 @@ export default function DocumentPanel({ employeeId, employeeName }) {
                           style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(34,201,122,.1)',color:'#22C97A',border:'1px solid rgba(34,201,122,.25)',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>
                           <Download size={11}/>
                         </a>
-                        <button
+                        {!readOnly && <button
                           type="button" onClick={()=>handleDelete(doc.id, doc.nama_file)}
                           style={{padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
                           <Trash2 size={11}/>
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   ))}

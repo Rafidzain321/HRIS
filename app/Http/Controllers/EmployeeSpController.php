@@ -21,6 +21,9 @@ class EmployeeSpController extends Controller
             'alasan'      => 'required|string',
             'catatan'     => 'nullable|string',
         ]);
+        if (Employee::whereKey($request->employee_id)->value('status') === 'NONAKTIF') {
+            return back()->with('error', 'Karyawan sudah terminated, data hanya bisa dilihat.');
+        }
 
         EmployeeSp::create([
             'employee_id' => $request->employee_id,
@@ -39,6 +42,9 @@ class EmployeeSpController extends Controller
 
     public function destroySp(EmployeeSp $sp)
     {
+        if ($sp->employee?->status === 'NONAKTIF') {
+            return back()->with('error', 'Karyawan sudah terminated, data hanya bisa dilihat.');
+        }
         $nama = $sp->employee?->nama_lengkap ?? '-';
         $tipe = $sp->tipe_sp;
         $sp->delete();

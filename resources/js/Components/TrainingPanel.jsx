@@ -149,7 +149,7 @@ function TrainingModal({ mode, training, types, employeeId, onClose, onSaved }) 
   );
 }
 
-export default function TrainingPanel({ employeeId }) {
+export default function TrainingPanel({ employeeId, readOnly = false }) {
   const [trainings, setTrainings] = useState([]);
   const [types,     setTypes]     = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -191,10 +191,10 @@ export default function TrainingPanel({ employeeId }) {
           <div style={{ fontSize:12, fontWeight:600, color:'var(--accent)', textTransform:'uppercase', letterSpacing:'.08em' }}>
             <BookOpen size={13} style={{verticalAlign:-2}}/> Training Karyawan
           </div>
-          <button type="button" onClick={()=>setModal({mode:'add'})}
+          {!readOnly && <button type="button" onClick={()=>setModal({mode:'add'})}
             style={{ padding:'6px 14px', borderRadius:7, border:'none', background:'linear-gradient(135deg,#E8A020,#A06010)', color:'#0C0F14', fontSize:11.5, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
             <Plus size={12} style={{verticalAlign:-2}}/> Tambah Training
-          </button>
+          </button>}
         </div>
 
         {loading ? (
@@ -261,7 +261,7 @@ export default function TrainingPanel({ employeeId }) {
                 </div>
 
                   {/* Actions */}
-                  <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+                  {!readOnly && <div style={{ display:'flex', gap:5, flexShrink:0 }}>
                     <button type="button" onClick={()=>setModal({mode:'edit', training:t})}
                       style={{ padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:600, background:'rgba(232,160,32,.12)', color:'var(--accent)', border:'1px solid rgba(232,160,32,.25)', cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
                       <Pencil size={12}/>
@@ -270,7 +270,7 @@ export default function TrainingPanel({ employeeId }) {
                       style={{ padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:600, background:'rgba(224,69,69,.1)', color:'#E04545', border:'1px solid rgba(224,69,69,.2)', cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
                       <Trash2 size={12}/>
                     </button>
-                  </div>
+                  </div>}
                 </div>
               );
             })}

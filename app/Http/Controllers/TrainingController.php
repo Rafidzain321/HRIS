@@ -125,6 +125,9 @@ class TrainingController extends Controller
 
     public function store(Request $request, Employee $employee)
     {
+        if ($employee->status === 'NONAKTIF') {
+            return response()->json(['message' => 'Karyawan sudah terminated, data hanya bisa dilihat.'], 403);
+        }
         $data = $request->validate(['training_type_id' => 'required|exists:training_types,id', ...self::TRAINING_RULES]);
 
         $exists = EmployeeTraining::where('employee_id', $employee->id)
@@ -140,6 +143,9 @@ class TrainingController extends Controller
 
     public function update(Request $request, EmployeeTraining $training)
     {
+        if ($training->employee?->status === 'NONAKTIF') {
+            return response()->json(['message' => 'Karyawan sudah terminated, data hanya bisa dilihat.'], 403);
+        }
         $training->update($request->validate(self::TRAINING_RULES));
         ActivityLog::record('update', 'Training', $training->employee?->nama_lengkap, "Update training: {$training->trainingType?->nama}");
         return response()->json(['message' => 'Training berhasil diperbarui.']);
@@ -147,6 +153,9 @@ class TrainingController extends Controller
 
     public function destroy(EmployeeTraining $training)
     {
+        if ($training->employee?->status === 'NONAKTIF') {
+            return response()->json(['message' => 'Karyawan sudah terminated, data hanya bisa dilihat.'], 403);
+        }
         $nama = $training->trainingType?->nama;
         $emp = $training->employee?->nama_lengkap;
         $training->delete();

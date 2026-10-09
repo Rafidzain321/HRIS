@@ -17,6 +17,14 @@ class AkunController extends Controller
         $akses  = $user->aksesKantor();
         $kantor = $akses === null ? null : Project::whereIn('id', $akses)->orderBy('nama')->pluck('nama');
 
+        // Data Project (client project) aktif per kantor yang bisa diakses user — info saja,
+        // penambahan project tetap lewat admin (Pengaturan > Data Project).
+        $projectKantor = Project::where('is_active', true)
+            ->when($akses !== null, fn($q) => $q->whereIn('id', $akses))
+            ->with(['clientProjects' => fn($q) => $q->where('is_active', true)->orderBy('kode')])
+            ->orderBy('nama')->get()
+            ->map(fn($p) => ['nama' => $p->nama, 'projects' => $p->clientProjects->pluck('kode')]);
+
         return Inertia::render('Akun/Index', [
             'akun' => [
                 'name'         => $user->name,
@@ -25,6 +33,7 @@ class AkunController extends Controller
                 'kantor_utama' => $user->project?->nama,
                 'akses_kantor' => $kantor, // null = semua kantor
             ],
+            'project_kantor' => $projectKantor,
         ]);
     }
 

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
-import { User, Camera, Trash2, Save, Loader2, Lock, Eye, EyeOff, TriangleAlert, Info, Phone, Mail } from 'lucide-react';
+import { User, Camera, Trash2, Save, Loader2, Lock, Eye, EyeOff, TriangleAlert, Info, Phone, Mail, FolderKanban } from 'lucide-react';
 
 const INP = {
   background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)',
@@ -34,7 +34,7 @@ function PasswordInput({ value, onChange, placeholder, hasError }) {
   );
 }
 
-export default function AkunIndex({ akun }) {
+export default function AkunIndex({ akun, project_kantor = [] }) {
   const { auth } = usePage().props;
   const fotoUrl  = auth?.user?.foto_url;
   const initials = (akun.name || '?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
@@ -231,6 +231,31 @@ export default function AkunIndex({ akun }) {
                 </div>
               ))}
               <div style={{fontSize:10,color:'var(--muted)',marginTop:8}}>Akses kantor diatur oleh admin.</div>
+            </div>
+          </div>
+
+          {/* ── Project di kantor user ── */}
+          <div className="panel">
+            <div className="panel-head"><div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><FolderKanban size={14}/> Project di Kantor Saya</div></div>
+            <div style={{padding:'6px 20px 14px'}}>
+              {project_kantor.map(k => (
+                <div key={k.nama} style={{padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{fontSize:12.5,fontWeight:600,marginBottom:6}}>{k.nama} <span style={{fontWeight:400,color:'var(--muted)'}}>· {k.projects.length} project</span></div>
+                  {k.projects.length ? (
+                    <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+                      {k.projects.map(kode => (
+                        <span key={kode} style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:99,background:'rgba(232,160,32,.12)',color:'var(--accent)'}}>{kode}</span>
+                      ))}
+                    </div>
+                  ) : <div style={{fontSize:11.5,color:'var(--muted)'}}>Belum ada project.</div>}
+                </div>
+              ))}
+              <div style={{display:'flex',alignItems:'flex-start',gap:6,fontSize:11,color:'var(--muted2)',marginTop:10,padding:'8px 10px',borderRadius:8,background:'var(--bg3)'}}>
+                <Info size={13} style={{flexShrink:0,marginTop:1}}/>
+                {auth?.user?.can?.is_admin_settings
+                  ? <span>Project bisa ditambah atau diubah di <b>Pengaturan → Data Project</b>.</span>
+                  : <span>Project yang Anda butuhkan belum ada? Hubungi <b>admin</b> untuk menambahkan project ke kantor Anda.</span>}
+              </div>
             </div>
           </div>
         </div>

@@ -248,7 +248,7 @@ function TambahSpModal({ employeeId, onClose, onSaved }) {
 }
 
 // ── SECTION SP ──
-function SpSection({ employeeId }) {
+function SpSection({ employeeId, readOnly = false }) {
   const [spList,   setSpList]   = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [showAdd,  setShowAdd]  = useState(false);
@@ -286,10 +286,10 @@ function SpSection({ employeeId }) {
           <div style={{fontSize:12,fontWeight:600,color:'#E04545',textTransform:'uppercase',letterSpacing:'.08em',display:'flex',alignItems:'center',gap:6}}>
             <TriangleAlert size={14}/> Surat Peringatan (SP)
           </div>
-          <button type="button" onClick={()=>setShowAdd(true)}
+          {!readOnly && <button type="button" onClick={()=>setShowAdd(true)}
             style={{padding:'5px 12px',borderRadius:7,border:'1px solid rgba(224,69,69,.3)',background:'rgba(224,69,69,.08)',color:'#E04545',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}>
             <Plus size={13}/> Tambah SP
-          </button>
+          </button>}
         </div>
 
         {loading ? (
@@ -311,10 +311,10 @@ function SpSection({ employeeId }) {
                       </span>
                       <span style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{sp.tanggal_sp}</span>
                     </div>
-                    <button type="button" onClick={()=>hapusSp(sp.id)}
+                    {!readOnly && <button type="button" onClick={()=>hapusSp(sp.id)}
                       style={{padding:'2px 8px',borderRadius:5,fontSize:11,background:'rgba(224,69,69,.1)',color:'#E04545',border:'1px solid rgba(224,69,69,.2)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",flexShrink:0,display:'flex',alignItems:'center'}}>
                       <Trash2 size={13}/>
-                    </button>
+                    </button>}
                   </div>
                   <div style={{fontSize:12.5,color:'var(--text)',marginTop:8,lineHeight:1.5}}>{sp.alasan}</div>
                   {sp.catatan && <div style={{fontSize:11.5,color:'var(--muted)',marginTop:4,fontStyle:'italic'}}>{sp.catatan}</div>}
@@ -491,6 +491,8 @@ function RiwayatGajiSection({ items = [] }) {
 // ── MAIN COMPONENT ──
 export default function EmployeeEdit({ employee, positions = [], departments = [], ho_divisions = [], client_project_list = [], can_manage_client_project = false, project_info = null, salary_history = [] }) {
   const isHo = project_info?.tipe_gaji === 'ho';
+  // Karyawan terminated: halaman cuma untuk dilihat (backend juga menolak simpan).
+  const readOnly = employee.status === 'NONAKTIF';
   const { data, setData, put, processing, isDirty } = useForm({
     id_badge:             employee.id_badge             || '',
     nama_lengkap:         employee.nama_lengkap         || '',
@@ -618,12 +620,13 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
               Karyawan ini sudah <b>terminated</b>
               {employee.tanggal_keluar && <> per {new Date(employee.tanggal_keluar + 'T00:00:00').toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })}</>}
               {employee.alasan_keluar && <> — {employee.alasan_keluar}</>}
-              . Data tetap bisa dilihat dan diperbaiki; untuk mengaktifkan kembali gunakan tombol Aktifkan di arsip.
+              . Data hanya bisa dilihat; untuk mengubah, aktifkan kembali lewat tombol Aktifkan di arsip.
             </span>
           </div>
         )}
 
         <form onSubmit={submit}>
+          <fieldset disabled={readOnly} style={{ border:0, padding:0, margin:0, minWidth:0 }}>
           <div className="panel" style={{ padding:24 }}>
 
             {/* DATA PRIBADI */}
@@ -716,7 +719,7 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                 <MultiSelect inputStyle={inputStyle} placeholder="Pilih project..."
                   options={client_project_list.map(cp=>({ value:cp.id, label:cp.kode + (cp.is_active ? '' : ' (nonaktif)') }))}
                   value={data.client_project_ids}
-                  onChange={v=>setData('client_project_ids', v)} />
+                  onChange={v=>setData('client_project_ids', v)} disabled={readOnly} />
                 {client_project_list.length===0 && (
                   <div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>
                     Kantor {project_info?.nama || 'ini'} belum punya project aktif.{' '}
@@ -965,8 +968,8 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                 padding:'10px 20px', borderRadius:8, border:'1px solid var(--border)',
                 background:'var(--bg3)', color:'var(--muted2)', fontSize:13,
                 textDecoration:'none', display:'inline-block',
-              }}>Batal</Link>
-              <button type="submit" disabled={processing} style={{
+              }}>{readOnly ? 'Kembali' : 'Batal'}</Link>
+              {!readOnly && <button type="submit" disabled={processing} style={{
                 padding:'10px 28px', borderRadius:8, border:'none',
                 background:'linear-gradient(135deg,#E8A020,#A06010)',
                 color:'#0C0F14', fontSize:13, fontWeight:700,
@@ -975,9 +978,10 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                 fontFamily:"'Outfit',sans-serif",
               }}>
                 {processing ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>Menyimpan...</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan Perubahan</span>}
-              </button>
+              </button>}
             </div>
           </div>
+          </fieldset>
         </form>
 
         {/* ── PANEL DI LUAR FORM ── */}
@@ -985,20 +989,20 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
 
           {/* SP, History Keluar & Riwayat Perpindahan */}
           <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px' }}>
-            <SpSection employeeId={employee.id} />
+            <SpSection employeeId={employee.id} readOnly={readOnly} />
             <HistoryKeluarSection employeeId={employee.id} />
             <RiwayatPerpindahanSection employeeId={employee.id} />
           </div>
 
           {/* Dokumen */}
           <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px' }}>
-            <DocumentPanel employeeId={employee.id} employeeName={employee.nama_lengkap} />
+            <DocumentPanel employeeId={employee.id} employeeName={employee.nama_lengkap} readOnly={readOnly} />
           </div>
 
           {/* Training */}
           {!isHo && (
             <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px' }}>
-              <TrainingPanel employeeId={employee.id} />
+              <TrainingPanel employeeId={employee.id} readOnly={readOnly} />
             </div>
           )}
 
