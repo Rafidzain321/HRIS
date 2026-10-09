@@ -602,7 +602,7 @@ function ProjectModal({ mode, project, onClose }) {
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(440px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
           <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}>
-            {mode==='add'?<><Plus size={15}/> Tambah Project</>:<><Pencil size={15}/> Edit Project</>}
+            {mode==='add'?<><Plus size={15}/> Tambah Kantor</>:<><Pencil size={15}/> Edit Kantor</>}
           </div>
           <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
@@ -615,7 +615,7 @@ function ProjectModal({ mode, project, onClose }) {
                   value={form.kode} onChange={e=>setForm(p=>({...p,kode:e.target.value}))} placeholder="cth: spr" autoFocus={mode==='add'} />
               </div>
               <div style={{flex:2}}>
-                <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Nama Project *</label>
+                <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Nama Kantor *</label>
                 <input type="text" style={{...INP,borderColor:errors.nama?'#E04545':'var(--border)'}}
                   value={form.nama} onChange={e=>setForm(p=>({...p,nama:e.target.value}))} placeholder="cth: Central WUR Langgak" />
               </div>
@@ -645,7 +645,7 @@ function ProjectModal({ mode, project, onClose }) {
               </div>
             </div>
             <div style={{fontSize:10.5,color:'var(--muted)',marginTop:-6}}>
-              Pilih "Standar" kecuali project ini memang punya skema gaji khusus seperti MD atau Head Office — skema yang salah bikin perhitungan gaji jadi tidak akurat.
+              Pilih "Standar" kecuali kantor ini memang punya skema gaji khusus seperti MD atau Head Office — skema yang salah bikin perhitungan gaji jadi tidak akurat.
             </div>
 
             <div>
@@ -754,7 +754,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
 
   const TABS = [
     ...(isSuperAdmin ? [{key:'users', label:<><User size={14}/> Manajemen User</>, count:users.length}] : []),
-    ...(isSuperAdmin ? [{key:'project', label:<><Building2 size={14}/> Project</>, count:projects.length}] : []),
+    ...(isSuperAdmin ? [{key:'project', label:<><Building2 size={14}/> Kantor</>, count:projects.length}] : []),
     {key:'jabatan',        label:<><Briefcase size={14}/> Jabatan</>,        count:positions.length},
     {key:'divisi',         label:<><Network size={14}/> Departemen</>,         count:ho_divisions.length},
     {key:'client-project', label:<><FolderKanban size={14}/> Data Project</>, count:client_projects.length},
@@ -919,8 +919,8 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
           {projectModal&&<ProjectModal mode={projectModal.mode} project={projectModal.project} onClose={()=>setProjectModal(null)}/>}
           <div className="panel">
             <div className="panel-head">
-              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><Building2 size={14}/> Master Project</div>
-              <button onClick={()=>setProjectModal({mode:'add'})} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah Project</button>
+              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><Building2 size={14}/> Master Kantor</div>
+              <button onClick={()=>setProjectModal({mode:'add'})} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah Kantor</button>
             </div>
             <div style={{padding:'14px 16px'}}>
               <div style={{overflowX:'auto'}}>
@@ -951,11 +951,11 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                         <div style={{display:'flex',gap:5,justifyContent:'center'}}>
                           <button onClick={()=>setProjectModal({mode:'edit',project:p})} style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><Pencil size={12}/></button>
                           <button onClick={()=>setConfirmModal({
-                              title: p.is_active ? 'Nonaktifkan Project' : 'Aktifkan Project',
+                              title: p.is_active ? 'Nonaktifkan Kantor' : 'Aktifkan Kantor',
                               icon: p.is_active ? <CircleSlash size={24} color="#E04545"/> : <CheckCircle2 size={24} color="#22C97A"/>,
                               message: p.is_active
-                                ? `Project "${p.nama}" akan dinonaktifkan — tidak akan muncul lagi sebagai pilihan project baru, tapi data karyawan & histori yang sudah ada tetap aman tersimpan.`
-                                : `Project "${p.nama}" akan diaktifkan kembali. Yakin?`,
+                                ? `Kantor "${p.nama}" akan dinonaktifkan — tidak akan muncul lagi sebagai pilihan kantor, tapi data karyawan & histori yang sudah ada tetap aman tersimpan.`
+                                : `Kantor "${p.nama}" akan diaktifkan kembali. Yakin?`,
                               confirmLabel: p.is_active
                                 ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><CircleSlash size={14}/>Nonaktifkan</span>
                                 : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><CheckCircle2 size={14}/>Aktifkan</span>,
@@ -968,11 +968,11 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                           </button>
                           <button
                             disabled={p.employees_count>0}
-                            title={p.employees_count>0?`Tidak bisa dihapus — masih ada ${p.employees_count} karyawan di project ini`:'Hapus project'}
+                            title={p.employees_count>0?`Tidak bisa dihapus — masih ada ${p.employees_count} karyawan di kantor ini`:'Hapus kantor'}
                             onClick={()=>p.employees_count===0&&setConfirmModal({
-                              title: 'Hapus Project',
+                              title: 'Hapus Kantor',
                               icon: <Trash2 size={24} color="#E04545"/>,
-                              message: <>Project <b style={{color:'var(--text)'}}>{p.nama}</b> akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.</>,
+                              message: <>Kantor <b style={{color:'var(--text)'}}>{p.nama}</b> akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.</>,
                               confirmLabel: <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Trash2 size={14}/>Ya, Hapus</span>,
                               confirmColor: '#E04545',
                               confirmBg: 'rgba(224,69,69,.12)',
@@ -986,7 +986,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                     </tr>
                   ))}
                   {projects.length===0&&(
-                    <tr><td colSpan={8} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Belum ada project.</td></tr>
+                    <tr><td colSpan={8} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Belum ada kantor.</td></tr>
                   )}
                 </tbody>
               </table>

@@ -434,6 +434,12 @@ class EmployeeController extends Controller
 
         // null = field tidak dikirim -> project tidak diubah; [] = dikosongkan.
         if ($clientProjectIds !== null) {
+            // Sama dengan pilihan di form: cuma project aktif milik kantor karyawan, plus yang sudah terpasang.
+            $boleh = ClientProject::where(fn($q) => $q
+                    ->where(fn($q2) => $q2->whereHas('kantors', fn($q3) => $q3->where('projects.id', $employee->project_id))->where('is_active', true))
+                    ->orWhereIn('id', $employee->clientProjects()->pluck('client_projects.id')))
+                ->pluck('id')->all();
+            $clientProjectIds = array_values(array_intersect(array_map('intval', $clientProjectIds), $boleh));
             $employee->clientProjects()->sync($clientProjectIds);
         }
 
@@ -449,6 +455,42 @@ class EmployeeController extends Controller
 
         return redirect()->route('employees.index')
             ->with('success', "Data {$employee->nama_lengkap} berhasil diperbarui.");
+    }
+
+    // Atur Data Project banyak karyawan sekaligus (Data Karyawan → centang → Atur Data Project).
+    // mode "tambah" = project ditambahkan ke yang sudah ada; "ganti" = project lama diganti project ini.
+    // Karyawan yang kantornya tidak terhubung ke project tersebut dilewati (sama seperti pilihan di Edit Karyawan).
+    // Bisa dipakai admin maupun HRD project (izin edit karyawan, dicek middleware route), tapi cuma
+    // untuk karyawan di kantor yang boleh dia edit penuh.
+    public function bulkClientProject(Request $request)
+    {
+        $data = $request->validate([
+            'employee_ids'      => 'required|array|min:1',
+            'employee_ids.*'    => 'integer|exists:employees,id',
+            'client_project_id' => ['required', Rule::exists('client_projects', 'id')->where('is_active', true)],
+            'mode'              => 'required|in:tambah,ganti',
+        ]);
+
+        $cp        = ClientProject::with('kantors:id')->findOrFail($data['client_project_id']);
+        $kantorIds = $cp->kantors->pluck('id');
+        $kantorEdit = auth()->user()->aksesKantor(true); // null = semua kantor
+        [$cocok, $lewat] = Employee::aktif()->whereIn('id', $data['employee_ids'])
+            ->when($kantorEdit !== null, fn($q) => $q->whereIn('project_id', $kantorEdit))
+            ->get(['id', 'project_id'])
+            ->partition(fn($e) => $kantorIds->contains($e->project_id));
+
+        foreach ($cocok as $e) {
+            $data['mode'] === 'ganti'
+                ? $e->clientProjects()->sync([$cp->id])
+                : $e->clientProjects()->syncWithoutDetaching([$cp->id]);
+        }
+
+        $pesan = ($data['mode'] === 'ganti' ? 'Data Project diganti jadi ' : 'Data Project ditambah ') . "{$cp->kode} untuk {$cocok->count()} karyawan"
+            . ($lewat->count() ? " ({$lewat->count()} dilewati karena kantornya belum terhubung ke {$cp->kode})" : '')
+            . (($luar = count($data['employee_ids']) - $cocok->count() - $lewat->count()) > 0 ? " ({$luar} dilewati karena di luar kantor yang boleh Anda ubah atau sudah terminated)" : '') . '.';
+        ActivityLog::record('update', 'Data Project', $cp->kode, "Massal: {$pesan}");
+
+        return response()->json(['ok' => $cocok->count() > 0, 'message' => $pesan]);
     }
 
     public function pindahUnitHo(Request $request, Employee $employee)

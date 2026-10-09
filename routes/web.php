@@ -77,6 +77,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/employees/{employee}/transfer-direct', [EmployeeTransferController::class, 'transferDirect'])->middleware('menu:karyawan,edit')->name('employees.transfer.direct');
     Route::post('/employees/{employee}/transfer-request', [EmployeeTransferController::class, 'requestTransfer'])->middleware('menu:karyawan,edit')->name('employees.transfer.request');
     Route::post('/employees/transfer-bulk', [EmployeeTransferController::class, 'transferBulk'])->middleware('menu:karyawan,edit')->name('employees.transfer.bulk');
+    Route::post('/employees/client-project-bulk', [EmployeeController::class, 'bulkClientProject'])->middleware('menu:karyawan,edit')->name('employees.client-project.bulk');
     Route::post('/employees/{employee}/pindah-unit-ho', [EmployeeController::class, 'pindahUnitHo'])->middleware('menu:karyawan,edit')->name('employees.pindah-unit-ho');
 
     Route::resource('employees', EmployeeController::class)->only(['index', 'show'])->middleware('menu:karyawan,view');

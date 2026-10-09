@@ -788,6 +788,73 @@ function BulkPindahProjectModal({ employeeIds, count, projects, isSuperAdmin, on
   );
 }
 
+// ── MODAL ATUR DATA PROJECT MASSAL ──
+function BulkClientProjectModal({ employeeIds, count, clientProjects, onClose, onSuccess }) {
+  const [clientProjectId, setClientProjectId] = useState('');
+  const [mode,    setMode]    = useState('tambah');
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+
+  const inp = { background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)', borderRadius:8, padding:'8px 11px', fontSize:12.5, fontFamily:"'Outfit',sans-serif", outline:'none', width:'100%', boxSizing:'border-box' };
+  async function submit(e) {
+    e.preventDefault();
+    if (!clientProjectId) { setError('Pilih Data Project.'); return; }
+    setLoading(true); setError('');
+    try {
+      const res = await axios.post('/employees/client-project-bulk', { employee_ids: employeeIds, client_project_id: clientProjectId, mode }, { headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content } });
+      if (res.data.ok) { onSuccess(res.data.message); onClose(); }
+      else setError(res.data.message);
+    } catch (err) { setError(err.response?.data?.message || 'Terjadi kesalahan.'); }
+    setLoading(false);
+  }
+  const modeOpt = (val, judul, ket) => (
+    <label style={{flex:1,padding:'10px 12px',borderRadius:8,cursor:'pointer',border:`1px solid ${mode===val?'var(--accent)':'var(--border)'}`,background:mode===val?'rgba(232,160,32,.08)':'var(--bg3)'}}>
+      <input type="radio" name="mode" checked={mode===val} onChange={()=>setMode(val)} style={{marginRight:6}}/>
+      <b style={{fontSize:12.5}}>{judul}</b>
+      <div style={{fontSize:10.5,color:'var(--muted)',marginTop:3}}>{ket}</div>
+    </label>
+  );
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.65)',display:'flex',alignItems:'center',justifyContent:'center'}} onMouseDown={e=>{e.currentTarget.dataset.downOutside=e.target===e.currentTarget;}} onClick={e=>{e.target===e.currentTarget&&e.currentTarget.dataset.downOutside==='true'&&onClose();}}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(460px,calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)',overflow:'hidden'}}>
+        <div style={{height:4,background:'linear-gradient(90deg,#E8A020,#A06010)'}}/>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}><ClipboardList size={15}/> Atur Data Project Massal</div>
+            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{count} karyawan terpilih</div>
+          </div>
+          <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
+        </div>
+        <form onSubmit={submit}>
+          <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
+            <div>
+              <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Data Project *</label>
+              <select style={inp} value={clientProjectId} onChange={e=>setClientProjectId(e.target.value)}>
+                <option value="">— Pilih Data Project —</option>
+                {clientProjects.map(cp=><option key={cp.id} value={cp.id}>{cp.kode}</option>)}
+              </select>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              {modeOpt('tambah', 'Tambahkan', 'Project lama karyawan tetap ada.')}
+              {modeOpt('ganti', 'Ganti', 'Project lama dilepas, diganti project ini.')}
+            </div>
+            <div style={{padding:'10px 14px',borderRadius:8,background:'var(--bg3)',fontSize:11,color:'var(--muted2)'}}>
+              Karyawan yang kantornya belum terhubung ke project ini akan dilewati. Hubungkan dulu di Pengaturan → Data Project.
+            </div>
+            {error && <div style={{padding:'8px 12px',borderRadius:8,background:'rgba(224,69,69,.1)',border:'1px solid rgba(224,69,69,.2)',fontSize:12,color:'#E04545',display:'flex',alignItems:'center',gap:6}}><TriangleAlert size={13}/> {error}</div>}
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid var(--border)'}}>
+            <button type="button" onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
+            <button type="submit" disabled={loading} style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?.7:1}}>
+              {loading ? <Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Save size={14}/>Simpan</span>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── MODAL APPROVE/REJECT ──
 function ApprovalModal({ transfer, action, onClose, onSuccess }) {
   const [catatan, setCatatan] = useState('');
@@ -967,6 +1034,9 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
   const [hoUnitTab,  setHoUnitTab]  = useState('all');
   const [selectedIds,   setSelectedIds]   = useState([]);
   const [showBulkPindah, setShowBulkPindah] = useState(false);
+  const [showBulkCp,    setShowBulkCp]    = useState(false);
+  // Admin & HRD project yang boleh edit karyawan (server membatasi ke kantor yang boleh dia edit).
+  const canManageCp = !!auth?.user?.can?.is_super_admin || (auth?.user?.permissions || []).includes('edit-karyawan');
   const [bulkFlash,     setBulkFlash]     = useState('');
   const projectColsKey = `emp-table-cols-${project_info?.kode || 'all'}`;
   const [activeCols, setActiveCols] = useState(() => {
@@ -981,8 +1051,9 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
     catch { setActiveCols(DEFAULT_COLS); }
   }, [projectColsKey]);
 
-  // Reset seleksi checkbox tiap kali data berubah (ganti halaman/filter/reload)
-  useEffect(() => { setSelectedIds([]); }, [data]);
+  // Reset seleksi checkbox tiap kali filter berubah. Pindah halaman TIDAK me-reset,
+  // supaya bisa centang karyawan lintas halaman untuk aksi massal (>50 orang).
+  useEffect(() => { setSelectedIds([]); }, [search, jabatan, clientProject, activeProjectId]);
 
   // HO tidak punya compliance (SIM/SIO/MCU/KP/Badge) — sembunyikan kolom itu meski tersimpan di preferensi user.
   const visibleCols = isHo
@@ -1072,6 +1143,22 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
       {showAdd    && <TambahModal jabatan_list={jabatan_list} projects={projects} onClose={()=>setShowAdd(false)} isHo={isHo} isSuperAdmin={isSuperAdmin} />}
       {showImport && <ImportModal onClose={()=>setShowImport(false)} isHo={isHo} />}
       {showPicker && <ColPickerModal selected={activeCols} onClose={()=>setShowPicker(false)} onApply={applyCols} hideCompliance={isHo} />}
+      {showBulkCp && (
+        <BulkClientProjectModal
+          employeeIds={selectedIds}
+          count={selectedIds.length}
+          clientProjects={client_project_list.filter(cp => cp.is_active)}
+          onClose={()=>setShowBulkCp(false)}
+          onSuccess={(msg)=>{
+            setBulkFlash(msg);
+            setSelectedIds([]);
+            router.visit(window.location.pathname + window.location.search, {
+              preserveScroll: true,
+              onSuccess: () => setTimeout(() => setBulkFlash(''), 5000),
+            });
+          }}
+        />
+      )}
       {showBulkPindah && (
         <BulkPindahProjectModal
           employeeIds={selectedIds}
@@ -1158,6 +1245,7 @@ function TabAktif({ data, prevUrl, nextUrl, links, curPage, lastPage, total, jab
               <div style={{fontSize:12.5,color:'var(--blue)',fontWeight:600}}>{selectedIds.length} karyawan terpilih</div>
               <div style={{display:'flex',gap:8}}>
                 <button type="button" onClick={()=>setSelectedIds([])} style={{padding:'6px 12px',borderRadius:7,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal Pilih</button>
+                {canManageCp && <button type="button" onClick={()=>setShowBulkCp(true)} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><ClipboardList size={13}/> Atur Data Project</button>}
                 <button type="button" onClick={()=>setShowBulkPindah(true)} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#3A8FE0,#1A5FA0)',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:5}}><RefreshCw size={13}/> {isSuperAdmin ? 'Pindahkan Project' : 'Ajukan Mutasi'}</button>
               </div>
             </div>
@@ -1412,7 +1500,7 @@ export default function EmployeeIndex({
   const tabs = [
     { key:'aktif',      label:'Karyawan Aktif',     count: total, icon: User },
     { key:'terminated', label:'Terminated',          count: terminated.length, icon: Archive },
-    { key:'transfer',   label:'Pindah Project',      count: pendingCount > 0 ? pendingCount : null, isAlert: pendingCount > 0, icon: RefreshCw },
+    { key:'transfer',   label:'Pindah Project',      count: pendingCount > 0 ? pendingCount : null, icon: RefreshCw },
   ];
 
   return (
@@ -1461,12 +1549,8 @@ export default function EmployeeIndex({
             <t.icon size={14}/> {t.label}
             {t.count !== null && t.count !== undefined && t.count > 0 && (
               <span style={{
-                background: t.isAlert
-                  ? (activeTab===t.key?'rgba(0,0,0,.2)':'#E04545')
-                  : (activeTab===t.key?'rgba(0,0,0,.2)':'var(--bg3)'),
-                color: t.isAlert
-                  ? '#fff'
-                  : (activeTab===t.key?'#0C0F14':'var(--muted2)'),
+                background: activeTab===t.key?'rgba(0,0,0,.2)':'var(--bg3)',
+                color: activeTab===t.key?'#0C0F14':'var(--muted2)',
                 fontSize:10.5,fontWeight:700,padding:'1px 7px',borderRadius:99,minWidth:20,textAlign:'center',
               }}>
                 {t.count}
