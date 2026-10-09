@@ -112,7 +112,7 @@ function PesertaPicker({ employees, divisionId, value, onChange }) {
         {list.length === 0 && <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>Tidak ada karyawan yang cocok.</div>}
       </div>
       {divisionId && !adaDiDivisi && (
-        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, padding: '0 2px' }}>Belum ada karyawan yang diset ke divisi ini (atur di Edit Karyawan → Detail HO) — semua karyawan HO ditampilkan.</div>
+        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, padding: '0 2px' }}>Belum ada karyawan yang diset ke departemen ini (atur di Edit Karyawan → Detail HO) — semua karyawan HO ditampilkan.</div>
       )}
     </div>
   );
@@ -157,14 +157,14 @@ function FormModal({ data, divisions, employees, maks, onClose }) {
       </>}>
       <form id="form-pengajuan" onSubmit={submit} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
-          <label style={lbl}>Divisi *</label>
+          <label style={lbl}>Departemen *</label>
           <select style={{ ...inp, borderColor: errors.ho_division_id ? '#E04545' : 'var(--border)' }} value={form.ho_division_id} onChange={e => set('ho_division_id', e.target.value ? Number(e.target.value) : '')}>
-            <option value="">— Pilih Divisi —</option>
+            <option value="">— Pilih Departemen —</option>
             {divAktif.map(d => <option key={d.id} value={d.id}>{d.nama}</option>)}
           </select>
           {divDipilih && !errors.ho_division_id && (
             <div style={{ fontSize: 10.5, marginTop: 4, color: sisa > 0 ? 'var(--muted)' : '#E04545' }}>
-              Kuota divisi ini: {divDipilih.terpakai}/{maks} terpakai{sisa <= 0 ? ' — sudah penuh untuk tahun ini' : ` (sisa ${sisa})`}
+              Kuota departemen ini: {divDipilih.terpakai}/{maks} terpakai{sisa <= 0 ? ' — sudah penuh untuk tahun ini' : ` (sisa ${sisa})`}
             </div>
           )}
           <ErrorText>{errors.ho_division_id}</ErrorText>
@@ -246,7 +246,7 @@ function ProsesModal({ data, keputusan, onClose }) {
 // ── DETAIL ──
 function DetailModal({ data, onClose }) {
   const baris = [
-    ['Divisi', data.divisi],
+    ['Departemen', data.divisi],
     ['Tempat / Penyelenggara', data.penyelenggara || '—'],
     ['Tanggal Rencana', fmtDate(data.tanggal_rencana)],
     ['Estimasi Biaya', fmtRp(data.estimasi_biaya)],
@@ -319,7 +319,7 @@ export default function PengajuanTrainingIndex({ tahun, requests = [], divisions
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ fontSize: 11.5, color: 'var(--muted)', maxWidth: 640, lineHeight: 1.5 }}>
-          Divisi mengajukan kebutuhan training sesuai pekerjaan — maksimal <b>{maks} pengajuan per divisi per tahun</b> (yang ditolak tidak dihitung). Pengajuan disetujui/ditolak oleh HR.
+          Departemen mengajukan kebutuhan training sesuai pekerjaan — maksimal <b>{maks} pengajuan per departemen per tahun</b> (yang ditolak tidak dihitung). Pengajuan disetujui/ditolak oleh HR.
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <select value={tahun} onChange={e => router.get('/pengajuan-training', { tahun: e.target.value }, { preserveState: false })} style={{ ...inp, width: 'auto' }}>
@@ -331,7 +331,7 @@ export default function PengajuanTrainingIndex({ tahun, requests = [], divisions
         </div>
       </div>
 
-      {/* Kuota per divisi */}
+      {/* Kuota per departemen */}
       <div style={{ ...card, padding: '12px 16px', marginBottom: 16 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>Kuota Pengajuan {tahun}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 8 }}>
@@ -377,7 +377,7 @@ export default function PengajuanTrainingIndex({ tahun, requests = [], divisions
             <thead>
               <tr style={{ background: 'var(--bg3)' }}>
                 <th style={th}>Training</th>
-                <th style={th}>Divisi</th>
+                <th style={th}>Departemen</th>
                 <th style={th}>Rencana</th>
                 <th style={{ ...th, textAlign: 'center' }}>Peserta</th>
                 <th style={{ ...th, textAlign: 'right' }}>Estimasi Biaya</th>

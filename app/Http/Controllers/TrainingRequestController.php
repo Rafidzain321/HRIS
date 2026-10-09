@@ -30,7 +30,7 @@ class TrainingRequestController extends Controller
         'employee_ids.*'  => 'integer|exists:employees,id',
     ];
     const MESSAGES = [
-        'ho_division_id.required' => 'Divisi wajib dipilih.',
+        'ho_division_id.required' => 'Departemen wajib dipilih.',
         'nama_training.required'  => 'Nama/jenis training wajib diisi.',
         'tanggal_rencana.required'=> 'Tanggal rencana wajib diisi.',
         'alasan.required'         => 'Alasan/kebutuhan training wajib diisi.',
@@ -99,7 +99,7 @@ class TrainingRequestController extends Controller
         });
 
         ActivityLog::record('create', 'Pengajuan Training', $tr->nama_training,
-            "Ajukan training \"{$tr->nama_training}\" — divisi {$tr->division->nama}, " . count($data['employee_ids']) . " peserta");
+            "Ajukan training \"{$tr->nama_training}\" — departemen {$tr->division->nama}, " . count($data['employee_ids']) . " peserta");
         return back()->with('success', "Pengajuan training \"{$tr->nama_training}\" berhasil dikirim.");
     }
 
@@ -184,7 +184,7 @@ class TrainingRequestController extends Controller
             ->whereIn('status', self::STATUS_KUOTA)->when($kecualiId, fn($q) => $q->where('id', '!=', $kecualiId))->count();
         if ($jumlah < self::MAKS_PER_DIVISI) return null;
         $nama = HoDivision::whereKey($divisionId)->value('nama');
-        return ['ho_division_id' => "Divisi {$nama} sudah mencapai batas " . self::MAKS_PER_DIVISI . " pengajuan training di tahun {$tahun}."];
+        return ['ho_division_id' => "Departemen {$nama} sudah mencapai batas " . self::MAKS_PER_DIVISI . " pengajuan training di tahun {$tahun}."];
     }
 
     // Peserta harus karyawan HO yang masih aktif.

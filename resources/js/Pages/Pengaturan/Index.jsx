@@ -391,14 +391,14 @@ function JabatanModal({ mode, position, onClose }) {
   );
 }
 
-// ── MODAL DIVISI HO (dipakai Edit Karyawan HO & Pengajuan Training) ──
+// ── MODAL DEPARTEMEN (ho_divisions) (dipakai Edit Karyawan HO & Pengajuan Training) ──
 function DivisiModal({ mode, divisi, onClose }) {
   const [nama,    setNama]    = useState(divisi?.nama||'');
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
   function submit(e) {
     e.preventDefault();
-    if (!nama.trim()) { setError('Nama divisi wajib diisi.'); return; }
+    if (!nama.trim()) { setError('Nama departemen wajib diisi.'); return; }
     setLoading(true); setError('');
     const url    = mode==='add'?'/pengaturan/ho-divisions':`/pengaturan/ho-divisions/${divisi.id}`;
     const method = mode==='add'?'post':'put';
@@ -413,13 +413,13 @@ function DivisiModal({ mode, divisi, onClose }) {
       <div style={{background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:16,width:'min(380px, calc(100vw - 24px))',boxShadow:'0 24px 80px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
           <div style={{fontFamily:'Syne,sans-serif',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:8}}>
-            {mode==='add'?<><Plus size={15}/> Tambah Divisi</>:<><Pencil size={15}/> Edit Divisi</>}
+            {mode==='add'?<><Plus size={15}/> Tambah Departemen</>:<><Pencil size={15}/> Edit Departemen</>}
           </div>
           <div onClick={onClose} style={{cursor:'pointer',color:'var(--muted)',display:'flex'}}><X size={18}/></div>
         </div>
         <form onSubmit={submit}>
           <div style={{padding:'18px 20px'}}>
-            <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Nama Divisi *</label>
+            <label style={{fontSize:10.5,color:'var(--muted)',marginBottom:4,display:'block'}}>Nama Departemen *</label>
             <input type="text" style={{...INP,borderColor:error?'#E04545':'var(--border)'}}
               value={nama} onChange={e=>setNama(e.target.value)} placeholder="cth: Finance Department" autoFocus />
             {error&&<div style={{display:'flex',alignItems:'center',gap:4,fontSize:10.5,color:'#E04545',marginTop:4}}><TriangleAlert size={12}/>{error}</div>}
@@ -756,7 +756,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
     ...(isSuperAdmin ? [{key:'users', label:<><User size={14}/> Manajemen User</>, count:users.length}] : []),
     ...(isSuperAdmin ? [{key:'project', label:<><Building2 size={14}/> Project</>, count:projects.length}] : []),
     {key:'jabatan',        label:<><Briefcase size={14}/> Jabatan</>,        count:positions.length},
-    {key:'divisi',         label:<><Network size={14}/> Divisi HO</>,         count:ho_divisions.length},
+    {key:'divisi',         label:<><Network size={14}/> Departemen</>,         count:ho_divisions.length},
     {key:'client-project', label:<><FolderKanban size={14}/> Data Project</>, count:client_projects.length},
     // Log Aktivitas cuma buat super-admin — standarnya user lain tidak perlu (dan tidak boleh)
     // memantau aktivitas user lain, jadi bukan lagi soal restrict_activity_log per-akun.
@@ -1060,16 +1060,16 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
           {divisiModal&&<DivisiModal mode={divisiModal.mode} divisi={divisiModal.divisi} onClose={()=>setDivisiModal(null)}/>}
           <div className="panel">
             <div className="panel-head">
-              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><Network size={14}/> Divisi Head Office</div>
-              {!isViewer && <button onClick={()=>setDivisiModal({mode:'add'})} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah Divisi</button>}
+              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:6}}><Network size={14}/> Departemen Head Office</div>
+              {!isViewer && <button onClick={()=>setDivisiModal({mode:'add'})} style={{padding:'6px 14px',borderRadius:7,border:'none',background:'linear-gradient(135deg,#E8A020,#A06010)',color:'#0C0F14',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center',gap:6}}><Plus size={14}/> Tambah Departemen</button>}
             </div>
             <div style={{padding:'14px 16px'}}>
               <div style={{fontSize:11,color:'var(--muted)',marginBottom:12,padding:'8px 12px',background:'var(--bg3)',borderRadius:8,lineHeight:1.5}}>
-                Divisi karyawan <b>Head Office</b> — diisi di Edit Karyawan (Detail HO) dan dipakai menu <b>Pengajuan Training</b> (kuota pengajuan per divisi per tahun). Divisi yang sudah tidak dipakai cukup dinonaktifkan.
+                Departemen karyawan <b>Head Office</b> — diisi di Edit Karyawan (Detail HO) dan dipakai menu <b>Pengajuan Training</b> (kuota pengajuan per departemen per tahun). Departemen yang sudah tidak dipakai cukup dinonaktifkan.
               </div>
               <div style={{overflowX:'auto'}}>
               <table className="kar-table">
-                <thead><tr><th>Nama Divisi</th><th style={{textAlign:'center'}}>Jumlah Karyawan</th><th style={{textAlign:'center'}}>Pengajuan Training</th><th style={{textAlign:'center'}}>Status</th><th style={{textAlign:'center'}}>Aksi</th></tr></thead>
+                <thead><tr><th>Nama Departemen</th><th style={{textAlign:'center'}}>Jumlah Karyawan</th><th style={{textAlign:'center'}}>Pengajuan Training</th><th style={{textAlign:'center'}}>Status</th><th style={{textAlign:'center'}}>Aksi</th></tr></thead>
                 <tbody>
                   {ho_divisions.map(d=>(
                     <tr key={d.id}
@@ -1095,9 +1095,9 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                           {!isViewer && <button onClick={()=>setDivisiModal({mode:'edit',divisi:d})} style={{padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,background:'rgba(232,160,32,.12)',color:'var(--accent)',border:'1px solid rgba(232,160,32,.25)',cursor:'pointer',fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><Pencil size={12}/></button>}
                           {!isViewer && d.employees_count===0 && d.requests_count===0 && (
                             <button onClick={()=>setConfirmModal({
-                              title: 'Hapus Divisi',
+                              title: 'Hapus Departemen',
                               icon: <Trash2 size={24} color="#E04545"/>,
-                              message: `Divisi "${d.nama}" akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`,
+                              message: `Departemen "${d.nama}" akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`,
                               confirmLabel: <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Trash2 size={14}/>Hapus Permanen</span>,
                               confirmColor: '#E04545',
                               confirmBg: 'rgba(224,69,69,.12)',
@@ -1110,7 +1110,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                     </tr>
                   ))}
                   {ho_divisions.length===0&&(
-                    <tr><td colSpan={5} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Belum ada divisi</td></tr>
+                    <tr><td colSpan={5} style={{padding:24,textAlign:'center',color:'var(--muted)'}}>Belum ada departemen</td></tr>
                   )}
                 </tbody>
               </table>

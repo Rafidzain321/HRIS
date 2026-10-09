@@ -56,9 +56,15 @@ class ProjectController extends Controller
         ]);
 
         $data['kode'] = strtolower($data['kode']);
+        $lama = $project->only(array_keys($data));
         $project->update($data);
 
-        ActivityLog::record('update', 'Project', $project->nama, "Update project: {$project->nama} ({$project->kode})");
+        // Catat kolom apa saja yang berubah, mis. "tipe_gaji: giam → md".
+        $perubahan = collect($project->getChanges())->except('updated_at')
+            ->map(fn($baru, $kolom) => "{$kolom}: " . ($lama[$kolom] ?? '-') . ' → ' . ($baru ?? '-'))
+            ->implode(', ');
+        ActivityLog::record('update', 'Project', $project->nama,
+            "Update project: {$project->nama} ({$project->kode})" . ($perubahan ? " — {$perubahan}" : ' — tidak ada perubahan'));
 
         return back()->with('success', "Project {$project->nama} berhasil diperbarui.");
     }

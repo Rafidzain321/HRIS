@@ -868,7 +868,7 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
                     <option value="HO-2">HO-2</option>
                   </select>
                 </Field>
-                <Field label="Divisi">
+                <Field label="Departemen">
                   <select style={selectStyle} value={data.ho_detail.ho_division_id} onChange={e=>setHo('ho_division_id',e.target.value)}>
                     <option value="">— Pilih —</option>
                     {ho_divisions.map(d=><option key={d.id} value={d.id}>{d.nama}</option>)}
