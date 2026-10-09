@@ -30,11 +30,11 @@ function StatusPill({ status }) {
 // ── EDIT TRAINING MODAL ─────────────────────────────────────
 function EditTrainingModal({ training, types, onClose, onSaved }) {
   const [form, setForm] = React.useState({
-    tanggal:      training.tanggal      || '',
+    tanggal:      training.tanggal_raw      || '',
     nama_trainer: training.nama_trainer || '',
     nilai:        training.nilai        || '',
     status:       training.status       || '',
-    expired_date: training.expired_date || '',
+    expired_date: training.expired_date_raw || '',
     catatan:      training.catatan      || '',
   });
   const [loading, setLoading] = React.useState(false);

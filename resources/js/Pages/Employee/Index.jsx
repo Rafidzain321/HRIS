@@ -508,7 +508,7 @@ function TambahModal({ jabatan_list, projects, onClose, isHo=false, isSuperAdmin
 
 // ── MODAL TERMINATION ──
 function TerminationModal({ employee, onClose }) {
-  const [form, setForm] = useState({ tanggal_keluar: new Date().toISOString().split('T')[0], alasan_keluar: '', catatan_keluar: '' });
+  const [form, setForm] = useState({ tanggal_keluar: new Date().toLocaleDateString('en-CA'), alasan_keluar: '', catatan_keluar: '' });
   const [loading, setLoading] = useState(false);
   const inp = { background:'var(--bg3)', border:'1px solid var(--border)', color:'var(--text)', borderRadius:8, padding:'8px 11px', fontSize:12.5, fontFamily:"'Outfit',sans-serif", outline:'none', width:'100%', boxSizing:'border-box' };
   const ALASAN = ['RESIGN','PHK','KONTRAK HABIS','MENINGGAL DUNIA','MUTASI','LAINNYA'];

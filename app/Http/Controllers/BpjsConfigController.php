@@ -15,7 +15,9 @@ class BpjsConfigController extends Controller
 
         return ProjectBpjsConfig::where('project_id', $pid)
             ->orderByDesc('berlaku_mulai')
-            ->get(['id', 'berlaku_mulai', 'pct_jht', 'pct_pensiun', 'pct_kes', 'dibuat_oleh']);
+            ->get(['id', 'berlaku_mulai', 'pct_jht', 'pct_pensiun', 'pct_kes', 'dibuat_oleh'])
+            // Format Y-m-d supaya tidak terkirim sebagai ISO UTC (mundur 1 hari).
+            ->map(fn($c) => [...$c->toArray(), 'berlaku_mulai' => $c->berlaku_mulai?->format('Y-m-d')]);
     }
 
     // ── Tambah versi baru (berlaku mulai tanggal tertentu) ───

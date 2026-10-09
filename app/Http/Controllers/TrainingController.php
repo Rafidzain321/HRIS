@@ -65,10 +65,12 @@ class TrainingController extends Controller
             'jabatan' => $t->employee?->position?->nama_jabatan ?? '-',
             'jenis' => $t->trainingType?->nama,
             'tanggal' => $t->tanggal?->format('d M Y'),
+            'tanggal_raw' => $t->tanggal?->format('Y-m-d'), // untuk input type="date" di Edit Training
             'nama_trainer' => $t->nama_trainer,
             'nilai' => $t->nilai,
             'status' => $t->status,
             'expired_date' => $t->expired_date?->format('d M Y'),
+            'expired_date_raw' => $t->expired_date?->format('Y-m-d'),
             'auto_expired' => $t->auto_expired,
             'auto_expired_fmt' => $t->auto_expired ? Carbon::parse($t->auto_expired)->format('d M Y') : null,
             'status_expired' => $t->status_expired,

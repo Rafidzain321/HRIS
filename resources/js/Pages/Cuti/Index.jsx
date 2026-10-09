@@ -298,7 +298,8 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
   const leaveDatesMap = new Map();
   selectedLeaves.forEach(l => {
     for (let d = new Date(l.tanggal_mulai + 'T00:00:00'); d <= new Date(l.tanggal_selesai + 'T00:00:00'); d.setDate(d.getDate() + 1)) {
-      leaveDatesMap.set(d.toISOString().slice(0, 10), l.jenis);
+      // 'en-CA' = YYYY-MM-DD tanggal lokal; toISOString() itu UTC jadi mundur 1 hari di WIB.
+      leaveDatesMap.set(d.toLocaleDateString('en-CA'), l.jenis);
     }
   });
 
