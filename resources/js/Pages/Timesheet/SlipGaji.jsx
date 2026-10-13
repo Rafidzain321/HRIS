@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router } from '@inertiajs/react';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, Info } from 'lucide-react';
 
 function rp(val) {
   if (val === null || val === undefined || val === '' || isNaN(val)) return 'Rp -';
@@ -591,7 +591,7 @@ export default function SlipGaji({
                 </table>
                 {slipFinal.tipe_project==='ho' && ((slipFinal.potongan_simulasi||0)+(slipFinal.potongan_custom_sum||0))>0 && (
                   <div style={{marginTop:8,padding:'8px 12px',borderRadius:8,background:'rgba(232,160,32,.08)',border:'1px solid rgba(232,160,32,.2)',fontSize:11,color:'var(--muted2)'}}>
-                    ℹ️ Info: potensi potongan cuti/alpa & lainnya (belum dipotong) = {rp((slipFinal.potongan_simulasi||0)+(slipFinal.potongan_custom_sum||0))}
+                    <Info size={12} style={{verticalAlign:-2}}/> Info: potensi potongan cuti/alpa & lainnya (belum dipotong) = {rp((slipFinal.potongan_simulasi||0)+(slipFinal.potongan_custom_sum||0))}
                   </div>
                 )}
                 <div style={{marginTop:16,padding:'14px 16px',borderRadius:10,background:'rgba(34,201,122,.08)',border:'1px solid rgba(34,201,122,.2)'}}>

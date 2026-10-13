@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
-import { CreditCard, X, Save, Search, Pencil, Download, Car } from 'lucide-react';
+import { CreditCard, X, Save, Search, Pencil, Download, Car, ChevronLeft, ChevronRight } from 'lucide-react';
 
 function DaysLeft({ days }){
   if(days===null||days===undefined) return <span style={{color:'var(--muted)',fontSize:11}}>—</span>;
@@ -165,9 +165,9 @@ export default function SimPage({ employees={data:[],total:0,links:[],current_pa
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:14,flexWrap:'wrap',gap:8}}>
             <div style={{fontSize:11,color:'var(--muted)'}}>Halaman {curPage} dari {lastPage} · {data.length} dari {total} karyawan</div>
             <div style={{display:'flex',gap:4}}>
-              <button disabled={!prevUrl} onClick={()=>prevUrl&&router.get(prevUrl)} style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:prevUrl?'var(--text)':'var(--muted)',cursor:prevUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}>← Prev</button>
+              <button disabled={!prevUrl} onClick={()=>prevUrl&&router.get(prevUrl)} style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:prevUrl?'var(--text)':'var(--muted)',cursor:prevUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}><ChevronLeft size={13} style={{verticalAlign:-2}}/> Prev</button>
               {pageLinks.map((l,i)=>(<button key={i} disabled={!l.url} onClick={()=>l.url&&router.get(l.url)} dangerouslySetInnerHTML={{__html:l.label}} style={{padding:'5px 10px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:l.active?'var(--accent)':'var(--card)',color:l.active?'#0C0F14':l.url?'var(--text)':'var(--muted)',cursor:l.url?'pointer':'default',fontFamily:"'Outfit',sans-serif",fontWeight:l.active?700:400,minWidth:34}}/>))}
-              <button disabled={!nextUrl} onClick={()=>nextUrl&&router.get(nextUrl)} style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:nextUrl?'var(--text)':'var(--muted)',cursor:nextUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}>Next →</button>
+              <button disabled={!nextUrl} onClick={()=>nextUrl&&router.get(nextUrl)} style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:nextUrl?'var(--text)':'var(--muted)',cursor:nextUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}>Next <ChevronRight size={13} style={{verticalAlign:-2}}/></button>
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@ import ImportModal from '@/Components/ImportModal';
 import {
   Settings, X, Check, Plus, Pencil, Construction, FileText, Lock, Search,
   RefreshCw, TriangleAlert, Loader2, CheckCircle2, HardHat, Trash2, Truck,
-  Upload, Download, Lightbulb, Save,
+  Upload, Download, Lightbulb, Save, ArrowRight, ArrowLeft, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
 // Kolom opsional tab Operator & Driver
@@ -316,7 +316,7 @@ function GantiOperatorModal({ equipment, employees, onClose }) {
               <button onClick={onClose} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Batal</button>
               <button disabled={!selected} onClick={()=>setConfirm(true)}
                 style={{padding:'9px 22px',borderRadius:8,border:'none',background:selected?'linear-gradient(135deg,#22C97A,#148050)':'var(--bg3)',color:selected?'#fff':'var(--muted)',fontSize:12.5,fontWeight:700,cursor:selected?'pointer':'not-allowed',fontFamily:"'Outfit',sans-serif",opacity:selected?1:0.5}}>
-                Lanjut →
+                Lanjut <ArrowRight size={14} style={{verticalAlign:-2}}/>
               </button>
             </div>
           </>
@@ -336,7 +336,7 @@ function GantiOperatorModal({ equipment, employees, onClose }) {
               </div>
             </div>
             <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-              <button onClick={()=>setConfirm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>← Kembali</button>
+              <button onClick={()=>setConfirm(false)} style={{padding:'9px 18px',borderRadius:8,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted2)',fontSize:12.5,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}><ArrowLeft size={14} style={{verticalAlign:-2}}/> Kembali</button>
               <button onClick={handleConfirm} disabled={loading}
                 style={{padding:'9px 22px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#22C97A,#148050)',color:'#fff',fontSize:12.5,fontWeight:700,cursor:loading?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif",opacity:loading?0.7:1}}>
                 {loading ? <span style={{display:'inline-flex',alignItems:'center',gap:6}}><Loader2 size={14} style={{animation:'spin .8s linear infinite'}}/>Menyimpan...</span> : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><CheckCircle2 size={14}/>Ya, Ganti Operator</span>}
@@ -973,7 +973,7 @@ return (
         <div style={{display:'flex',gap:4}}>
           <button disabled={!prevUrl} onClick={()=>prevUrl&&router.get(prevUrl, {view}, {preserveState:true})}
             style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:prevUrl?'var(--text)':'var(--muted)',cursor:prevUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}>
-            ← Prev
+            <ChevronLeft size={13} style={{verticalAlign:-2}}/> Prev
           </button>
           {links.map((l,i)=>(
             <button key={i} disabled={!l.url} onClick={()=>l.url&&router.get(l.url, {view}, {preserveState:true})}
@@ -983,7 +983,7 @@ return (
           ))}
           <button disabled={!nextUrl} onClick={()=>nextUrl&&router.get(nextUrl, {view}, {preserveState:true})}
             style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:nextUrl?'var(--text)':'var(--muted)',cursor:nextUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}>
-            Next →
+            Next <ChevronRight size={13} style={{verticalAlign:-2}}/>
           </button>
         </div>
       </div>

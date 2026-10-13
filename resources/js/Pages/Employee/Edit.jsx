@@ -8,7 +8,7 @@ import axios from 'axios';
 import {
   Plus, Check, TriangleAlert, X, Loader2, Trash2, LogOut, ClipboardList,
   User, CreditCard, Car, HardHat, Stethoscope, Building2, FileText, Landmark, Save,
-  ScrollText, Wallet, RefreshCw,
+  ScrollText, Wallet, RefreshCw, ChevronUp, ChevronDown, ArrowLeft,
 } from 'lucide-react';
 
 function ComboBox({ value, onChange, options, placeholder, inputStyle }) {
@@ -59,7 +59,7 @@ function ComboBox({ value, onChange, options, placeholder, inputStyle }) {
             cursor:'pointer', color:'var(--muted)', fontSize:11, userSelect:'none',
           }}
         >
-          {open ? '▲' : '▼'}
+          {open ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
         </div>
       </div>
  
@@ -601,7 +601,7 @@ export default function EmployeeEdit({ employee, positions = [], departments = [
             padding:'8px 14px', borderRadius:8,
             background:'var(--card)', border:'1px solid var(--border)',
             color:'var(--muted2)', fontSize:12.5, textDecoration:'none',
-          }}>← Kembali</Link>
+          }}><ArrowLeft size={14} style={{verticalAlign:-2}}/> Kembali</Link>
           <div>
             <div style={{ fontFamily:'Syne,sans-serif', fontSize:16, fontWeight:700 }}>{employee.nama_lengkap}</div>
             <div style={{ fontSize:11.5, color:'var(--muted)' }}>{employee.id_badge}</div>

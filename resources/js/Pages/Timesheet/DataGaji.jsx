@@ -10,7 +10,7 @@ import {
   BookOpen, PenLine, BarChart3, Eye, Upload, Download, Stethoscope, User,
   CreditCard, XCircle, Building2, RefreshCw, Shield, Truck, Bell, Users,
   Siren, LogOut, Factory, Construction, Wrench, Cog, Calculator, Folder,
-  Timer, AlarmClock, Pause, Lightbulb, Info,
+  Timer, AlarmClock, Pause, Lightbulb, Info, RotateCcw,
 } from 'lucide-react';
 
 function rp(val) {
@@ -689,7 +689,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
         Disimpan ke → upah_lembur + total_lembur_flat
                     (via overtime_custom.lump_sum)
         Masuk ke Gaji Kotor sebagai Upah Lembur`}</S>
-                <P>Jumlah hari otomatis dari timesheet, bisa dioverride manual. Klik <b>↩</b> untuk reset ke otomatis.</P>
+                <P>Jumlah hari otomatis dari timesheet, bisa dioverride manual. Klik <b><RotateCcw size={11} style={{verticalAlign:-1}}/></b> untuk reset ke otomatis.</P>
               </Box>
             )}
             {showNk && showKhawista && (
@@ -771,7 +771,7 @@ function TabPanduan({ projectIds=[], isSuperAdmin=false }) {
           )}
 
           <H2>Menonaktifkan Potongan Per Karyawan</H2>
-          <P>Di tabel Data Gaji, setiap kolom BPJS memiliki tombol <b><X size={12} style={{verticalAlign:'-2px'}}/></b> untuk menonaktifkan potongan tersebut khusus untuk karyawan bersangkutan. Klik <b>↩</b> untuk mengaktifkan kembali.</P>
+          <P>Di tabel Data Gaji, setiap kolom BPJS memiliki tombol <b><X size={12} style={{verticalAlign:'-2px'}}/></b> untuk menonaktifkan potongan tersebut khusus untuk karyawan bersangkutan. Klik <b><RotateCcw size={11} style={{verticalAlign:-1}}/></b> untuk mengaktifkan kembali.</P>
         </div>)}
 
         {/* ── RINGKASAN RUMUS ── */}
@@ -948,7 +948,7 @@ Helper:
             Disimpan ke → upah_lembur + total_lembur_flat
                         (via overtime_custom.lump_sum)
             Masuk Gaji Kotor sebagai Upah Lembur`}</S>
-                  <P>Jumlah hari otomatis dari timesheet (H.Sabtu dari timesheet). Bisa dioverride manual — klik <b>↩</b> untuk reset ke otomatis.</P>
+                  <P>Jumlah hari otomatis dari timesheet (H.Sabtu dari timesheet). Bisa dioverride manual — klik <b><RotateCcw size={11} style={{verticalAlign:-1}}/></b> untuk reset ke otomatis.</P>
                 </Box>
               </div>
 
@@ -1001,7 +1001,7 @@ Helper:
                   → upah_lembur + total_lembur_flat
         Masuk Gaji Kotor sebagai Upah Lembur`}</S>
             <P>Semua karyawan flat NK masuk satu daftar overtime yang sama (tidak ada pembagian sub-group).</P>
-            <P>Jumlah hari otomatis dari timesheet. Bisa dioverride manual — klik <b>↩</b> untuk reset ke otomatis.</P>
+            <P>Jumlah hari otomatis dari timesheet. Bisa dioverride manual — klik <b><RotateCcw size={11} style={{verticalAlign:-1}}/></b> untuk reset ke otomatis.</P>
           </Box>
 
           {showKhawista && (
@@ -1162,7 +1162,7 @@ function EditCell({ val, onSave, width=80 }) {
 }
 
 function BpjsCell({ val, overridden, onToggle }) {
-  if(overridden) return <div style={{display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end'}}><span style={{fontSize:9,color:'var(--muted)',textDecoration:'line-through'}}>{rp(val)}</span><button onClick={onToggle} style={{fontSize:9,padding:'1px 5px',borderRadius:4,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.1)',color:'#22C97A',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>↩</button></div>;
+  if(overridden) return <div style={{display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end'}}><span style={{fontSize:9,color:'var(--muted)',textDecoration:'line-through'}}>{rp(val)}</span><button onClick={onToggle} style={{fontSize:9,padding:'1px 5px',borderRadius:4,border:'1px solid rgba(34,201,122,.3)',background:'rgba(34,201,122,.1)',color:'#22C97A',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}><RotateCcw size={10} style={{verticalAlign:-1}}/></button></div>;
   return <div style={{display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end'}}><span style={{color:'#E04545',fontSize:10}}>{rp(val)}</span><button onClick={onToggle} style={{fontSize:8,padding:'1px 4px',borderRadius:4,border:'1px solid rgba(224,69,69,.2)',background:'rgba(224,69,69,.06)',color:'#E04545',cursor:'pointer',opacity:.7,fontFamily:"'Outfit',sans-serif",display:'flex',alignItems:'center'}}><X size={9}/></button></div>;
 }
 
@@ -2036,7 +2036,7 @@ function TabelOvertimeCustom({ tahun, bulan, token, isViewer=false, subGroup='al
                         <button onClick={()=>setField(r.employee_id,'sabtu_hari', r.sabtu_hari_auto)}
                           title="Reset ke otomatis"
                           style={{fontSize:9,padding:'1px 4px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted)',cursor:'pointer',flexShrink:0}}>
-                          ↩
+                          <RotateCcw size={10} style={{verticalAlign:-1}}/>
                         </button>
                       )}
                     </div>
@@ -2065,7 +2065,7 @@ function TabelOvertimeCustom({ tahun, bulan, token, isViewer=false, subGroup='al
                         <button onClick={()=>setField(r.employee_id,'minggu_hari', r.minggu_hari_auto)}
                           title="Reset ke otomatis"
                           style={{fontSize:9,padding:'1px 4px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg3)',color:'var(--muted)',cursor:'pointer',flexShrink:0}}>
-                          ↩
+                          <RotateCcw size={10} style={{verticalAlign:-1}}/>
                         </button>
                       )}
                     </div>

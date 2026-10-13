@@ -6,7 +6,7 @@ import {
   LayoutDashboard, User, Shield, Stethoscope, CreditCard, HardHat,
   ClipboardList, Car, Truck, Calendar, Receipt, Wallet, BookOpen, Bell,
   Settings, X, Loader2, CheckCircle2, XCircle, TriangleAlert,
-  Trash2, LogOut, Menu, Eye, Building2, Check, Target, CalendarDays, HeartHandshake, CircleUser, GraduationCap,
+  Trash2, LogOut, Menu, Eye, Building2, Check, Target, CalendarDays, HeartHandshake, CircleUser, GraduationCap, ChevronDown,
 } from 'lucide-react';
 
 const NAV = [
@@ -300,7 +300,7 @@ function ProjectDropdown({ authUser }) {
         }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: activeColor }} />
         <span style={{ fontSize: 11, fontWeight: 700, color: activeColor }}>{activeLabel}</span>
-        <span style={{ fontSize: 9, color: 'var(--muted)' }}>▼</span>
+        <ChevronDown size={11} color="var(--muted)" />
       </div>
 
       {open && (

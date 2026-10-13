@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import ImportModal from '@/Components/ImportModal';
-import { Settings, X, Check, Plus, Pencil, Save, ClipboardList, Upload, Download, Search, Trash2 } from 'lucide-react';
+import { Settings, X, Check, Plus, Pencil, Save, ClipboardList, Upload, Download, Search, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const CCPM_COLS = [
   { key:'id_card',          label:'NIK / KTP' },
@@ -455,7 +455,7 @@ export default function CcpmIndex({ manpower = { data:[], total:0 }, filters = {
                 style={{
                   padding:'5px 12px', borderRadius:6, fontSize:12, cursor:prevUrl?'pointer':'default',
                   border:'1px solid var(--border)', background:'var(--card)', color:prevUrl?'var(--text)':'var(--muted)',
-                }}>← Prev</button>
+                }}><ChevronLeft size={13} style={{verticalAlign:-2}}/> Prev</button>
 
               {links.map((link, i) => (
                 <button key={i}
@@ -478,7 +478,7 @@ export default function CcpmIndex({ manpower = { data:[], total:0 }, filters = {
                 style={{
                   padding:'5px 12px', borderRadius:6, fontSize:12, cursor:nextUrl?'pointer':'default',
                   border:'1px solid var(--border)', background:'var(--card)', color:nextUrl?'var(--text)':'var(--muted)',
-                }}>Next →</button>
+                }}>Next <ChevronRight size={13} style={{verticalAlign:-2}}/></button>
             </div>
           </div>
         </div>

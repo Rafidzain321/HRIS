@@ -1,7 +1,7 @@
 // resources/js/Pages/SlipGaji/Print.jsx
 import React from 'react';
 import { router } from '@inertiajs/react';
-import { Download, Printer } from 'lucide-react';
+import { Download, Printer, ArrowLeft } from 'lucide-react';
 import { SlipCetak } from '@/Pages/Timesheet/SlipGaji';
 
 const BULAN_NAMA = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -87,7 +87,7 @@ export default function SlipGajiPrint({ slip, periode }) {
       {/* CONTROL BAR */}
       <div className="control-bar">
         <button className="btn-ctrl btn-back" onClick={() => router.visit('/timesheet/slip-gaji')}>
-          ← Kembali
+          <ArrowLeft size={14} style={{verticalAlign:-2}}/> Kembali
         </button>
         <div className="title">
           Slip Gaji — {slip.nama_lengkap} · {periodeLabel}

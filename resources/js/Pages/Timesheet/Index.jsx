@@ -519,7 +519,7 @@ function TambahAnggotaModal({ onClose, availableEmployees = [], projectKode = ''
                                         style={{background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:8,padding:'7px 11px',fontSize:12.5,fontFamily:"'Outfit',sans-serif",outline:'none',width:'100%'}}>
                                         <option value="">— Tidak ada —</option>
                                         {SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()].map(o => (
-                                            <option key={o.value} value={o.value}>{o.emoji} {o.label}</option>
+                                            <option key={o.value} value={o.value}>{o.label}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -635,7 +635,7 @@ function EditAnggotaModal({ member, onClose, projectKode }) {
                             <select style={inp} value={subGroup} onChange={e=>setSubGroup(e.target.value)}>
                               <option value="">— Tidak ada (tampil di semua tab) —</option>
                               {SUB_GROUP_OPTIONS[(projectKode||'').toLowerCase()].map(o => (
-                                <option key={o.value} value={o.value}>{o.emoji} {o.label}</option>
+                                <option key={o.value} value={o.value}>{o.label}</option>
                               ))}
                             </select>
                             {subGroup && (

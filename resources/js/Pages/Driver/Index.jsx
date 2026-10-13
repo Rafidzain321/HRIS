@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { router, usePage } from '@inertiajs/react';
 import ImportModal from '@/Components/ImportModal';
-import { Plus, Pencil, X, Save, Truck, Upload, Download, Search, Check, Trash2 } from 'lucide-react';
+import { Plus, Pencil, X, Save, Truck, Upload, Download, Search, Check, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // ── Helper: strip trailing .0 dari angka yang disimpan sebagai float ──
 function stripDotZero(val) {
@@ -412,7 +412,7 @@ export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filt
             <div style={{fontSize:11,color:'var(--muted)'}}>Menampilkan {data.length} dari {total} driver</div>
             <div style={{display:'flex',gap:4}}>
               <button disabled={!prevUrl} onClick={()=>prevUrl&&router.get(prevUrl)}
-                style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:prevUrl?'var(--text)':'var(--muted)',cursor:prevUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}>← Prev</button>
+                style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:prevUrl?'var(--text)':'var(--muted)',cursor:prevUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}><ChevronLeft size={13} style={{verticalAlign:-2}}/> Prev</button>
               {links.map((l,i) => (
                 <button key={i} disabled={!l.url} onClick={()=>l.url&&router.get(l.url)}
                   style={{padding:'5px 10px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:l.active?'var(--accent)':'var(--card)',color:l.active?'#0C0F14':l.url?'var(--text)':'var(--muted)',cursor:l.url?'pointer':'default',fontFamily:"'Outfit',sans-serif",fontWeight:l.active?700:400}}>
@@ -420,7 +420,7 @@ export default function DriverIndex({ drivers = {data:[],total:0,stats:{}}, filt
                 </button>
               ))}
               <button disabled={!nextUrl} onClick={()=>nextUrl&&router.get(nextUrl)}
-                style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:nextUrl?'var(--text)':'var(--muted)',cursor:nextUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}>Next →</button>
+                style={{padding:'5px 12px',borderRadius:6,fontSize:12,border:'1px solid var(--border)',background:'var(--card)',color:nextUrl?'var(--text)':'var(--muted)',cursor:nextUrl?'pointer':'default',fontFamily:"'Outfit',sans-serif"}}>Next <ChevronRight size={13} style={{verticalAlign:-2}}/></button>
             </div>
           </div>
         </div>
