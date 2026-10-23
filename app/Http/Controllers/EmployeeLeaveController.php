@@ -6,7 +6,10 @@ use App\Models\ActivityLog;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeLeave;
 use App\Models\Holiday;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -210,37 +213,8 @@ class EmployeeLeaveController extends Controller
         if ($jumlahHari < 1) {
             return back()->withErrors(['tanggal_selesai' => 'Rentang tanggal ini tidak mengandung hari kerja (semua akhir pekan/hari libur).']);
         }
-
-        // Pasal 25 PP — Cuti Haji/Umroh cuma 1x seumur bekerja & maksimal 15 hari kerja.
-        if (in_array($data['jenis'], ['cuti_haji', 'cuti_umroh'])) {
-            if (EmployeeLeave::sudahPernahPakai($employeeId, $data['jenis'])) {
-                return back()->withErrors(['jenis' => self::JENIS_LABELS[$data['jenis']] . ' cuma bisa dipakai 1 kali selama karyawan bekerja di perusahaan ini, dan karyawan ini sudah pernah memakainya.']);
-            }
-            if ($jumlahHari > self::MAKS_HAJI_UMROH_HARI) {
-                return back()->withErrors(['tanggal_selesai' => self::JENIS_LABELS[$data['jenis']] . ' maksimal ' . self::MAKS_HAJI_UMROH_HARI . ' hari kerja per pemakaian.']);
-            }
-        }
-
-        // Pasal 27 PP — Izin Tanpa Upah maksimal 5 hari kerja per tahun.
-        if ($data['jenis'] === 'izin_tanpa_upah') {
-            $sudahDipakai = EmployeeLeave::totalHariTahunIni($employeeId, 'izin_tanpa_upah', $tahun);
-            if ($sudahDipakai + $jumlahHari > self::MAKS_IZIN_TANPA_UPAH_TAHUN) {
-                $sisa = max(0, self::MAKS_IZIN_TANPA_UPAH_TAHUN - $sudahDipakai);
-                return back()->withErrors(['tanggal_selesai' => "Izin Tanpa Upah maksimal " . self::MAKS_IZIN_TANPA_UPAH_TAHUN . " hari kerja/tahun. Sisa kuota tahun {$tahun}: {$sisa} hari."]);
-            }
-        }
-
-        // "Cuti Berlebih" — karyawan boleh "meminjam" jatah cuti tahunan tahun depan kalau jatah
-        // tahun ini sudah habis, TAPI totalnya (jatah tahun ini + pinjaman) dibatasi supaya tidak
-        // sampai menembus jatah 2 tahun ke depan sekaligus.
-        if ($data['jenis'] === 'cuti_tahunan') {
-            $jatahEfektifTahunIni = EmployeeLeave::jatahEfektif($employeeId, $tahun, self::JATAH_TAHUNAN, self::MAKS_BAWA_KE_DEPAN);
-            $terpakaiTahunIni = EmployeeLeave::totalHariTahunIni($employeeId, 'cuti_tahunan', $tahun);
-            $batasMaksimal = $jatahEfektifTahunIni + self::MAKS_BAWA_KE_DEPAN; // jatah tahun ini + maks pinjaman dari jatah tahun depan
-            if ($terpakaiTahunIni + $jumlahHari > $batasMaksimal) {
-                $sisaBisaDiambil = max(0, $batasMaksimal - $terpakaiTahunIni);
-                return back()->withErrors(['tanggal_selesai' => "Cuti Tahunan {$tahun} sudah termasuk pinjam dari jatah tahun depan, maksimal {$batasMaksimal} hari (jatah {$jatahEfektifTahunIni} hari + maks pinjam " . self::MAKS_BAWA_KE_DEPAN . " hari). Sisa yang bisa diambil: {$sisaBisaDiambil} hari."]);
-            }
+        if ($error = $this->cekAturan($employeeId, $data['jenis'], $tahun, $jumlahHari)) {
+            return back()->withErrors($error);
         }
 
         $leave = EmployeeLeave::create([
@@ -261,5 +235,153 @@ class EmployeeLeaveController extends Controller
         $leave->delete();
         ActivityLog::record('delete', 'Cuti', $nama, 'Catatan cuti dihapus');
         return back()->with('success', 'Catatan cuti berhasil dihapus.');
+    }
+
+    // Simpan perubahan dari tampilan Grid Bulanan (klik per tanggal). "hapus" diproses dulu
+    // (catatan yang kena dipotong/dipecah), lalu "tambah": tanggal berurutan (cuma dipisah akhir
+    // pekan/libur) dengan jenis sama digabung jadi satu catatan. Semua atau tidak sama sekali.
+    public function grid(Request $request)
+    {
+        $data = $request->validate([
+            'tambah'               => 'array',
+            'tambah.*.employee_id' => 'required|integer',
+            'tambah.*.tanggal'     => 'required|date_format:Y-m-d',
+            'tambah.*.jenis'       => 'required|in:' . implode(',', array_keys(self::JENIS_LABELS)),
+            'hapus'                => 'array',
+            'hapus.*.employee_id'  => 'required|integer',
+            'hapus.*.tanggal'      => 'required|date_format:Y-m-d',
+        ]);
+        $karyawan = $this->karyawanAktifHo()->keyBy('id');
+        $libur    = Holiday::pluck('tanggal')->map(fn ($d) => $d->toDateString())->flip();
+        $hariKerja = fn (Carbon $d) => !$d->isWeekend() && !isset($libur[$d->toDateString()]);
+
+        try {
+            $jumlah = DB::transaction(function () use ($data, $karyawan, $hariKerja) {
+                foreach ($data['hapus'] ?? [] as $h) {
+                    if ($karyawan->has($h['employee_id'])) $this->hapusHari((int) $h['employee_id'], $h['tanggal']);
+                }
+
+                // Kelompokkan tanggal per karyawan+jenis, lalu gabung yang berurutan jadi rentang.
+                $kelompok = [];
+                foreach ($data['tambah'] ?? [] as $t) {
+                    if ($karyawan->has($t['employee_id']) && $hariKerja(Carbon::parse($t['tanggal']))) {
+                        $kelompok[$t['employee_id'] . '|' . $t['jenis']][] = $t['tanggal'];
+                    }
+                }
+                $jumlah = 0;
+                foreach ($kelompok as $kunci => $tanggal) {
+                    [$employeeId, $jenis] = explode('|', $kunci);
+                    sort($tanggal);
+                    $rentang = [];
+                    foreach (array_unique($tanggal) as $tgl) {
+                        $akhir = $rentang ? end($rentang)[1] : null;
+                        $antara = $akhir ? Carbon::parse($akhir)->addDay() : null;
+                        while ($antara && $antara->toDateString() < $tgl && !$hariKerja($antara)) $antara->addDay();
+                        if ($antara && $antara->toDateString() === $tgl) $rentang[count($rentang) - 1][1] = $tgl;
+                        else $rentang[] = [$tgl, $tgl];
+                    }
+
+                    $nama = $karyawan[$employeeId]->nama_lengkap;
+                    foreach ($rentang as [$mulai, $selesai]) {
+                        $bentrok = EmployeeLeave::where('employee_id', $employeeId)
+                            ->where('tanggal_mulai', '<=', $selesai)->where('tanggal_selesai', '>=', $mulai)->exists();
+                        if ($bentrok) {
+                            throw ValidationException::withMessages(['grid' => "{$nama}: tanggal {$mulai} s/d {$selesai} sudah ada catatan cuti/izin lain. Muat ulang halaman."]);
+                        }
+                        $hari = EmployeeLeave::hitungHariKerja($mulai, $selesai);
+                        if ($error = $this->cekAturan((int) $employeeId, $jenis, (int) substr($mulai, 0, 4), $hari)) {
+                            throw ValidationException::withMessages(['grid' => "{$nama}: " . reset($error)]);
+                        }
+                        EmployeeLeave::create([
+                            'employee_id'     => $employeeId,
+                            'jenis'           => $jenis,
+                            'kategori_izin'   => $jenis === 'izin_tanpa_potong' ? 'lainnya' : null,
+                            'tanggal_mulai'   => $mulai,
+                            'tanggal_selesai' => $selesai,
+                            'jumlah_hari'     => $hari,
+                            'dicatat_oleh'    => auth()->user()?->name,
+                        ]);
+                        $jumlah++;
+                    }
+                }
+                return $jumlah;
+            });
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        $tambah = count($data['tambah'] ?? []);
+        $hapus  = count($data['hapus'] ?? []);
+        ActivityLog::record('update', 'Cuti', 'Grid Bulanan', "Input grid: {$tambah} hari ditandai, {$hapus} hari dihapus ({$jumlah} catatan baru)");
+
+        return back()->with('success', 'Perubahan cuti berhasil disimpan.');
+    }
+
+    // Lepas satu tanggal dari catatan cuti yang mencakupnya: hapus/potong ujung/pecah jadi dua.
+    private function hapusHari(int $employeeId, string $tanggal): void
+    {
+        $leave = EmployeeLeave::where('employee_id', $employeeId)
+            ->where('tanggal_mulai', '<=', $tanggal)->where('tanggal_selesai', '>=', $tanggal)->first();
+        if (!$leave) return;
+
+        $mulai   = $leave->tanggal_mulai->toDateString();
+        $selesai = $leave->tanggal_selesai->toDateString();
+        $sebelum = Carbon::parse($tanggal)->subDay()->toDateString();
+        $sesudah = Carbon::parse($tanggal)->addDay()->toDateString();
+
+        $potongan = array_filter([
+            $mulai < $tanggal ? [$mulai, $sebelum] : null,
+            $selesai > $tanggal ? [$sesudah, $selesai] : null,
+        ]);
+        $leave->delete();
+        foreach ($potongan as [$m, $s]) {
+            $hari = EmployeeLeave::hitungHariKerja($m, $s);
+            if ($hari < 1) continue; // sisa potongan cuma akhir pekan/libur
+            // Rapikan ujung yang jatuh di akhir pekan/libur (mis. "6–8 Nov" jadi "6–6 Nov").
+            while (EmployeeLeave::hitungHariKerja($m, $m) === 0) $m = Carbon::parse($m)->addDay()->toDateString();
+            while (EmployeeLeave::hitungHariKerja($s, $s) === 0) $s = Carbon::parse($s)->subDay()->toDateString();
+            EmployeeLeave::create([
+                ...$leave->only(['employee_id', 'jenis', 'kategori_izin', 'keterangan', 'dicatat_oleh']),
+                'tanggal_mulai' => $m, 'tanggal_selesai' => $s, 'jumlah_hari' => $hari,
+            ]);
+        }
+    }
+
+    // Aturan kuota per jenis (dipakai catat cuti biasa & Grid Bulanan). null = lolos, selain itu [field => pesan].
+    private function cekAturan(int $employeeId, string $jenis, int $tahun, int $jumlahHari): ?array
+    {
+        // Pasal 25 PP — Cuti Haji/Umroh cuma 1x seumur bekerja & maksimal 15 hari kerja.
+        if (in_array($jenis, ['cuti_haji', 'cuti_umroh'])) {
+            if (EmployeeLeave::sudahPernahPakai($employeeId, $jenis)) {
+                return ['jenis' => self::JENIS_LABELS[$jenis] . ' cuma bisa dipakai 1 kali selama karyawan bekerja di perusahaan ini, dan karyawan ini sudah pernah memakainya.'];
+            }
+            if ($jumlahHari > self::MAKS_HAJI_UMROH_HARI) {
+                return ['tanggal_selesai' => self::JENIS_LABELS[$jenis] . ' maksimal ' . self::MAKS_HAJI_UMROH_HARI . ' hari kerja per pemakaian.'];
+            }
+        }
+
+        // Pasal 27 PP — Izin Tanpa Upah maksimal 5 hari kerja per tahun.
+        if ($jenis === 'izin_tanpa_upah') {
+            $sudahDipakai = EmployeeLeave::totalHariTahunIni($employeeId, 'izin_tanpa_upah', $tahun);
+            if ($sudahDipakai + $jumlahHari > self::MAKS_IZIN_TANPA_UPAH_TAHUN) {
+                $sisa = max(0, self::MAKS_IZIN_TANPA_UPAH_TAHUN - $sudahDipakai);
+                return ['tanggal_selesai' => "Izin Tanpa Upah maksimal " . self::MAKS_IZIN_TANPA_UPAH_TAHUN . " hari kerja/tahun. Sisa kuota tahun {$tahun}: {$sisa} hari."];
+            }
+        }
+
+        // "Cuti Berlebih" — karyawan boleh "meminjam" jatah cuti tahunan tahun depan kalau jatah
+        // tahun ini sudah habis, TAPI totalnya (jatah tahun ini + pinjaman) dibatasi supaya tidak
+        // sampai menembus jatah 2 tahun ke depan sekaligus.
+        if ($jenis === 'cuti_tahunan') {
+            $jatahEfektifTahunIni = EmployeeLeave::jatahEfektif($employeeId, $tahun, self::JATAH_TAHUNAN, self::MAKS_BAWA_KE_DEPAN);
+            $terpakaiTahunIni = EmployeeLeave::totalHariTahunIni($employeeId, 'cuti_tahunan', $tahun);
+            $batasMaksimal = $jatahEfektifTahunIni + self::MAKS_BAWA_KE_DEPAN; // jatah tahun ini + maks pinjaman dari jatah tahun depan
+            if ($terpakaiTahunIni + $jumlahHari > $batasMaksimal) {
+                $sisaBisaDiambil = max(0, $batasMaksimal - $terpakaiTahunIni);
+                return ['tanggal_selesai' => "Cuti Tahunan {$tahun} sudah termasuk pinjam dari jatah tahun depan, maksimal {$batasMaksimal} hari (jatah {$jatahEfektifTahunIni} hari + maks pinjam " . self::MAKS_BAWA_KE_DEPAN . " hari). Sisa yang bisa diambil: {$sisaBisaDiambil} hari."];
+            }
+        }
+
+        return null;
     }
 }

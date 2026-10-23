@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import AppLayout, { ConfirmModal } from '@/Layouts/AppLayout';
 import { usePage, router } from '@inertiajs/react';
 import {
-  CalendarDays, ClipboardCheck, Plus, Trash2, X, TriangleAlert, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown, Download,
+  CalendarDays, ClipboardCheck, Plus, Trash2, X, TriangleAlert, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown, Download, Save, LayoutGrid, List,
 } from 'lucide-react';
 
 const card = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12 };
@@ -254,6 +254,184 @@ function AddLeaveModal({ employees, defaultEmployeeId, onClose }) {
 }
 
 // ── MAIN ────────────────────────────────────────────────────
+// ── GRID BULANAN: baris = karyawan, kolom = tanggal. Pilih jenis, klik/geser sel untuk tandai;
+// klik sel dengan jenis yang sama untuk hapus. Perubahan dikumpulkan dulu, lalu disimpan sekaligus.
+const KODE_JENIS = { cuti_tahunan: 'C', izin_tanpa_potong: 'I', cuti_haji: 'H', cuti_umroh: 'U', izin_tanpa_upah: 'TU', cuti_bersalin: 'B', cuti_haid: 'HD' };
+const isoOf = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+function GridBulanan({ employees, leaves, holidaysByDate, tahun, jatah, canEdit }) {
+  const now = new Date();
+  const [month, setMonth]   = useState(now.getFullYear() === Number(tahun) ? now.getMonth() : 0);
+  const [jenis, setJenis]   = useState('cuti_tahunan');
+  const [pending, setPending] = useState({}); // { "empId|iso": jenis | null }
+  const [paint, setPaint]   = useState(undefined); // nilai yang sedang "dikuaskan" saat mouse ditahan
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+
+  // Cuti yang sudah tersimpan, dipecah per hari kerja: { "empId|iso": jenis }
+  const existing = {};
+  leaves.forEach(l => {
+    for (let d = new Date(l.tanggal_mulai + 'T00:00:00'); d <= new Date(l.tanggal_selesai + 'T00:00:00'); d.setDate(d.getDate() + 1)) {
+      existing[`${l.employee_id}|${d.toLocaleDateString('en-CA')}`] = l.jenis;
+    }
+  });
+
+  const daysInMonth = new Date(tahun, month + 1, 0).getDate();
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const iso = isoOf(tahun, month, i + 1);
+    const dow = new Date(iso + 'T00:00:00').getDay();
+    return { d: i + 1, iso, dow, libur: dow === 0 || dow === 6 || !!holidaysByDate[iso] };
+  });
+
+  const nilai = key => (key in pending ? pending[key] : existing[key] ?? null);
+  function terapkan(key, val) {
+    setPending(p => {
+      const next = { ...p };
+      if (val === (existing[key] ?? null)) delete next[key]; else next[key] = val;
+      return next;
+    });
+  }
+  function mulai(key) {
+    const val = nilai(key) === jenis ? null : jenis;
+    setPaint(val); terapkan(key, val);
+  }
+  React.useEffect(() => {
+    const up = () => setPaint(undefined);
+    window.addEventListener('mouseup', up);
+    return () => window.removeEventListener('mouseup', up);
+  }, []);
+
+  const jumlahUbah = Object.keys(pending).length;
+  function simpan() {
+    const tambah = [], hapus = [];
+    Object.entries(pending).forEach(([key, val]) => {
+      const [employee_id, tanggal] = key.split('|');
+      if (existing[key]) hapus.push({ employee_id: Number(employee_id), tanggal });
+      if (val) tambah.push({ employee_id: Number(employee_id), tanggal, jenis: val });
+    });
+    setSaving(true); setError('');
+    router.post('/cuti/grid', { tambah, hapus }, {
+      preserveScroll: true,
+      onSuccess: () => setPending({}),
+      onError: err => setError(err.grid || Object.values(err)[0] || 'Gagal menyimpan.'),
+      onFinish: () => setSaving(false),
+    });
+  }
+
+  // Sisa cuti tahunan ikut berubah sesuai perubahan yang belum disimpan.
+  const terpakai = {};
+  leaves.forEach(l => { if (l.jenis === 'cuti_tahunan') terpakai[l.employee_id] = (terpakai[l.employee_id] || 0) + l.jumlah_hari; });
+  Object.entries(pending).forEach(([key, val]) => {
+    const empId = key.split('|')[0];
+    if (existing[key] === 'cuti_tahunan') terpakai[empId] = (terpakai[empId] || 0) - 1;
+    if (val === 'cuti_tahunan') terpakai[empId] = (terpakai[empId] || 0) + 1;
+  });
+
+  const q = search.trim().toLowerCase();
+  const rows = employees.filter(e => !q || e.nama_lengkap.toLowerCase().includes(q) || e.jabatan.toLowerCase().includes(q));
+  const cellW = 26;
+
+  return (
+    <div style={{ ...card, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button onClick={() => setMonth(m => Math.max(0, m - 1))} disabled={month === 0} style={{ ...inp, width: 'auto', padding: '6px 8px', cursor: 'pointer' }}><ChevronLeft size={14} /></button>
+          <div style={{ minWidth: 120, textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{MONTH_NAMES[month]} {tahun}</div>
+          <button onClick={() => setMonth(m => Math.min(11, m + 1))} disabled={month === 11} style={{ ...inp, width: 'auto', padding: '6px 8px', cursor: 'pointer' }}><ChevronRight size={14} /></button>
+        </div>
+        <div style={{ position: 'relative', width: 220 }}>
+          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', display: 'flex' }}><Search size={13} /></span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama / jabatan..." style={{ ...inp, paddingLeft: 30 }} />
+        </div>
+        {canEdit && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Tandai sebagai</span>
+            <select value={jenis} onChange={e => setJenis(e.target.value)} style={{ ...inp, width: 'auto' }}>
+              {Object.entries(JENIS_META).map(([k, m]) => <option key={k} value={k}>{KODE_JENIS[k]} — {m.label}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '8px 16px', borderBottom: '1px solid var(--border)', fontSize: 10.5, color: 'var(--muted2)' }}>
+        {Object.entries(JENIS_META).map(([k, m]) => (
+          <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ minWidth: 18, textAlign: 'center', fontWeight: 700, borderRadius: 4, padding: '0 3px', background: m.bg, color: m.color }}>{KODE_JENIS[k]}</span>{m.label}
+          </span>
+        ))}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 18, height: 12, borderRadius: 3, background: 'var(--bg3)' }} />Sabtu/Minggu/Libur</span>
+      </div>
+
+      <div style={{ overflowX: 'auto', userSelect: 'none' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead>
+            <tr style={{ background: 'var(--bg3)' }}>
+              <th style={{ position: 'sticky', left: 0, zIndex: 2, background: 'var(--bg3)', textAlign: 'left', padding: '6px 12px', minWidth: 180, fontSize: 11, color: 'var(--muted)' }}>Karyawan</th>
+              {days.map(x => (
+                <th key={x.d} title={holidaysByDate[x.iso]?.keterangan} style={{ width: cellW, minWidth: cellW, padding: '4px 0', textAlign: 'center', fontSize: 10, color: x.libur ? '#E04545' : 'var(--muted)' }}>
+                  {x.d}<div style={{ fontSize: 8.5, fontWeight: 400 }}>{DOW[x.dow].slice(0, 2)}</div>
+                </th>
+              ))}
+              <th style={{ padding: '6px 10px', fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>Sisa</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan={days.length + 2} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Tidak ada karyawan.</td></tr>}
+            {rows.map(e => {
+              const sisa = (e.jatah_efektif ?? jatah) - (terpakai[e.id] || 0);
+              return (
+                <tr key={e.id} style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ position: 'sticky', left: 0, zIndex: 1, background: 'var(--card)', padding: '5px 12px', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontWeight: 600, fontSize: 12 }}>{e.nama_lengkap}</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>{e.jabatan}</div>
+                  </td>
+                  {days.map(x => {
+                    const key = `${e.id}|${x.iso}`;
+                    const v = nilai(key);
+                    const meta = v ? JENIS_META[v] : null;
+                    const berubah = key in pending;
+                    const bisa = canEdit && !x.libur;
+                    return (
+                      <td key={x.d}
+                        onMouseDown={() => bisa && mulai(key)}
+                        onMouseEnter={() => bisa && paint !== undefined && terapkan(key, paint)}
+                        style={{
+                          width: cellW, height: 30, padding: 0, textAlign: 'center', fontWeight: 700, fontSize: 10,
+                          borderLeft: '1px solid var(--border)', cursor: bisa ? 'pointer' : 'default',
+                          background: x.libur ? 'var(--bg3)' : meta ? meta.bg : 'transparent', color: meta?.color,
+                          outline: berubah ? '2px dashed var(--accent)' : 'none', outlineOffset: -3,
+                        }}>
+                        {meta ? KODE_JENIS[v] : ''}
+                      </td>
+                    );
+                  })}
+                  <td style={{ padding: '5px 10px', textAlign: 'center', fontWeight: 700, color: sisa <= 0 ? '#E04545' : sisa <= 3 ? '#E8A020' : '#22C97A' }}>{sisa}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {canEdit && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '10px 16px', borderTop: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 11.5, color: jumlahUbah ? 'var(--accent)' : 'var(--muted)' }}>
+            {jumlahUbah ? `${jumlahUbah} perubahan belum disimpan (bergaris putus-putus)` : 'Klik atau tahan & geser di sel tanggal untuk menandai. Klik lagi untuk menghapus.'}
+          </span>
+          {error && <span style={{ fontSize: 11.5, color: '#E04545', display: 'flex', alignItems: 'center', gap: 5 }}><TriangleAlert size={13} /> {error}</span>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button disabled={!jumlahUbah || saving} onClick={() => { setPending({}); setError(''); }} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted2)', fontSize: 12, cursor: jumlahUbah ? 'pointer' : 'not-allowed', fontFamily: "'Outfit',sans-serif" }}>Batal</button>
+            <button disabled={!jumlahUbah || saving} onClick={simpan} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#E8A020,#A06010)', color: '#0C0F14', fontSize: 12, fontWeight: 700, cursor: jumlahUbah ? 'pointer' : 'not-allowed', opacity: jumlahUbah ? 1 : .55, fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
+              {saving ? <Loader2 size={14} style={{ animation: 'spin .8s linear infinite' }} /> : <Save size={14} />} Simpan
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CutiIndex({ employees = [], leaves = [], holidays = [], tahun, jatah }) {
   const { auth } = usePage().props;
   const canEdit = (auth?.user?.permissions || []).includes('edit-cuti');
@@ -268,6 +446,7 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10); // 10 | 25 | 50 | 'all'
+  const [view, setView] = useState('grid'); // 'grid' = Grid Bulanan, 'per' = Per Karyawan
 
   const holidaysByDate = {};
   holidays.forEach(h => { holidaysByDate[h.tanggal] = h; });
@@ -351,6 +530,11 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Jatah {jatah} hari kerja / tahun / karyawan</span>
+          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginLeft: 6 }}>
+            {[['grid', LayoutGrid, 'Grid Bulanan'], ['per', List, 'Per Karyawan']].map(([k, Icon, label]) => (
+              <button key={k} onClick={() => setView(k)} style={{ padding: '7px 12px', border: 'none', background: view === k ? 'rgba(232,160,32,.15)' : 'var(--bg3)', color: view === k ? 'var(--accent)' : 'var(--muted2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 5 }}><Icon size={13} /> {label}</button>
+            ))}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <a href={`/cuti/export?tahun=${tahun}`} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(58,143,224,.3)', background: 'rgba(58,143,224,.08)', color: 'var(--blue)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}><Download size={14} /> Export Excel</a>
@@ -360,7 +544,9 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
+      {view === 'grid' && <GridBulanan employees={employees} leaves={leaves} holidaysByDate={holidaysByDate} tahun={tahun} jatah={jatah} canEdit={canEdit} />}
+
+      {view === 'per' && <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
         <div style={{ ...card, overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', maxWidth: 280, flex: 1 }}>
@@ -469,7 +655,7 @@ export default function CutiIndex({ employees = [], leaves = [], holidays = [], 
             </div>
           </div>
         </div>
-      </div>
+      </div>}
     </AppLayout>
   );
 }

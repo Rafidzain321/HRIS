@@ -227,7 +227,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/cuti', [EmployeeLeaveController::class, 'index'])->middleware('menu:cuti,view')->name('cuti');
     Route::get('/cuti/export', [EmployeeLeaveController::class, 'export'])->middleware('menu:cuti,view')->name('cuti.export');
     Route::post('/cuti', [EmployeeLeaveController::class, 'store'])->middleware('menu:cuti,edit')->name('cuti.store');
-    Route::delete('/cuti/{leave}', [EmployeeLeaveController::class, 'destroy'])->middleware('menu:cuti,edit')->name('cuti.destroy');
+    Route::post('/cuti/grid', [EmployeeLeaveController::class, 'grid'])->middleware('menu:cuti,edit')->name('cuti.grid');
+    Route::delete('/cuti/{leave}',[EmployeeLeaveController::class, 'destroy'])->middleware('menu:cuti,edit')->name('cuti.destroy');
 
     // ── Kehadiran (rekap bulanan, khusus Head Office, HR yang input) ──
     Route::get('/kehadiran', [EmployeeAttendanceController::class, 'index'])->middleware('menu:kehadiran,view')->name('kehadiran');
