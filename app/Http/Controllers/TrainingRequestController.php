@@ -118,7 +118,7 @@ class TrainingRequestController extends Controller
             $trainingRequest->employees()->sync($data['employee_ids']);
         });
 
-        ActivityLog::record('update', 'Pengajuan Training', $trainingRequest->nama_training, "Ubah pengajuan training \"{$trainingRequest->nama_training}\"");
+        ActivityLog::record('update', 'Pengajuan Training', $trainingRequest->nama_training, "Ubah pengajuan training \"{$trainingRequest->nama_training}\"" . ActivityLog::rincian($trainingRequest));
         return back()->with('success', 'Pengajuan training berhasil diperbarui.');
     }
 

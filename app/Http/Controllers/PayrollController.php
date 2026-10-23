@@ -874,7 +874,7 @@ class PayrollController extends Controller
             );
         }
 
-        ActivityLog::record('update', 'Data Gaji', $employee->nama_lengkap, "Update data karyawan dari Data Gaji: {$employee->nama_lengkap}");
+        ActivityLog::record('update', 'Data Gaji', $employee->nama_lengkap, "Update data karyawan dari Data Gaji: {$employee->nama_lengkap}" . ActivityLog::rincian($employee));
 
         return response()->json(['ok' => true]);
     }

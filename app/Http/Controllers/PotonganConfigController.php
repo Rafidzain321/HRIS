@@ -29,7 +29,7 @@ class PotonganConfigController extends Controller
         ]);
 
         $item->update($data);
-        ActivityLog::record('update', 'Konfigurasi Potongan', $item->label, "Update item potongan: {$item->label}");
+        ActivityLog::record('update', 'Konfigurasi Potongan', $item->label, "Update item potongan: {$item->label}" . ActivityLog::rincian($item));
         return response()->json(['ok' => true]);
     }
 

@@ -147,7 +147,7 @@ class TrainingController extends Controller
             return response()->json(['message' => 'Karyawan sudah terminated, data hanya bisa dilihat.'], 403);
         }
         $training->update($request->validate(self::TRAINING_RULES));
-        ActivityLog::record('update', 'Training', $training->employee?->nama_lengkap, "Update training: {$training->trainingType?->nama}");
+        ActivityLog::record('update', 'Training', $training->employee?->nama_lengkap, "Update training: {$training->trainingType?->nama}" . ActivityLog::rincian($training));
         return response()->json(['message' => 'Training berhasil diperbarui.']);
     }
 
@@ -191,6 +191,7 @@ class TrainingController extends Controller
         $berubah = (string) $oldMasaBerlaku !== (string) $newMasaBerlaku;
 
         $trainingType->update([...$data, 'has_expired' => isset($data['masa_berlaku_tahun'])]);
+        $rincian = ActivityLog::rincian($trainingType, ['masa_berlaku_tahun', 'has_expired']);
 
         // Masa berlaku berubah -> hitung ulang expired_date semua training jenis ini
         // (tanggal training + masa berlaku; kosong = seumur hidup).
@@ -204,7 +205,7 @@ class TrainingController extends Controller
         }
 
         ActivityLog::record('update', 'Jenis Training', $trainingType->nama,
-            "Update jenis training: {$trainingType->nama}" .
+            "Update jenis training: {$trainingType->nama}" . $rincian .
             ($berubah ? " | Masa berlaku: {$oldMasaBerlaku} → {$newMasaBerlaku} tahun ({$trainings->count()} record diperbarui)" : "")
         );
 

@@ -397,25 +397,6 @@ class EmployeeController extends Controller
             ...self::CLIENT_PROJECT_RULES,
         ]);
 
-        // Field penting yang perubahannya dicatat detail di log aktivitas.
-        $watchFields = [
-            'no_rekening'  => 'No. Rekening',
-            'expired_sim'  => 'Expired SIM',
-            'exp_mcu'      => 'Expired MCU',
-            'expire_badge' => 'Expired Badge',
-            'position_id'  => 'Jabatan',
-            'ptkp'         => 'PTKP',
-            'status_mcu'   => 'Status MCU',
-        ];
-        $changed = [];
-        foreach ($watchFields as $field => $label) {
-            $old = $employee->$field instanceof Carbon ? $employee->$field->format('Y-m-d') : $employee->$field;
-            $new = $data[$field] ?? null;
-            if ((string) $old !== (string) $new) {
-                $changed[] = "{$label}: {$old} -> {$new}";
-            }
-        }
-
         $hoDetailData     = $data['ho_detail'] ?? null;
         $clientProjectIds = $data['client_project_ids'] ?? null;
         unset($data['ho_detail'], $data['client_project_ids']);
@@ -431,6 +412,7 @@ class EmployeeController extends Controller
         }
 
         $employee->update($data);
+        $rincian = ActivityLog::rincian($employee);
 
         // null = field tidak dikirim -> project tidak diubah; [] = dikosongkan.
         if ($clientProjectIds !== null) {
@@ -440,17 +422,18 @@ class EmployeeController extends Controller
                     ->orWhereIn('id', $employee->clientProjects()->pluck('client_projects.id')))
                 ->pluck('id')->all();
             $clientProjectIds = array_values(array_intersect(array_map('intval', $clientProjectIds), $boleh));
+            $cpLama = $employee->clientProjects()->orderBy('kode')->pluck('kode')->implode(', ');
             $employee->clientProjects()->sync($clientProjectIds);
+            $cpBaru = $employee->clientProjects()->orderBy('kode')->pluck('kode')->implode(', ');
+            if ($cpLama !== $cpBaru) $rincian .= ($rincian ? ', ' : ' | ') . "Data Project: " . ($cpLama ?: '(kosong)') . " → " . ($cpBaru ?: '(kosong)');
         }
 
         if ($isHoProject && $hoDetailData) {
-            EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], $hoDetailData);
+            $ho = EmployeeHoDetail::updateOrCreate(['employee_id' => $employee->id], $hoDetailData);
+            if ($hoRincian = ActivityLog::rincian($ho, ['employee_id'])) $rincian .= ($rincian ? ', ' : ' | ') . 'Detail HO: ' . substr($hoRincian, 3);
         }
 
-        $desc = "Update data karyawan: {$employee->nama_lengkap} ({$employee->id_badge})";
-        if ($changed) {
-            $desc .= ' | ' . implode(', ', $changed);
-        }
+        $desc = "Update data karyawan: {$employee->nama_lengkap} ({$employee->id_badge})" . $rincian;
         ActivityLog::record('update', 'Karyawan', $employee->nama_lengkap, $desc);
 
         return redirect()->route('employees.index')

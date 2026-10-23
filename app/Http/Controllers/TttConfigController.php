@@ -57,7 +57,7 @@ class TttConfigController extends Controller
         ]);
 
         $item->update($data);
-        ActivityLog::record('update', 'Konfigurasi TTT', $item->label, "Update item TTT: {$item->label}");
+        ActivityLog::record('update', 'Konfigurasi TTT', $item->label, "Update item TTT: {$item->label}" . ActivityLog::rincian($item));
         return response()->json(['ok' => true]);
     }
 

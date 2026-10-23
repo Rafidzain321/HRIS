@@ -60,7 +60,7 @@ class AkunController extends Controller
 
         $user->update($data);
         $ket = 'Ubah ' . implode(' & ', array_map(fn($f) => self::LABEL_FIELD[$f], $berubah));
-        if (in_array('email', $berubah)) $ket .= " (email: {$lama['email']} -> {$data['email']})";
+        $ket .= ActivityLog::rincian($user);
         ActivityLog::record('update', 'Akun', $user->name, $ket);
         return back()->with('success', in_array('email', $berubah)
             ? "Akun berhasil diperbarui. Login berikutnya pakai email {$data['email']}."

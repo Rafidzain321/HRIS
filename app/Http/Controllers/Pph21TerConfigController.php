@@ -54,11 +54,12 @@ class Pph21TerConfigController extends Controller
         ]);
 
         $bracket->update($data);
+        $rincian = ActivityLog::rincian($bracket);
         $this->resortKategori($bracket->kategori);
         \App\Support\Pph21Ter::clearCache();
 
         ActivityLog::record('update', 'Konfigurasi PPh21 (TER)', "Kategori {$bracket->kategori}",
-            'Batas atas ' . ($data['batas_atas'] !== null ? number_format($data['batas_atas'], 0, ',', '.') : 'tak terhingga') . ", tarif {$data['tarif_persen']}%");
+            'Batas atas ' . ($data['batas_atas'] !== null ? number_format($data['batas_atas'], 0, ',', '.') : 'tak terhingga') . ", tarif {$data['tarif_persen']}%" . $rincian);
 
         return response()->json(['ok' => true]);
     }

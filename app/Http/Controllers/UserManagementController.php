@@ -201,10 +201,11 @@ class UserManagementController extends Controller
                 ? ['password' => Hash::make($data['password'])]
                 : []),
         ]);
+        $rincian = ActivityLog::rincian($user, ['project_ids', 'full_edit_project_ids']);
         $user->syncRoles([$data['role']]);
         $user->syncPermissions($data['role'] === 'super-admin' ? [] : $this->permissionNames($data['permissions'] ?? []));
 
-        ActivityLog::record('update', 'User', $user->name, "Data user diperbarui");
+        ActivityLog::record('update', 'User', $user->name, "Data user diperbarui (role: {$data['role']})" . $rincian);
         return back()->with('success', "User {$user->name} berhasil diperbarui.");
     }
 

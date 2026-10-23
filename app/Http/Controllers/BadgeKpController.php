@@ -79,7 +79,7 @@ class BadgeKpController extends Controller
             'rfid'         => 'nullable|string|max:50',
         ]);
         $employee->update($data);
-        ActivityLog::record('update', 'Badge/KP', $employee->nama_lengkap, "Update Badge/KP: {$employee->nama_lengkap}");
+        ActivityLog::record('update', 'Badge/KP', $employee->nama_lengkap, "Update Badge/KP: {$employee->nama_lengkap}" . ActivityLog::rincian($employee));
         return back()->with('success', "Badge/KP {$employee->nama_lengkap} berhasil diperbarui.");
     }
 }

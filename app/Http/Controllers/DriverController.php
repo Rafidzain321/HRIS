@@ -125,7 +125,7 @@ class DriverController extends Controller
         }
 
         $driver->update($this->castStringFields($request->validate(self::RULES)));
-        ActivityLog::record('update', 'Driver', $driver->name, "Update data driver: {$driver->name}");
+        ActivityLog::record('update', 'Driver', $driver->name, "Update data driver: {$driver->name}" . ActivityLog::rincian($driver));
         return redirect()->route('driver')->with('success', "Data {$driver->name} diperbarui.");
     }
 

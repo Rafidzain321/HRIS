@@ -451,7 +451,7 @@ class EmployeeKpiController extends Controller
         ]);
 
         $criteria->update($data);
-        ActivityLog::record('update', 'Kriteria KPI', $criteria->employee?->nama_lengkap, "Ubah teks kriteria menjadi: {$data['deskripsi']}");
+        ActivityLog::record('update', 'Kriteria KPI', $criteria->employee?->nama_lengkap, "Ubah teks kriteria" . ActivityLog::rincian($criteria));
 
         return back()->with('success', 'Kriteria berhasil diperbarui.');
     }

@@ -134,7 +134,7 @@ class EquipmentController extends Controller
         if ($this->isViewer()) return back()->with('error', 'Viewer tidak memiliki akses.');
 
         $equipment->update($request->validate($this->unitRules("required|string|max:30|unique:equipments,no_unit,{$equipment->id}")));
-        ActivityLog::record('update', 'Equipment', $equipment->no_unit, "Update unit equipment: {$equipment->no_unit}");
+        ActivityLog::record('update', 'Equipment', $equipment->no_unit, "Update unit equipment: {$equipment->no_unit}" . ActivityLog::rincian($equipment));
         return redirect()->route('equipment')->with('success', "Unit {$equipment->no_unit} berhasil diperbarui.");
     }
 
@@ -208,7 +208,7 @@ class EquipmentController extends Controller
         if ($this->isViewer()) return back()->with('error', 'Viewer tidak memiliki akses.');
 
         $operator->update($request->validate(self::OPERATOR_RULES));
-        ActivityLog::record('update', 'Equipment', $operator->operator_name, "Update data operator: {$operator->operator_name}");
+        ActivityLog::record('update', 'Equipment', $operator->operator_name, "Update data operator: {$operator->operator_name}" . ActivityLog::rincian($operator));
         return redirect()->route('equipment')->with('success', "Data operator {$operator->operator_name} berhasil diperbarui.");
     }
 

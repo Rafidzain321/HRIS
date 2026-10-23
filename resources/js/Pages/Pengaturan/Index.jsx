@@ -1307,7 +1307,7 @@ export default function PengaturanIndex({ users=[], roles=[], projects=[], posit
                         <td style={{fontSize:12,color:'var(--muted2)'}}>{l.module}</td>
                         <td style={{fontSize:12}}>{l.target_name||'—'}</td>
                         <td title={l.description||''}
-                          style={{fontSize:11.5,color:'var(--muted)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'default'}}>
+                          style={{fontSize:11.5,color:'var(--muted)',minWidth:240,maxWidth:480,whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.45,cursor:'default'}}>
                           {l.description||'—'}
                         </td>
                         <td style={{fontSize:11,fontFamily:'monospace',color:'var(--muted2)'}}>{l.ip_address||'—'}</td>

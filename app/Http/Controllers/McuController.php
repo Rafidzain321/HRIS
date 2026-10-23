@@ -65,7 +65,7 @@ class McuController extends Controller
             'derajat_kesehatan' => 'nullable|string|max:50',
         ]);
         $employee->update($data);
-        ActivityLog::record('update', 'MCU', $employee->nama_lengkap, "Update MCU: {$employee->nama_lengkap}");
+        ActivityLog::record('update', 'MCU', $employee->nama_lengkap, "Update MCU: {$employee->nama_lengkap}" . ActivityLog::rincian($employee));
         return back()->with('success', "MCU {$employee->nama_lengkap} berhasil diperbarui.");
     }
 

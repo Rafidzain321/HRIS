@@ -65,7 +65,7 @@ class SimController extends Controller
             'rfid'            => 'nullable|string|max:50',
         ]);
         $employee->update($data);
-        ActivityLog::record('update', 'SIM', $employee->nama_lengkap, "Update SIM: {$employee->nama_lengkap}");
+        ActivityLog::record('update', 'SIM', $employee->nama_lengkap, "Update SIM: {$employee->nama_lengkap}" . ActivityLog::rincian($employee));
         return back()->with('success', "SIM {$employee->nama_lengkap} berhasil diperbarui.");
     }
 }

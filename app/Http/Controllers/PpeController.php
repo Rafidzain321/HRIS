@@ -84,8 +84,8 @@ class PpeController extends Controller
             'tgl_ear_plug_2'  => 'nullable|date',
             'catatan'         => 'nullable|string|max:500',
         ]);
-        Ppe::updateOrCreate(['employee_id' => $employee->id], $data);
-        ActivityLog::record('update', 'PPE', $employee->nama_lengkap, "Update PPE: {$employee->nama_lengkap}");
+        $ppe = Ppe::updateOrCreate(['employee_id' => $employee->id], $data);
+        ActivityLog::record('update', 'PPE', $employee->nama_lengkap, "Update PPE: {$employee->nama_lengkap}" . ActivityLog::rincian($ppe));
         return back()->with('success', "PPE {$employee->nama_lengkap} berhasil diperbarui.");
     }
 

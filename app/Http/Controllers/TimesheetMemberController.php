@@ -147,7 +147,7 @@ class TimesheetMemberController extends Controller
         $member->update($request->only(['nama_override', 'urutan', 'aktif', 'tipe', 'sub_group', 'kelompok']));
 
         $nama = $member->nama_override ?? $member->employee?->nama_lengkap ?? $member->id_badge;
-        ActivityLog::record('update', 'Timesheet', $nama, "Update anggota timesheet: {$nama}");
+        ActivityLog::record('update', 'Timesheet', $nama, "Update anggota timesheet: {$nama}" . ActivityLog::rincian($member));
 
         return back()->with('success', 'Data diperbarui.');
     }

@@ -107,7 +107,7 @@ class CcpmController extends Controller
         }
 
         $ccpm->update($request->validate(self::RULES));
-        ActivityLog::record('update', 'CCPM', $ccpm->name, "Edit manpower CCPM: {$ccpm->name}");
+        ActivityLog::record('update', 'CCPM', $ccpm->name, "Edit manpower CCPM: {$ccpm->name}" . ActivityLog::rincian($ccpm));
         return redirect()->route('ccpm')->with('success', "Data {$ccpm->name} berhasil diperbarui.");
     }
 
