@@ -81,7 +81,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/employees/{employee}/pindah-unit-ho', [EmployeeController::class, 'pindahUnitHo'])->middleware('menu:karyawan,edit')->name('employees.pindah-unit-ho');
 
     Route::resource('employees', EmployeeController::class)->only(['index', 'show'])->middleware('menu:karyawan,view');
-    Route::resource('employees', EmployeeController::class)->only(['create', 'store', 'edit', 'update', 'destroy'])->middleware('menu:karyawan,edit');
+    Route::resource('employees', EmployeeController::class)->only(['store', 'edit', 'update', 'destroy'])->middleware('menu:karyawan,edit');
 
     Route::prefix('compliance')->name('compliance.')->group(function () {
         Route::get('/ppe', [PpeController::class, 'index'])->middleware('menu:ppe,view')->name('ppe');

@@ -551,6 +551,50 @@ class EmployeeController extends Controller
             ->with('success', "{$employee->nama_lengkap} berhasil di-terminate ({$data['alasan_keluar']}).");
     }
 
+    // Arsip Terminated → Edit: ubah tanggal/alasan/catatan keluar karyawan yang sudah terminated.
+    // Riwayat Keluar (log terminasi terakhir) ikut disamakan supaya tidak beda dengan data karyawan.
+    public function terminateUpdate(Request $request, Employee $employee)
+    {
+        if ($this->isViewer()) {
+            return back()->with('error', 'Viewer tidak memiliki akses untuk mengubah data.');
+        }
+        if ($employee->status !== 'NONAKTIF') {
+            return back()->with('error', 'Karyawan ini tidak berstatus terminated.');
+        }
+
+        $data = $request->validate([
+            'tanggal_keluar' => 'required|date',
+            'alasan_keluar'  => 'required|in:RESIGN,PHK,KONTRAK HABIS,MENINGGAL DUNIA,MUTASI,LAINNYA',
+            'catatan_keluar' => 'nullable|string|max:500',
+        ]);
+        $keluar = [
+            'tanggal_keluar' => $data['tanggal_keluar'],
+            'alasan_keluar'  => $data['alasan_keluar'],
+            'catatan_keluar' => $data['catatan_keluar'] ?? null,
+        ];
+
+        $employee->update($keluar);
+        $rincian = ActivityLog::rincian($employee);
+
+        $log = EmployeeTerminationLog::where('employee_id', $employee->id)->latest('id')->first();
+        $log ? $log->update($keluar) : EmployeeTerminationLog::create([
+            'employee_id'  => $employee->id,
+            ...$keluar,
+            'dicatat_oleh' => auth()->user()->name ?? 'System',
+        ]);
+
+        ActivityLog::record('update', 'Karyawan', $employee->nama_lengkap,
+            "Edit data keluar {$employee->nama_lengkap} ({$employee->id_badge})" . ($rincian ?: ' | tidak ada perubahan')
+        );
+
+        // Sama seperti terminate: keluar di bulan sebelumnya -> hilang dari timesheet.
+        if (Carbon::parse($data['tanggal_keluar'])->format('Y-m') < Carbon::today()->format('Y-m')) {
+            TimesheetMember::where('id_badge', $employee->id_badge)->update(['aktif' => false]);
+        }
+
+        return back()->with('success', "Data keluar {$employee->nama_lengkap} berhasil diperbarui.");
+    }
+
     public function checkBadge(Request $request)
     {
         $exclude = $request->get('exclude');
