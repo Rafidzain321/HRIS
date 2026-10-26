@@ -60,6 +60,9 @@ class PpeController extends Controller
 
     public function update(Request $request, Employee $employee)
     {
+        if ($employee->status === 'NONAKTIF') {
+            return back()->with('error', 'Karyawan sudah terminated, data hanya bisa dilihat.');
+        }
         $data = $request->validate([
             'frc'             => 'nullable|string|max:10',
             'safety_shoes'    => 'nullable|string|max:10',

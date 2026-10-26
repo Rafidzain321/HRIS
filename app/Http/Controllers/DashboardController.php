@@ -244,7 +244,13 @@ class DashboardController extends Controller
         // ── Chart 2: Total Pengeluaran Gaji 12 Bulan Terakhir ──
         $namaBulan = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 
-        $projectsMap = \App\Models\Project::whereIn('id', $visibleProjectIds)
+        // Gaji kantor HO cuma boleh dilihat super-admin (menu gaji HO juga tidak tampil untuk user lain),
+        // dan user dengan restrict_payroll tidak melihat grafik gaji sama sekali.
+        $gajiProjectIds = $user->restrict_payroll ? [] : ($user->hasRole('super-admin')
+            ? $visibleProjectIds
+            : array_values(array_diff($visibleProjectIds, \App\Models\Project::where('tipe_gaji', 'ho')->pluck('id')->all())));
+
+        $projectsMap = \App\Models\Project::whereIn('id', $gajiProjectIds)
             ->pluck('kode', 'id');
 
         $startDate = \Carbon\Carbon::now()->subMonths(11)->startOfMonth();
@@ -252,7 +258,7 @@ class DashboardController extends Controller
 
         $rawGaji = \App\Models\EmployeePayroll::query()
             ->join('employees', 'employees.id', '=', 'employee_payroll.employee_id')
-            ->whereIn('employees.project_id', $visibleProjectIds)
+            ->whereIn('employees.project_id', $gajiProjectIds)
             ->whereRaw('(employee_payroll.tahun * 100 + employee_payroll.bulan) >= ?', [$startKey])
             ->groupBy('employee_payroll.tahun', 'employee_payroll.bulan', 'employees.project_id')
             ->selectRaw('
@@ -283,7 +289,7 @@ class DashboardController extends Controller
                 'total' => 0,
             ];
 
-            foreach ($visibleProjectIds as $pid) {
+            foreach ($gajiProjectIds as $pid) {
                 $kode = $projectsMap[$pid] ?? "Project{$pid}";
 
                 if (isset($gajiIndex[$key][$pid])) {

@@ -57,6 +57,9 @@ class McuController extends Controller
 
     public function update(Request $request, Employee $employee)
     {
+        if ($employee->status === 'NONAKTIF') {
+            return back()->with('error', 'Karyawan sudah terminated, data hanya bisa dilihat.');
+        }
         $data = $request->validate([
             'tgl_mcu'           => 'nullable|date',
             'exp_mcu'           => 'nullable|date',

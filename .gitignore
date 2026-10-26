@@ -27,3 +27,5 @@ Thumbs.db
 /.agents/
 /.claude/
 /CLAUDE.md
+# Dump database production (berisi data pribadi & kredensial) — jangan di-commit
+/database/production/

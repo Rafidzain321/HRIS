@@ -296,7 +296,7 @@ export default function Dashboard({
       </div>
 
       {/* ROW: JABATAN (compact) + MASA KERJA + PENGELUARAN GAJI — 3 kolom sejajar, biar ga ada kolom yang kosong melompong */}
-      <div className="dash-grid-3" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1.4fr',gap:16,alignItems:'stretch'}}>
+      <div className="dash-grid-3" style={{display:'grid',gridTemplateColumns:projectKeys.length?'1fr 1fr 1.4fr':'1fr 1fr',gap:16,alignItems:'stretch'}}>
         {/* ── Komposisi Jabatan — compact: 1 stacked bar + legend list ── */}
         <div className="panel" style={{display:'flex',flexDirection:'column'}}>
           <div className="panel-head">
@@ -334,8 +334,8 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* ── PANEL BARU: Pengeluaran Gaji 12 Bulan ── */}
-        <div className="panel" style={{display:'flex',flexDirection:'column'}}>
+        {/* ── PANEL BARU: Pengeluaran Gaji 12 Bulan ── (disembunyikan kalau tidak ada kantor yang gajinya boleh dilihat) */}
+        {projectKeys.length > 0 && <div className="panel" style={{display:'flex',flexDirection:'column'}}>
           <div className="panel-head">
             <div className="panel-title">
               Pengeluaran Gaji 12 Bulan Terakhir
@@ -352,7 +352,7 @@ export default function Dashboard({
                 height="100%"
             />
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* ── PANEL BARU: Contract & Probation Reminder ── */}

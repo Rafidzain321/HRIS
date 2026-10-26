@@ -57,6 +57,9 @@ class SimController extends Controller
 
     public function update(Request $request, Employee $employee)
     {
+        if ($employee->status === 'NONAKTIF') {
+            return back()->with('error', 'Karyawan sudah terminated, data hanya bisa dilihat.');
+        }
         $data = $request->validate([
             'type_sim'        => 'nullable|string|max:10',
             'no_sim'          => 'nullable|string|max:30',

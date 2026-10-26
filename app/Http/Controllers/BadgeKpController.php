@@ -72,6 +72,9 @@ class BadgeKpController extends Controller
 
     public function update(Request $request, Employee $employee)
     {
+        if ($employee->status === 'NONAKTIF') {
+            return back()->with('error', 'Karyawan sudah terminated, data hanya bisa dilihat.');
+        }
         $data = $request->validate([
             'expire_badge' => 'nullable|date',
             'status_kp'    => 'nullable|string|max:100',
